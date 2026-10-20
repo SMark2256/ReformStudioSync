@@ -9,7 +9,7 @@ export const App: React.FC = () => {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Navigate to="/reception" replace />} />
+        <Route path="/" element={<Navigate to="/login" replace />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/reception" element={<ReceptionPage />} />
         <Route path="/monitor" element={<MonitorPage />} />
