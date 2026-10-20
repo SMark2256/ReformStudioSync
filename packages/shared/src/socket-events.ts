@@ -7,6 +7,8 @@ export const SOCKET_EVENTS = {
   CHECKIN_REVOKED: 'checkin:revoked',
   MONITOR_STATE: 'monitor:state',
   MONITOR_PING: 'monitor:ping',
+  MONITOR_TEST_PING: 'monitor:test-ping',
+  MONITOR_DEVICE_REVOKED: 'monitor:device-revoked',
 } as const;
 
 export interface CheckInResultPayload {
@@ -39,3 +41,18 @@ export interface MonitorStatePayload {
   connectedDisplays: number;
   lastHeartbeat: string;
 }
+
+export interface MonitorTestPingPayload {
+  deviceId?: string | null;
+  deviceName?: string | null;
+  senderName?: string;
+  message: string;
+  timestamp: string;
+}
+
+export interface MonitorDeviceRevokedPayload {
+  deviceId: string;
+  reason?: string;
+  timestamp: string;
+}
+

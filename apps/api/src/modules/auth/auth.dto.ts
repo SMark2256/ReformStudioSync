@@ -54,3 +54,24 @@ export class VerifyDisplayPairingDto {
   @IsNotEmpty({ message: 'A 6 jegyű párosító kód megadása kötelező.' })
   pairingCode: string;
 }
+
+export class UpdateDisplayDeviceDto {
+  @ApiProperty({ example: 'Pult iPad #1' })
+  @IsString()
+  @IsNotEmpty({ message: 'Az eszköz nevének megadása kötelező.' })
+  name: string;
+}
+
+export class UnpairSelfDeviceDto {
+  @ApiProperty({ example: 'device-token-hash' })
+  @IsString()
+  @IsNotEmpty({ message: 'Az eszköz token megadása kötelező.' })
+  deviceToken: string;
+}
+
+export class SendMonitorTestSignalDto {
+  @ApiPropertyOptional({ example: 'device-uuid' })
+  @IsOptional()
+  @IsString()
+  deviceId?: string;
+}

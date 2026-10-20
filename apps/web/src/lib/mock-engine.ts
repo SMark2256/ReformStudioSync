@@ -6,11 +6,14 @@ import {
   DailyFinanceSummaryDto,
   DEFAULT_STUDIO_ID,
   DisplayDeviceDto,
+  DisplayDeviceStatus,
   DUPLICATE_SCAN_COOLDOWN_SECONDS,
   EXPIRING_SOON_THRESHOLD_DAYS,
   GuestDto,
   GuestPassDto,
   LoggedCheckInDto,
+  MonitorDeviceRevokedPayload,
+  MonitorTestPingPayload,
   OfflineScanItemDto,
   OfflineSyncResponseDto,
   PairDisplayResponseDto,
@@ -374,16 +377,37 @@ export function createInitialMockDatabase(): MockDatabaseState {
     guests,
     checkIns,
     payments,
-    devices: [
-      {
-        id: 'dev-1',
-        name: 'Recepciós Pult Másodlagos Monitor',
-        pairingCode: null,
-        isActive: true,
-        lastSeenAt: now.toISOString(),
-        createdAt: addDays(now, -15),
-      },
-    ],
+    devices: [],
+  };
+}
+
+const PAIRING_CODE_TTL_MS = 10 * 60 * 1000; // 10 perc
+
+function normalizeDisplayDevice(d: Partial<DisplayDeviceDto> & { id: string; name: string }): DisplayDeviceDto {
+  const now = Date.now();
+  const pairingCode = d.pairingCode ?? null;
+  const pairingExpiresAt = d.pairingExpiresAt ?? null;
+  let status: DisplayDeviceStatus = 'PAIRED';
+
+  if (pairingCode) {
+    const expiresMs = pairingExpiresAt
+      ? new Date(pairingExpiresAt).getTime()
+      : now + PAIRING_CODE_TTL_MS;
+    status = expiresMs <= now ? 'EXPIRED' : 'PENDING_PAIRING';
+  }
+
+  return {
+    id: d.id,
+    name: d.name,
+    status,
+    pairingCode,
+    pairingExpiresAt,
+    pairedAt: d.pairedAt ?? (pairingCode ? null : d.createdAt ?? new Date().toISOString()),
+    isActive: d.isActive ?? true,
+    lastSeenAt: pairingCode ? null : (d.lastSeenAt ?? null),
+    lastActivityType: pairingCode ? null : (d.lastActivityType ?? 'Sikeresen párosítva'),
+    isOnline: !pairingCode && (d.isActive ?? true),
+    createdAt: d.createdAt ?? new Date().toISOString(),
   };
 }
 
@@ -397,7 +421,12 @@ class MockStudioEngine {
         this.save(initial);
         return initial;
       }
-      return JSON.parse(raw) as MockDatabaseState;
+      const parsed = JSON.parse(raw) as MockDatabaseState;
+      // Eltávolítjuk a korábbi verzióból bent maradt fiktív "dev-1" ("Recepciós Pult Másodlagos Monitor") rekordot
+      parsed.devices = (parsed.devices ?? [])
+        .filter((d) => !(d.id === 'dev-1' && d.name === 'Recepciós Pult Másodlagos Monitor'))
+        .map((d) => normalizeDisplayDevice(d));
+      return parsed;
     } catch {
       return createInitialMockDatabase();
     }
@@ -916,6 +945,14 @@ class MockStudioEngine {
       warnings.push('EXPIRING_SOON');
     }
 
+    for (const dev of state.devices) {
+      if (!dev.pairingCode && dev.isActive) {
+        dev.lastSeenAt = now.toISOString();
+        dev.lastActivityType = `Beléptetés megjelenítve (${guestFullName})`;
+      }
+    }
+    this.save(state);
+
     const successPayload: CheckInResultPayload = {
       checkInId: checkInLog.id,
       status: CheckInStatus.SUCCESS,
@@ -972,6 +1009,12 @@ class MockStudioEngine {
 
     checkIn.status = CheckInStatus.CANCELLED;
     checkIn.reason = 'Recepciós által sztornózva';
+    for (const dev of state.devices) {
+      if (!dev.pairingCode && dev.isActive) {
+        dev.lastSeenAt = new Date().toISOString();
+        dev.lastActivityType = `Sztornó megjelenítve (${checkIn.guestName})`;
+      }
+    }
     this.save(state);
 
     const revokedPayload: CheckInRevokedPayload = {
@@ -1085,16 +1128,47 @@ class MockStudioEngine {
     };
   }
 
+  private ensureUniqueDeviceName(
+    devices: DisplayDeviceDto[],
+    name: string,
+    excludeDeviceId?: string,
+  ): string {
+    const trimmed = name.trim();
+    if (!trimmed) {
+      throw new Error('Az eszköz nevének megadása kötelező.');
+    }
+    const collision = devices.find(
+      (d) =>
+        d.id !== excludeDeviceId &&
+        d.name.trim().toLowerCase() === trimmed.toLowerCase(),
+    );
+    if (collision) {
+      throw new Error(
+        `Már létezik "${trimmed}" nevű kijelző! Ugyanolyan nevű monitort nem lehet kétszer létrehozni.`,
+      );
+    }
+    return trimmed;
+  }
+
   initDisplayPairing(name: string): DisplayDeviceDto {
     const state = this.load();
+    const cleanName = this.ensureUniqueDeviceName(state.devices, name);
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + PAIRING_CODE_TTL_MS);
     const code = String(Math.floor(100000 + Math.random() * 900000));
+
     const device: DisplayDeviceDto = {
       id: `dev-${Date.now()}`,
-      name: name.trim(),
+      name: cleanName,
+      status: 'PENDING_PAIRING',
       pairingCode: code,
+      pairingExpiresAt: expiresAt.toISOString(),
+      pairedAt: null,
       isActive: true,
-      lastSeenAt: new Date().toISOString(),
-      createdAt: new Date().toISOString(),
+      lastSeenAt: null,
+      lastActivityType: null,
+      isOnline: false,
+      createdAt: now.toISOString(),
     };
     state.devices.unshift(device);
     this.save(state);
@@ -1103,14 +1177,30 @@ class MockStudioEngine {
 
   verifyDisplayPairing(pairingCode: string): PairDisplayResponseDto {
     const state = this.load();
+    const code = pairingCode.trim();
     const device = state.devices.find(
-      (d) => d.pairingCode === pairingCode.trim() && d.isActive,
+      (d) => d.pairingCode === code && d.isActive,
     );
     if (!device) {
       throw new Error('Érvénytelen vagy már felhasznált 6 jegyű párosító kód.');
     }
+    if (
+      device.pairingExpiresAt &&
+      new Date(device.pairingExpiresAt).getTime() <= Date.now()
+    ) {
+      throw new Error(
+        'A párosító kód lejárt (10 perc után érvénytelenné válik). Kérj új kódot a recepción!',
+      );
+    }
+
+    const nowIso = new Date().toISOString();
+    device.status = 'PAIRED';
     device.pairingCode = null;
-    device.lastSeenAt = new Date().toISOString();
+    device.pairingExpiresAt = null;
+    device.pairedAt = nowIso;
+    device.lastSeenAt = nowIso;
+    device.lastActivityType = 'Sikeresen párosítva';
+    device.isOnline = true;
     this.save(state);
 
     return {
@@ -1119,8 +1209,145 @@ class MockStudioEngine {
     };
   }
 
+  regenerateDisplayPairingCode(deviceId: string): DisplayDeviceDto {
+    const state = this.load();
+    const device = state.devices.find((d) => d.id === deviceId);
+    if (!device) {
+      throw new Error('A keresett kijelző eszköz nem található.');
+    }
+
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + PAIRING_CODE_TTL_MS);
+    const code = String(Math.floor(100000 + Math.random() * 900000));
+
+    device.status = 'PENDING_PAIRING';
+    device.pairingCode = code;
+    device.pairingExpiresAt = expiresAt.toISOString();
+    device.pairedAt = null;
+    device.lastSeenAt = null;
+    device.lastActivityType = null;
+    device.isOnline = false;
+    this.save(state);
+
+    const revokedPayload: MonitorDeviceRevokedPayload = {
+      deviceId: device.id,
+      reason: 'A recepció új párosító kódot kért ehhez a kijelzőhöz.',
+      timestamp: now.toISOString(),
+    };
+    broadcastToLocalMonitors({
+      type: 'DEVICE_REVOKED',
+      payload: revokedPayload,
+    });
+
+    return device;
+  }
+
+  renameDisplayDevice(deviceId: string, newName: string): DisplayDeviceDto {
+    const state = this.load();
+    const device = state.devices.find((d) => d.id === deviceId);
+    if (!device) {
+      throw new Error('A keresett kijelző eszköz nem található.');
+    }
+    const cleanName = this.ensureUniqueDeviceName(
+      state.devices,
+      newName,
+      deviceId,
+    );
+    device.name = cleanName;
+    this.save(state);
+    return normalizeDisplayDevice(device);
+  }
+
+  deleteDisplayDevice(deviceId: string): { deletedId: string } {
+    const state = this.load();
+    const idx = state.devices.findIndex((d) => d.id === deviceId);
+    if (idx === -1) {
+      throw new Error('A keresett kijelző eszköz nem található.');
+    }
+    const [removed] = state.devices.splice(idx, 1);
+    this.save(state);
+
+    broadcastToLocalMonitors({
+      type: 'DEVICE_REVOKED',
+      payload: {
+        deviceId: removed.id,
+        reason: 'A kijelző párosítását törölték a recepcióról.',
+        timestamp: new Date().toISOString(),
+      },
+    });
+
+    return { deletedId: removed.id };
+  }
+
+  unpairSelfDevice(deviceToken: string): { unpairedId: string } {
+    const state = this.load();
+    const deviceId = deviceToken.replace('mock-device-token-', '').trim();
+    const idx = state.devices.findIndex((d) => d.id === deviceId);
+    if (idx !== -1) {
+      const [removed] = state.devices.splice(idx, 1);
+      this.save(state);
+      broadcastToLocalMonitors({
+        type: 'DEVICE_REVOKED',
+        payload: {
+          deviceId: removed.id,
+          reason: 'A párosítást megszakították a kijelzőről.',
+          timestamp: new Date().toISOString(),
+        },
+      });
+      return { unpairedId: removed.id };
+    }
+    return { unpairedId: deviceId || 'unknown' };
+  }
+
+  sendMonitorTestSignal(
+    deviceId?: string,
+    senderName = 'Recepció',
+  ): MonitorTestPingPayload {
+    const state = this.load();
+    const nowIso = new Date().toISOString();
+    let targetName: string | null = null;
+
+    if (deviceId) {
+      const dev = state.devices.find((d) => d.id === deviceId);
+      if (!dev) {
+        throw new Error('A megadott kijelző nem található.');
+      }
+      targetName = dev.name;
+      if (!dev.pairingCode) {
+        dev.lastSeenAt = nowIso;
+        dev.lastActivityType = 'Teszt jel fogadva';
+      }
+    } else {
+      for (const dev of state.devices) {
+        if (!dev.pairingCode && dev.isActive) {
+          dev.lastSeenAt = nowIso;
+          dev.lastActivityType = 'Teszt jel fogadva';
+        }
+      }
+    }
+
+    this.save(state);
+
+    const payload: MonitorTestPingPayload = {
+      deviceId: deviceId ?? null,
+      deviceName: targetName,
+      senderName,
+      message: targetName
+        ? `Teszt jel sikeresen fogadva a(z) "${targetName}" kijelzőn!`
+        : 'Teszt jel sikeresen fogadva! A Vendégmonitor kapcsolat aktív.',
+      timestamp: nowIso,
+    };
+
+    broadcastToLocalMonitors({
+      type: 'TEST_PING',
+      payload,
+    });
+
+    return payload;
+  }
+
   getDisplayDevices(): DisplayDeviceDto[] {
-    return this.load().devices;
+    return this.load().devices.map((d) => normalizeDisplayDevice(d));
   }
 }
 

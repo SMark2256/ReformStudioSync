@@ -167,14 +167,19 @@ model Payment {
 }
 
 model DisplayDevice {
-  id          String   @id @default(uuid())
-  studioId    String   @default("default-studio") @map("studio_id")
-  name        String
-  pairingCode String?  @unique @map("pairing_code")
-  deviceToken String   @unique @map("device_token")
-  isActive    Boolean  @default(true) @map("is_active")
-  lastSeenAt  DateTime @default(now()) @map("last_seen_at")
-  createdAt   DateTime @default(now()) @map("created_at")
+  id               String    @id @default(uuid())
+  studioId         String    @default("default-studio") @map("studio_id")
+  name             String
+  pairingCode      String?   @unique @map("pairing_code")
+  pairingExpiresAt DateTime? @map("pairing_expires_at")
+  pairedAt         DateTime? @map("paired_at")
+  deviceToken      String    @unique @map("device_token")
+  isActive         Boolean   @default(true) @map("is_active")
+  lastSeenAt       DateTime? @map("last_seen_at")
+  lastActivityType String?   @map("last_activity_type")
+  createdAt        DateTime  @default(now()) @map("created_at")
 
+  @@unique([studioId, name])
   @@map("display_devices")
 }
+

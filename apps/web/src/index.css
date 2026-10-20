@@ -20,6 +20,7 @@
 }
 
 .reception-theme-dark .bg-slate-50:not(.monitor-invariant *),
+.reception-theme-dark .bg-slate-50\/70:not(.monitor-invariant *),
 .reception-theme-dark .bg-slate-100:not(.monitor-invariant *) {
   background-color: #0f172a !important;
 }
@@ -29,6 +30,7 @@
 }
 
 .reception-theme-dark .border-slate-200:not(.monitor-invariant *),
+.reception-theme-dark .border-slate-200\/80:not(.monitor-invariant *),
 .reception-theme-dark .border-slate-300:not(.monitor-invariant *),
 .reception-theme-dark .border-slate-100:not(.monitor-invariant *) {
   border-color: #1e293b !important;
@@ -68,57 +70,81 @@
   background-color: rgba(30, 41, 59, 0.6) !important;
 }
 
-/* Státusz kártyák finomhangolása sötét módban */
-.reception-theme-dark .bg-emerald-50\/60,
-.reception-theme-dark .bg-emerald-50\/70,
-.reception-theme-dark .bg-emerald-50 {
+/* Státusz kártyák, badge-ek és akciók finomhangolása sötét módban */
+.reception-theme-dark .bg-emerald-50\/60:not(.monitor-invariant *),
+.reception-theme-dark .bg-emerald-50\/70:not(.monitor-invariant *),
+.reception-theme-dark .bg-emerald-50:not(.monitor-invariant *),
+.reception-theme-dark .bg-emerald-100:not(.monitor-invariant *) {
   background-color: rgba(16, 185, 129, 0.14) !important;
   border-color: rgba(16, 185, 129, 0.35) !important;
 }
 
-.reception-theme-dark .text-emerald-800,
-.reception-theme-dark .text-emerald-700 {
+.reception-theme-dark .border-emerald-200:not(.monitor-invariant *),
+.reception-theme-dark .border-emerald-300:not(.monitor-invariant *) {
+  border-color: rgba(16, 185, 129, 0.38) !important;
+}
+
+.reception-theme-dark .text-emerald-900:not(.monitor-invariant *),
+.reception-theme-dark .text-emerald-800:not(.monitor-invariant *),
+.reception-theme-dark .text-emerald-700:not(.monitor-invariant *) {
   color: #6ee7b7 !important;
 }
 
-.reception-theme-dark .bg-amber-50\/70,
-.reception-theme-dark .bg-amber-50 {
+.reception-theme-dark .bg-amber-50\/50:not(.monitor-invariant *),
+.reception-theme-dark .bg-amber-50\/70:not(.monitor-invariant *),
+.reception-theme-dark .bg-amber-50:not(.monitor-invariant *),
+.reception-theme-dark .bg-amber-100:not(.monitor-invariant *),
+.reception-theme-dark .bg-amber-100\/90:not(.monitor-invariant *) {
   background-color: rgba(245, 158, 11, 0.14) !important;
-  border-color: rgba(245, 158, 11, 0.35) !important;
+  border-color: rgba(245, 158, 11, 0.38) !important;
 }
 
-.reception-theme-dark .text-amber-900,
-.reception-theme-dark .text-amber-800,
-.reception-theme-dark .text-amber-700 {
+.reception-theme-dark .border-amber-200:not(.monitor-invariant *),
+.reception-theme-dark .border-amber-300:not(.monitor-invariant *) {
+  border-color: rgba(245, 158, 11, 0.42) !important;
+}
+
+.reception-theme-dark .text-amber-950:not(.monitor-invariant *),
+.reception-theme-dark .text-amber-900:not(.monitor-invariant *),
+.reception-theme-dark .text-amber-800:not(.monitor-invariant *),
+.reception-theme-dark .text-amber-700:not(.monitor-invariant *) {
   color: #fcd34d !important;
 }
 
-.reception-theme-dark .bg-rose-50\/70,
-.reception-theme-dark .bg-rose-50\/40,
-.reception-theme-dark .bg-rose-50 {
+.reception-theme-dark .bg-rose-50\/70:not(.monitor-invariant *),
+.reception-theme-dark .bg-rose-50\/40:not(.monitor-invariant *),
+.reception-theme-dark .bg-rose-50:not(.monitor-invariant *),
+.reception-theme-dark .bg-rose-100:not(.monitor-invariant *) {
   background-color: rgba(244, 63, 94, 0.14) !important;
-  border-color: rgba(244, 63, 94, 0.35) !important;
+  border-color: rgba(244, 63, 94, 0.38) !important;
 }
 
-.reception-theme-dark .text-rose-800,
-.reception-theme-dark .text-rose-700 {
+.reception-theme-dark .border-rose-200:not(.monitor-invariant *),
+.reception-theme-dark .border-rose-300:not(.monitor-invariant *),
+.reception-theme-dark .border-rose-400:not(.monitor-invariant *) {
+  border-color: rgba(244, 63, 94, 0.42) !important;
+}
+
+.reception-theme-dark .text-rose-800:not(.monitor-invariant *),
+.reception-theme-dark .text-rose-700:not(.monitor-invariant *),
+.reception-theme-dark .text-rose-600:not(.monitor-invariant *) {
   color: #fda4af !important;
 }
 
-.reception-theme-dark .bg-teal-50\/60 {
+.reception-theme-dark .bg-teal-50\/60:not(.monitor-invariant *) {
   background-color: rgba(20, 184, 166, 0.14) !important;
   border-color: rgba(20, 184, 166, 0.35) !important;
 }
 
-.reception-theme-dark .text-teal-900 {
+.reception-theme-dark .text-teal-900:not(.monitor-invariant *) {
   color: #5eead4 !important;
 }
 
-.reception-theme-dark .bg-sky-50\/70 {
+.reception-theme-dark .bg-sky-50\/70:not(.monitor-invariant *) {
   background-color: rgba(14, 165, 233, 0.14) !important;
   border-color: rgba(14, 165, 233, 0.35) !important;
 }
 
-.reception-theme-dark .text-sky-900 {
+.reception-theme-dark .text-sky-900:not(.monitor-invariant *) {
   color: #7dd3fc !important;
 }
