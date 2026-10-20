@@ -9,6 +9,7 @@ import { Toaster } from 'sonner';
 import { App } from './App';
 import './index.css';
 import { notify } from './lib/notify';
+import { SpeedInsights } from "@vercel/speed-insights/react"
 
 const queryClient = new QueryClient({
   mutationCache: new MutationCache({
@@ -31,6 +32,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
       <App />
+      <SpeedInsights />
       <Toaster
         position="bottom-right"
         richColors
