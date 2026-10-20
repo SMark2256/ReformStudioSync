@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: reform-studio-api
+    runtime: node
+    plan: free
+    region: frankfurt
+    buildCommand: npm install && npm run build:shared && npm --workspace=@reform/api run prisma:generate && npm --workspace=@reform/api run build
+    startCommand: npm --workspace=@reform/api run prisma:deploy && npm --workspace=@reform/api run start:prod
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3001
+      - key: DATABASE_URL
+        sync: false
+      - key: DIRECT_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: CORS_ORIGIN
+        sync: false

@@ -1,0 +1,26 @@
+{
+  "name": "reform-studio-sync",
+  "version": "1.0.0",
+  "private": true,
+  "description": "ReformStudioSync — Egystúdiós (SaaS-ready) Recepciós és Valós Idejű Vendégmonitor Rendszer",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build:shared": "npm --workspace=@reform/shared run build",
+    "build:api": "npm --workspace=@reform/shared run build && npm --workspace=@reform/api run build",
+    "build:web": "npm --workspace=@reform/shared run build && npm --workspace=@reform/web run build",
+    "build": "npm run build:shared && npm --workspace=@reform/api run build && npm --workspace=@reform/web run build",
+    "dev:api": "npm --workspace=@reform/api run start:dev",
+    "dev:web": "npm --workspace=@reform/web run dev",
+    "db:generate": "npm --workspace=@reform/api run prisma:generate",
+    "db:migrate": "npm --workspace=@reform/api run prisma:migrate",
+    "db:push": "npm --workspace=@reform/api run prisma:push",
+    "db:seed": "npm --workspace=@reform/api run prisma:seed",
+    "typecheck": "npm run build:shared && npm --workspace=@reform/api run typecheck && npm --workspace=@reform/web run typecheck"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
