@@ -1,3 +1,4 @@
+import { SpeedInsights } from '@vercel/speed-insights/react';
 import {
   MutationCache,
   QueryClient,
@@ -9,7 +10,7 @@ import { Toaster } from 'sonner';
 import { App } from './App';
 import './index.css';
 import { notify } from './lib/notify';
-import { SpeedInsights } from "@vercel/speed-insights/react"
+import { useThemeStore } from './stores/themeStore';
 
 const queryClient = new QueryClient({
   mutationCache: new MutationCache({
@@ -28,20 +29,28 @@ const queryClient = new QueryClient({
   },
 });
 
+const ThemedToaster: React.FC = () => {
+  const { theme } = useThemeStore();
+  return (
+    <Toaster
+      position="bottom-right"
+      theme={theme}
+      richColors
+      closeButton
+      expand={true}
+      toastOptions={{
+        className: 'font-sans',
+      }}
+    />
+  );
+};
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
       <App />
       <SpeedInsights />
-      <Toaster
-        position="bottom-right"
-        richColors
-        closeButton
-        expand={true}
-        toastOptions={{
-          className: 'font-sans',
-        }}
-      />
+      <ThemedToaster />
     </QueryClientProvider>
   </React.StrictMode>,
 );

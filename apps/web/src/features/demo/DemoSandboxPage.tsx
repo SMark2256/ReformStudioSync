@@ -29,16 +29,19 @@ import {
 } from 'lucide-react';
 import React, { useCallback, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { ThemeToggleButton } from '../../components/ThemeToggleButton';
 import { useBarcodeScanner } from '../../hooks/useBarcodeScanner';
 import { mockStudioEngine } from '../../lib/mock-engine';
 import { notify } from '../../lib/notify';
 import { useOfflineQueueStore } from '../../stores/offlineQueueStore';
+import { useThemeStore } from '../../stores/themeStore';
 import { DigitalPassCardModal } from '../guests/DigitalPassCardModal';
 import { GuestModal } from '../guests/GuestModal';
 import { MonitorDisplayCard } from '../monitor/MonitorDisplayCard';
 import { SellPassModal } from '../reception/SellPassModal';
 
 export const DemoSandboxPage: React.FC = () => {
+  const { theme } = useThemeStore();
   const [, setTick] = useState(0);
   const forceRender = useCallback(() => setTick((t) => t + 1), []);
 
@@ -194,7 +197,11 @@ export const DemoSandboxPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 pb-12">
+    <div
+      className={`min-h-screen bg-slate-100 pb-12 transition-colors duration-200 ${
+        theme === 'dark' ? 'reception-theme-dark dark' : ''
+      }`}
+    >
       {/* Top Demo Header */}
       <header className="sticky top-0 z-30 border-b border-slate-800 bg-slate-950 text-white shadow-md">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
@@ -218,6 +225,8 @@ export const DemoSandboxPage: React.FC = () => {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            <ThemeToggleButton />
+
             <Link
               to="/reception"
               className="inline-flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs font-semibold text-slate-200 hover:bg-slate-800"

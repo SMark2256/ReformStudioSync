@@ -36,7 +36,7 @@ export const MonitorDisplayCard: React.FC<MonitorDisplayCardProps> = ({
   if (revokedBanner) {
     return (
       <div
-        className={`flex flex-col items-center justify-center rounded-3xl bg-gradient-to-br from-amber-500 to-orange-600 text-white shadow-2xl transition-all duration-300 ${
+        className={`monitor-invariant flex flex-col items-center justify-center rounded-3xl bg-gradient-to-br from-amber-500 to-orange-600 text-white shadow-2xl transition-all duration-300 ${
           compact ? 'min-h-[340px] p-6' : 'min-h-[78vh] p-12'
         }`}
       >
@@ -72,7 +72,7 @@ export const MonitorDisplayCard: React.FC<MonitorDisplayCardProps> = ({
   if (!activeResult) {
     return (
       <div
-        className={`relative flex flex-col items-center justify-between overflow-hidden rounded-3xl border border-slate-800 bg-gradient-to-br from-slate-950 via-slate-900 to-emerald-950 text-white shadow-2xl ${
+        className={`monitor-invariant relative flex flex-col items-center justify-between overflow-hidden rounded-3xl border border-slate-800 bg-gradient-to-br from-slate-950 via-slate-900 to-emerald-950 text-white shadow-2xl ${
           compact ? 'min-h-[340px] p-6' : 'min-h-[78vh] p-12'
         }`}
       >
@@ -143,7 +143,7 @@ export const MonitorDisplayCard: React.FC<MonitorDisplayCardProps> = ({
 
   return (
     <div
-      className={`flex flex-col items-center justify-between rounded-3xl bg-gradient-to-br ${bgClass} text-white shadow-2xl transition-all duration-300 ${
+      className={`monitor-invariant flex flex-col items-center justify-between rounded-3xl bg-gradient-to-br ${bgClass} text-white shadow-2xl transition-all duration-300 ${
         compact ? 'min-h-[340px] p-6' : 'min-h-[78vh] p-12'
       }`}
     >

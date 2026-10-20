@@ -33,6 +33,7 @@ import {
 } from 'lucide-react';
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { ThemeToggleButton } from '../../components/ThemeToggleButton';
 import { useBarcodeScanner } from '../../hooks/useBarcodeScanner';
 import { useMonitorChannel } from '../../hooks/useMonitorChannel';
 import { api } from '../../lib/api';
@@ -40,6 +41,7 @@ import { notify } from '../../lib/notify';
 import { soundFeedback } from '../../lib/sound';
 import { useAuthStore } from '../../stores/authStore';
 import { useOfflineQueueStore } from '../../stores/offlineQueueStore';
+import { useThemeStore } from '../../stores/themeStore';
 import { DigitalPassCardModal } from '../guests/DigitalPassCardModal';
 import { GuestModal } from '../guests/GuestModal';
 import { SellPassModal } from './SellPassModal';
@@ -49,6 +51,7 @@ type ActiveTab = 'desk' | 'guests' | 'finance' | 'admin';
 export const ReceptionPage: React.FC = () => {
   const queryClient = useQueryClient();
   const { user } = useAuthStore();
+  const { theme } = useThemeStore();
   const {
     queue: offlineQueue,
     isOnline,
@@ -343,7 +346,11 @@ export const ReceptionPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col">
+    <div
+      className={`min-h-screen bg-slate-50 flex flex-col transition-colors duration-200 ${
+        theme === 'dark' ? 'reception-theme-dark dark' : ''
+      }`}
+    >
       {/* Top Navigation Bar */}
       <header className="sticky top-0 z-30 border-b border-slate-200 bg-slate-900 text-white shadow-sm">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
@@ -438,6 +445,8 @@ export const ReceptionPage: React.FC = () => {
                 <VolumeX className="h-4 w-4 text-slate-500" />
               )}
             </button>
+
+            <ThemeToggleButton />
 
             <button
               type="button"

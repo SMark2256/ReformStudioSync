@@ -142,7 +142,7 @@ export const DigitalPassCardModal: React.FC<DigitalPassCardModalProps> = ({
               </span>
             </div>
 
-            <div className="mt-5 grid grid-cols-1 gap-4 rounded-xl bg-white p-4 text-slate-900 sm:grid-cols-3 sm:items-center">
+            <div className="mt-5 grid grid-cols-1 gap-4 rounded-xl bg-white barcode-white-box p-4 text-slate-900 sm:grid-cols-3 sm:items-center">
               <div className="sm:col-span-2 flex flex-col items-center justify-center">
                 <canvas ref={barcodeCanvasRef} className="max-w-full h-auto" />
                 <span className="mt-1 text-[11px] text-slate-500">

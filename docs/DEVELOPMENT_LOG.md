@@ -52,3 +52,12 @@ Ez a dokumentum rögzíti a **ReformStudioSync** rendszer fázisonkénti megval�
 - **Megvalósított elemek:**
   - `render.yaml` Blueprint, `apps/web/vercel.json`, `.env.example` sablonok.
   - `docs/INSTALLATION_GUIDE.md` (Telepítési és Üzemeltetési Útmutató) és `docs/USER_GUIDE.md` (Felhasználói Kézikönyv).
+
+## Fázis 7: Kritikus Üzleti Tesztkészlet (`Vitest`) és Recepciós Sötét Mód (Dark Mode)
+- **Megvalósított elemek:**
+  - **Kritikus végkimenetel tesztek (`npm test`):**
+    - `apps/api/src/modules/check-ins/check-ins.service.spec.ts` (8 üzleti teszteset: sikeres levonás, `TIME_BASED` vs `OCCASION_BASED` priorizálás, leghamarabb lejáró bérlet kiválasztása, `LAST_OCCASION` + `EXPIRING_SOON` figyelmeztetések és inaktiválás, 60 mp-es `DUPLICATE_SCAN` védelem és `forceDuplicate` felülbírálás, `DENIED` elutasítások fagyasztott/lejárt/ismeretlen kártyára, `ConflictException` versenyhelyzet-védelem negatív egyenleg ellen, 1-kattintásos `revokeCheckIn` sztornó és offline `idempotencyKey`).
+    - `apps/api/src/modules/passes/passes-finance.spec.ts` (3 pénzügyi és bérlet teszteset: atomi bérleteladás + kasszatétel, fagyasztás feloldásakor automatikus nap-jóváírás a lejáratra, valamint fizetés sztornózásakor bérlet-deaktiválás és napi kasszazárás korrekció).
+  - **Választható Recepciós Sötét Mód (`useThemeStore` + `ThemeToggleButton`):**
+    - `apps/web/src/stores/themeStore.ts` és `apps/web/src/components/ThemeToggleButton.tsx` (1-kattintásos Nap/Hold kapcsoló a Recepciós Pult és a Demo fejlécében, `localStorage` mentéssel).
+    - A Vendégmonitor (`/monitor` és `MonitorDisplayCard` `.monitor-invariant` védelemmel) megjelenése garantáltan változatlan marad.

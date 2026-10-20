@@ -7,3 +7,118 @@
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
 }
+
+/*
+ * Recepciós Sötét Mód (Dark Mode) — Kizárólag a .reception-theme-dark
+ * konténerekre érvényesül, a Vendégmonitor (/monitor és .monitor-invariant)
+ * garantáltan változatlan marad!
+ */
+.reception-theme-dark {
+  color-scheme: dark;
+  background-color: #0b1120 !important;
+  color: #f1f5f9;
+}
+
+.reception-theme-dark .bg-slate-50:not(.monitor-invariant *),
+.reception-theme-dark .bg-slate-100:not(.monitor-invariant *) {
+  background-color: #0f172a !important;
+}
+
+.reception-theme-dark .bg-white:not(.monitor-invariant *):not(.barcode-white-box) {
+  background-color: #111827 !important;
+}
+
+.reception-theme-dark .border-slate-200:not(.monitor-invariant *),
+.reception-theme-dark .border-slate-300:not(.monitor-invariant *),
+.reception-theme-dark .border-slate-100:not(.monitor-invariant *) {
+  border-color: #1e293b !important;
+}
+
+.reception-theme-dark .divide-slate-100:not(.monitor-invariant *) > :not([hidden]) ~ :not([hidden]) {
+  border-color: #1e293b !important;
+}
+
+.reception-theme-dark .text-slate-900:not(.monitor-invariant *) {
+  color: #f8fafc !important;
+}
+
+.reception-theme-dark .text-slate-800:not(.monitor-invariant *),
+.reception-theme-dark .text-slate-700:not(.monitor-invariant *) {
+  color: #e2e8f0 !important;
+}
+
+.reception-theme-dark .text-slate-600:not(.monitor-invariant *),
+.reception-theme-dark .text-slate-500:not(.monitor-invariant *) {
+  color: #94a3b8 !important;
+}
+
+.reception-theme-dark input:not(.monitor-invariant *),
+.reception-theme-dark select:not(.monitor-invariant *),
+.reception-theme-dark textarea:not(.monitor-invariant *) {
+  background-color: #0f172a !important;
+  color: #f8fafc !important;
+  border-color: #334155 !important;
+}
+
+.reception-theme-dark input::placeholder {
+  color: #64748b !important;
+}
+
+.reception-theme-dark tr.hover\:bg-slate-50\/80:hover {
+  background-color: rgba(30, 41, 59, 0.6) !important;
+}
+
+/* Státusz kártyák finomhangolása sötét módban */
+.reception-theme-dark .bg-emerald-50\/60,
+.reception-theme-dark .bg-emerald-50\/70,
+.reception-theme-dark .bg-emerald-50 {
+  background-color: rgba(16, 185, 129, 0.14) !important;
+  border-color: rgba(16, 185, 129, 0.35) !important;
+}
+
+.reception-theme-dark .text-emerald-800,
+.reception-theme-dark .text-emerald-700 {
+  color: #6ee7b7 !important;
+}
+
+.reception-theme-dark .bg-amber-50\/70,
+.reception-theme-dark .bg-amber-50 {
+  background-color: rgba(245, 158, 11, 0.14) !important;
+  border-color: rgba(245, 158, 11, 0.35) !important;
+}
+
+.reception-theme-dark .text-amber-900,
+.reception-theme-dark .text-amber-800,
+.reception-theme-dark .text-amber-700 {
+  color: #fcd34d !important;
+}
+
+.reception-theme-dark .bg-rose-50\/70,
+.reception-theme-dark .bg-rose-50\/40,
+.reception-theme-dark .bg-rose-50 {
+  background-color: rgba(244, 63, 94, 0.14) !important;
+  border-color: rgba(244, 63, 94, 0.35) !important;
+}
+
+.reception-theme-dark .text-rose-800,
+.reception-theme-dark .text-rose-700 {
+  color: #fda4af !important;
+}
+
+.reception-theme-dark .bg-teal-50\/60 {
+  background-color: rgba(20, 184, 166, 0.14) !important;
+  border-color: rgba(20, 184, 166, 0.35) !important;
+}
+
+.reception-theme-dark .text-teal-900 {
+  color: #5eead4 !important;
+}
+
+.reception-theme-dark .bg-sky-50\/70 {
+  background-color: rgba(14, 165, 233, 0.14) !important;
+  border-color: rgba(14, 165, 233, 0.35) !important;
+}
+
+.reception-theme-dark .text-sky-900 {
+  color: #7dd3fc !important;
+}
