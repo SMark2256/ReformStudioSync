@@ -71,3 +71,10 @@ export interface TabletDocumentPushPayload {
   documentType: string;
   pushedAt: string;
 }
+
+export interface ScannerEventPayload {
+  barcode: string;
+  rawBarcode?: string;
+  sourceRoute?: string;
+  scannedAt: string;
+}

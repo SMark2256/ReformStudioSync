@@ -5,6 +5,7 @@ import {
 import {
   Maximize2,
   Monitor,
+  QrCode,
   ShieldCheck,
   Smartphone,
   Wifi,
@@ -16,10 +17,13 @@ import { mockStudioEngine } from '../../lib/mock-engine';
 import { notify } from '../../lib/notify';
 import { soundFeedback } from '../../lib/sound';
 import { useAuthStore } from '../../stores/authStore';
+import { useScannerChannelStore } from '../../stores/scannerChannelStore';
 import { MonitorDisplayCard } from './MonitorDisplayCard';
 
 export const MonitorPage: React.FC = () => {
   const { accessToken, deviceToken, deviceName, setDeviceAuth } = useAuthStore();
+  const { isListening: isScannerListening, lastScannedCode } =
+    useScannerChannelStore();
   const [activeResult, setActiveResult] = useState<CheckInResultPayload | null>(
     null,
   );
@@ -144,6 +148,20 @@ export const MonitorPage: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-2.5">
+            <span
+              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${
+                isScannerListening
+                  ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
+                  : 'bg-slate-800 text-slate-400 border border-slate-700'
+              }`}
+              title="A kijelző folyamatosan figyeli a csatlakoztatott QR / vonalkód olvasót"
+            >
+              <QrCode className="h-3.5 w-3.5" />
+              {isScannerListening
+                ? `QR Szkenner Csatorna Aktív${lastScannedCode ? ` (#${lastScannedCode})` : ''}`
+                : 'QR Szkenner Szünetel'}
+            </span>
+
             <span
               className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${
                 isConnected

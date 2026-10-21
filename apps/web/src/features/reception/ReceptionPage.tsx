@@ -43,14 +43,18 @@ import {
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { ThemeToggleButton } from '../../components/ThemeToggleButton';
-import { useBarcodeScanner } from '../../hooks/useBarcodeScanner';
-import { useMonitorChannel } from '../../hooks/useMonitorChannel';
+import { normalizeScannedCode } from '../../hooks/useBarcodeScanner';
+import {
+  broadcastToScannerChannel,
+  useMonitorChannel,
+} from '../../hooks/useMonitorChannel';
 import { api } from '../../lib/api';
 import { mockStudioEngine } from '../../lib/mock-engine';
 import { notify } from '../../lib/notify';
 import { soundFeedback } from '../../lib/sound';
 import { useAuthStore } from '../../stores/authStore';
 import { useOfflineQueueStore } from '../../stores/offlineQueueStore';
+import { useScannerChannelStore } from '../../stores/scannerChannelStore';
 import { useThemeStore } from '../../stores/themeStore';
 import { DigitalPassCardModal } from '../guests/DigitalPassCardModal';
 import { GuestModal } from '../guests/GuestModal';
@@ -77,9 +81,15 @@ export const ReceptionPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<ActiveTab>('desk');
   const [manualBarcode, setManualBarcode] = useState('');
   const [guestSearch, setGuestSearch] = useState('');
-  const [lastCheckIn, setLastCheckIn] = useState<CheckInResultPayload | null>(
-    null,
-  );
+  const {
+    isListening: isScannerListening,
+    setListening: setScannerListening,
+    lastScannedCode,
+    lastCheckInResult: lastCheckIn,
+    recordCheckInResult: setLastCheckIn,
+    recordRevokedResult,
+    recordScanAttempt,
+  } = useScannerChannelStore();
   const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
   const [greetingSeconds, setGreetingSeconds] = useState<number>(() =>
     mockStudioEngine.getMonitorGreetingSeconds(),
@@ -212,7 +222,8 @@ export const ReceptionPage: React.FC = () => {
         `Beléptetés sztornózva: ${res.guestName}`,
         `Az alkalom visszaírva. Új egyenleg: ${res.restoredRemainingPasses}`,
       );
-      setLastCheckIn(null);
+      recordRevokedResult(res);
+      broadcastToScannerChannel({ type: 'CHECKIN_REVOKED', payload: res });
       refreshAll();
     },
   });
@@ -230,6 +241,7 @@ export const ReceptionPage: React.FC = () => {
       }),
     onSuccess: (res) => {
       setLastCheckIn(res);
+      broadcastToScannerChannel({ type: 'CHECKIN_RESULT', payload: res });
       notify.checkInResult(res, {
         onRevoke: (checkInId) => revokeMutation.mutate(checkInId),
         onForceDuplicate: (barcode) =>
@@ -249,6 +261,7 @@ export const ReceptionPage: React.FC = () => {
     mutationFn: api.deductPassUsage,
     onSuccess: (res) => {
       setLastCheckIn(res);
+      broadcastToScannerChannel({ type: 'CHECKIN_RESULT', payload: res });
       setDeductModalState({ isOpen: false, guest: null });
       notify.checkInResult(res, {
         onRevoke: (checkInId) => revokeMutation.mutate(checkInId),
@@ -273,8 +286,10 @@ export const ReceptionPage: React.FC = () => {
 
   const handleBarcodeScan = useCallback(
     (barcode: string) => {
-      const code = barcode.trim();
+      const code = normalizeScannedCode(barcode);
       if (!code) return;
+
+      recordScanAttempt(code);
 
       if (!isOnline) {
         const queued = enqueueScan(code);
@@ -290,14 +305,8 @@ export const ReceptionPage: React.FC = () => {
         visitType: VisitType.CIRCUIT_TRAINING,
       });
     },
-    [isOnline, enqueueScan, scanMutation],
+    [isOnline, enqueueScan, scanMutation, recordScanAttempt],
   );
-
-  // Global physical USB/Bluetooth barcode scanner hook
-  useBarcodeScanner({
-    onScan: handleBarcodeScan,
-    enabled: true,
-  });
 
   // Online / Offline listener + automatic FIFO queue sync
   useEffect(() => {
@@ -595,6 +604,35 @@ export const ReceptionPage: React.FC = () => {
 
           {/* Right Status & Actions */}
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                const next = !isScannerListening;
+                setScannerListening(next);
+                notify.info(
+                  next
+                    ? 'Folyamatos QR/Vonalkód figyelés bekapcsolva'
+                    : 'QR/Vonalkód csatorna szüneteltetve',
+                  next
+                    ? 'A rendszer minden oldalon folyamatosan figyeli a beérkező QR és vonalkódokat.'
+                    : 'A háttérbeli automatikus HID leolvasás ideiglenesen kikapcsolva.',
+                );
+              }}
+              title="Globális QR / Vonalkód Szkenner Csatorna állapota (minden oldalon aktív)"
+              className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold border transition-all ${
+                isScannerListening
+                  ? 'border-emerald-500/30 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
+                  : 'border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 text-slate-500'
+              }`}
+            >
+              <QrCode className="h-3.5 w-3.5" />
+              <span>
+                {isScannerListening
+                  ? `QR Csatorna: Aktív${lastScannedCode ? ` (#${lastScannedCode})` : ''}`
+                  : 'QR Csatorna: Szünetel'}
+              </span>
+            </button>
+
             <button
               type="button"
               onClick={() => setOnline(!isOnline)}
@@ -936,7 +974,9 @@ export const ReceptionPage: React.FC = () => {
                       </div>
                     </div>
                     <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700 border border-emerald-200 shrink-0">
-                      USB/HID Aktív
+                      {isScannerListening
+                        ? 'QR / 2D HID Csatorna Aktív'
+                        : 'QR Csatorna Szünetel'}
                     </span>
                   </div>
 
@@ -951,9 +991,10 @@ export const ReceptionPage: React.FC = () => {
                   >
                     <input
                       type="text"
+                      data-barcode-input="true"
                       value={manualBarcode}
                       onChange={(e) => setManualBarcode(e.target.value)}
-                      placeholder="Csippantsd le a kártyát bárhol, vagy írd be a kódot (pl. 100001)..."
+                      placeholder="Csippantsd le a QR-kódot / kártyát bárhol, vagy írd be a kódot (pl. 100001)..."
                       className="flex-1 rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-mono focus:border-emerald-600 focus:outline-none"
                     />
                     <button

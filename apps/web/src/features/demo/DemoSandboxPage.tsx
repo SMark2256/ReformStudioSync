@@ -33,10 +33,12 @@ import {
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { ThemeToggleButton } from '../../components/ThemeToggleButton';
-import { useBarcodeScanner } from '../../hooks/useBarcodeScanner';
+import { normalizeScannedCode } from '../../hooks/useBarcodeScanner';
+import { broadcastToScannerChannel } from '../../hooks/useMonitorChannel';
 import { mockStudioEngine } from '../../lib/mock-engine';
 import { notify } from '../../lib/notify';
 import { useOfflineQueueStore } from '../../stores/offlineQueueStore';
+import { useScannerChannelStore } from '../../stores/scannerChannelStore';
 import { useThemeStore } from '../../stores/themeStore';
 import { DigitalPassCardModal } from '../guests/DigitalPassCardModal';
 import { GuestModal } from '../guests/GuestModal';
@@ -91,6 +93,14 @@ export const DemoSandboxPage: React.FC = () => {
     clearQueue,
   } = useOfflineQueueStore();
 
+  const {
+    lastCheckInResult,
+    lastRevokedResult,
+    recordCheckInResult,
+    recordRevokedResult,
+    recordScanAttempt,
+  } = useScannerChannelStore();
+
   const guests = mockStudioEngine.getGuests();
   const services = mockStudioEngine.getServices(true);
   const templates = mockStudioEngine.getTemplates(true);
@@ -129,6 +139,8 @@ export const DemoSandboxPage: React.FC = () => {
     (checkInId: string) => {
       try {
         const revoked = mockStudioEngine.revokeCheckIn(checkInId);
+        recordRevokedResult(revoked);
+        broadcastToScannerChannel({ type: 'CHECKIN_REVOKED', payload: revoked });
         showRevokedOnEmbeddedMonitor(revoked);
         notify.success(
           `Beléptetés / Levonás sztornózva: ${revoked.guestName}`,
@@ -139,16 +151,21 @@ export const DemoSandboxPage: React.FC = () => {
         notify.error('Sztornó hiba', (err as Error).message);
       }
     },
-    [showRevokedOnEmbeddedMonitor, forceRender],
+    [recordRevokedResult, showRevokedOnEmbeddedMonitor, forceRender],
   );
 
   const handleSimulatedScan = useCallback(
     (
-      barcode: string,
+      rawBarcode: string,
       forceDuplicate = false,
       visitType: VisitType = VisitType.CIRCUIT_TRAINING,
       serviceId?: string,
     ) => {
+      const barcode = normalizeScannedCode(rawBarcode);
+      if (!barcode) return;
+
+      recordScanAttempt(barcode);
+
       if (!isOnline) {
         const item = enqueueScan(barcode);
         notify.warning(
@@ -165,6 +182,8 @@ export const DemoSandboxPage: React.FC = () => {
           visitType,
           serviceId,
         });
+        recordCheckInResult(result);
+        broadcastToScannerChannel({ type: 'CHECKIN_RESULT', payload: result });
         showOnEmbeddedMonitor(result);
         notify.checkInResult(result, {
           onRevoke: (chkId) => handleRevokeCheckIn(chkId),
@@ -189,18 +208,30 @@ export const DemoSandboxPage: React.FC = () => {
       }
     },
     [
+      recordScanAttempt,
       isOnline,
       enqueueScan,
+      recordCheckInResult,
       showOnEmbeddedMonitor,
       handleRevokeCheckIn,
       forceRender,
     ],
   );
 
-  useBarcodeScanner({
-    onScan: (code) => handleSimulatedScan(code),
-    enabled: true,
-  });
+  // Szinkronizáljuk a globális szkenner csatorna eredményét a beágyazott demo monitorral is
+  useEffect(() => {
+    if (lastCheckInResult) {
+      showOnEmbeddedMonitor(lastCheckInResult);
+      forceRender();
+    }
+  }, [lastCheckInResult, showOnEmbeddedMonitor, forceRender]);
+
+  useEffect(() => {
+    if (lastRevokedResult) {
+      showRevokedOnEmbeddedMonitor(lastRevokedResult);
+      forceRender();
+    }
+  }, [lastRevokedResult, showRevokedOnEmbeddedMonitor, forceRender]);
 
   const handleResetDemo = () => {
     mockStudioEngine.resetDatabase();

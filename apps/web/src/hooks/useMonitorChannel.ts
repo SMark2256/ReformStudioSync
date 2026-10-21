@@ -3,6 +3,8 @@ import {
   CheckInRevokedPayload,
   MONITOR_BROADCAST_CHANNEL,
   MonitorStatePayload,
+  SCANNER_BROADCAST_CHANNEL,
+  ScannerEventPayload,
   SOCKET_EVENTS,
   SOCKET_NAMESPACE,
 } from '@reform/shared';
@@ -12,12 +14,24 @@ import { useAuthStore } from '../stores/authStore';
 
 export type MonitorBroadcastMessage =
   | { type: 'CHECKIN_RESULT'; payload: CheckInResultPayload }
-  | { type: 'CHECKIN_REVOKED'; payload: CheckInRevokedPayload };
+  | { type: 'CHECKIN_REVOKED'; payload: CheckInRevokedPayload }
+  | { type: 'SCAN_TRIGGERED'; payload: ScannerEventPayload };
 
 export function broadcastToLocalMonitors(message: MonitorBroadcastMessage) {
   if (typeof window === 'undefined' || !('BroadcastChannel' in window)) return;
   try {
     const channel = new BroadcastChannel(MONITOR_BROADCAST_CHANNEL);
+    channel.postMessage(message);
+    channel.close();
+  } catch {
+    // BroadcastChannel not supported
+  }
+}
+
+export function broadcastToScannerChannel(message: MonitorBroadcastMessage) {
+  if (typeof window === 'undefined' || !('BroadcastChannel' in window)) return;
+  try {
+    const channel = new BroadcastChannel(SCANNER_BROADCAST_CHANNEL);
     channel.postMessage(message);
     channel.close();
   } catch {

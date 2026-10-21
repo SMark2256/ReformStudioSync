@@ -92,3 +92,4 @@ export const DUPLICATE_SCAN_COOLDOWN_SECONDS = 10;
 export const EXPIRING_SOON_THRESHOLD_DAYS = 3;
 export const DEFAULT_MONITOR_GREETING_SECONDS = 7;
 export const MONITOR_BROADCAST_CHANNEL = 'reform_monitor_channel';
+export const SCANNER_BROADCAST_CHANNEL = 'reform_studio_scanner_channel';
