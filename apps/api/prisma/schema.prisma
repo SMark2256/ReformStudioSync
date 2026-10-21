@@ -13,9 +13,39 @@ enum Role {
   RECEPTIONIST
 }
 
+enum GuestStatus {
+  ACTIVE
+  INACTIVE
+  PAUSED
+}
+
+enum ServiceCategory {
+  CIRCUIT
+  COSMETIC
+  BODY_SHAPING
+}
+
 enum PassType {
   OCCASION_BASED
   TIME_BASED
+}
+
+enum MembershipStatus {
+  ACTIVE
+  PAUSED
+  TERMINATED
+}
+
+enum MembershipDueStatus {
+  PENDING
+  PARTIAL
+  PAID
+  WAIVED
+}
+
+enum VisitType {
+  CIRCUIT_TRAINING
+  TREATMENT
 }
 
 enum PaymentMethod {
@@ -31,6 +61,24 @@ enum CheckInStatus {
   CANCELLED
 }
 
+enum DocumentType {
+  GDPR_CONSENT
+  HEALTH_QUESTIONNAIRE
+  HOUSE_RULES
+  TREATMENT_CONSENT
+}
+
+enum DocumentStatus {
+  PENDING_SIGNATURE
+  SIGNED
+}
+
+enum MessageStatus {
+  SENT
+  DELIVERED
+  FAILED
+}
+
 model User {
   id           String   @id @default(uuid())
   studioId     String   @default("default-studio") @map("studio_id")
@@ -42,38 +90,111 @@ model User {
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
-  checkIns LoggedCheckIn[]
-  payments Payment[]
+  checkIns     LoggedCheckIn[]
+  payments     Payment[]
+  visits       Visit[]
+  passUsages   PassUsageLog[]
+  auditLogs    AuditLog[]
+  notes        GuestNote[]
+  measurements Measurement[]
 
   @@index([studioId])
   @@map("users")
 }
 
 model Guest {
-  id          String   @id @default(uuid())
-  studioId    String   @default("default-studio") @map("studio_id")
+  id          String      @id @default(uuid())
+  studioId    String      @default("default-studio") @map("studio_id")
   barcode     String
-  firstName   String   @map("first_name")
-  lastName    String   @map("last_name")
+  firstName   String      @map("first_name")
+  lastName    String      @map("last_name")
   email       String?
   phone       String?
+  birthDate   DateTime?   @map("birth_date")
+  nameDay     String?     @map("name_day")
+  status      GuestStatus @default(ACTIVE)
   notes       String?
-  isActive    Boolean  @default(true) @map("is_active")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  isActive    Boolean     @default(true) @map("is_active")
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
 
-  passes   GuestPass[]
-  checkIns LoggedCheckIn[]
-  payments Payment[]
+  passes        GuestPass[]
+  memberships   Membership[]
+  checkIns      LoggedCheckIn[]
+  visits        Visit[]
+  passUsages    PassUsageLog[]
+  payments      Payment[]
+  measurements  Measurement[]
+  photos        GuestPhoto[]
+  documents     GuestDocument[]
+  internalNotes GuestNote[]
+  messageLogs   MessageLog[]
 
   @@unique([studioId, barcode])
   @@index([studioId, lastName, firstName])
   @@map("guests")
 }
 
+model Service {
+  id              String          @id @default(uuid())
+  studioId        String          @default("default-studio") @map("studio_id")
+  name            String
+  category        ServiceCategory @default(BODY_SHAPING)
+  durationMinutes Int             @default(30) @map("duration_minutes")
+  priceHuf        Int             @default(0) @map("price_huf")
+  isActive        Boolean         @default(true) @map("is_active")
+  createdAt       DateTime        @default(now()) @map("created_at")
+
+  passTemplates PassTemplate[]
+  guestPasses   GuestPass[]
+  passUsages    PassUsageLog[]
+  photos        GuestPhoto[]
+
+  @@index([studioId, isActive])
+  @@map("services")
+}
+
+model Membership {
+  id            String           @id @default(uuid())
+  studioId      String           @default("default-studio") @map("studio_id")
+  guestId       String           @map("guest_id")
+  monthlyFeeHuf Int              @map("monthly_fee_huf")
+  startDate     DateTime         @map("start_date")
+  dueDay        Int              @default(10) @map("due_day")
+  status        MembershipStatus @default(ACTIVE)
+  pausedAt      DateTime?        @map("paused_at")
+  terminatedAt  DateTime?        @map("terminated_at")
+  createdAt     DateTime         @default(now()) @map("created_at")
+
+  guest Guest           @relation(fields: [guestId], references: [id], onDelete: Cascade)
+  dues  MembershipDue[]
+
+  @@index([guestId, status])
+  @@map("memberships")
+}
+
+model MembershipDue {
+  id            String              @id @default(uuid())
+  membershipId  String              @map("membership_id")
+  period        String              // YYYY-MM
+  dueDate       DateTime            @map("due_date")
+  amountHuf     Int                 @map("amount_huf")
+  paidAmountHuf Int                 @default(0) @map("paid_amount_huf")
+  status        MembershipDueStatus @default(PENDING)
+  createdAt     DateTime            @default(now()) @map("created_at")
+
+  membership  Membership          @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  allocations PaymentAllocation[]
+
+  @@unique([membershipId, period])
+  @@index([dueDate, status])
+  @@map("membership_dues")
+}
+
 model PassTemplate {
   id           String   @id @default(uuid())
   studioId     String   @default("default-studio") @map("studio_id")
+  serviceId    String?  @map("service_id")
   name         String
   type         PassType
   totalPasses  Int?     @map("total_passes")
@@ -82,6 +203,7 @@ model PassTemplate {
   isActive     Boolean  @default(true) @map("is_active")
   createdAt    DateTime @default(now()) @map("created_at")
 
+  service         Service?    @relation(fields: [serviceId], references: [id], onDelete: SetNull)
   purchasedPasses GuestPass[]
 
   @@index([studioId, isActive])
@@ -93,6 +215,7 @@ model GuestPass {
   studioId        String    @default("default-studio") @map("studio_id")
   guestId         String    @map("guest_id")
   passTemplateId  String    @map("pass_template_id")
+  serviceId       String?   @map("service_id")
   type            PassType
   totalPasses     Int?      @map("total_passes")
   remainingPasses Int?      @map("remaining_passes")
@@ -103,14 +226,32 @@ model GuestPass {
   frozenAt        DateTime? @map("frozen_at")
   createdAt       DateTime  @default(now()) @map("created_at")
 
-  guest        Guest           @relation(fields: [guestId], references: [id], onDelete: Cascade)
-  passTemplate PassTemplate    @relation(fields: [passTemplateId], references: [id])
+  guest        Guest               @relation(fields: [guestId], references: [id], onDelete: Cascade)
+  passTemplate PassTemplate        @relation(fields: [passTemplateId], references: [id])
+  service      Service?            @relation(fields: [serviceId], references: [id], onDelete: SetNull)
   usageLogs    PassUsageLog[]
   payments     Payment[]
+  allocations  PaymentAllocation[]
   checkIns     LoggedCheckIn[]
 
   @@index([guestId, isActive, expirationDate])
   @@map("guest_passes")
+}
+
+model Visit {
+  id          String    @id @default(uuid())
+  studioId    String    @default("default-studio") @map("studio_id")
+  guestId     String    @map("guest_id")
+  checkedInAt DateTime  @default(now()) @map("checked_in_at")
+  visitType   VisitType @default(CIRCUIT_TRAINING) @map("visit_type")
+  employeeId  String    @map("employee_id")
+
+  guest    Guest @relation(fields: [guestId], references: [id], onDelete: Cascade)
+  employee User  @relation(fields: [employeeId], references: [id])
+
+  @@index([guestId, checkedInAt])
+  @@index([studioId, checkedInAt])
+  @@map("visits")
 }
 
 model LoggedCheckIn {
@@ -119,6 +260,7 @@ model LoggedCheckIn {
   guestId        String        @map("guest_id")
   guestPassId    String?       @map("guest_pass_id")
   userId         String        @map("user_id")
+  visitType      VisitType     @default(CIRCUIT_TRAINING) @map("visit_type")
   status         CheckInStatus @default(SUCCESS)
   reason         String?
   idempotencyKey String?       @unique @map("idempotency_key")
@@ -134,13 +276,22 @@ model LoggedCheckIn {
 }
 
 model PassUsageLog {
-  id          String   @id @default(uuid())
-  guestPassId String   @map("guest_pass_id")
-  delta       Int      @default(-1)
-  usedAt      DateTime @default(now()) @map("used_at")
-  note        String?
+  id             String    @id @default(uuid())
+  guestPassId    String    @map("guest_pass_id")
+  guestId        String?   @map("guest_id")
+  serviceId      String?   @map("service_id")
+  employeeId     String?   @map("employee_id")
+  delta          Int       @default(-1)
+  usedAt         DateTime  @default(now()) @map("used_at")
+  reversedAt     DateTime? @map("reversed_at")
+  reversalReason String?   @map("reversal_reason")
+  operationKey   String?   @unique @map("operation_key")
+  note           String?
 
   guestPass GuestPass @relation(fields: [guestPassId], references: [id], onDelete: Cascade)
+  guest     Guest?    @relation(fields: [guestId], references: [id], onDelete: SetNull)
+  service   Service?  @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+  employee  User?     @relation(fields: [employeeId], references: [id], onDelete: SetNull)
 
   @@index([guestPassId, usedAt])
   @@map("pass_usage_logs")
@@ -158,12 +309,137 @@ model Payment {
   note             String?
   createdAt        DateTime      @default(now()) @map("created_at")
 
-  guest      Guest      @relation(fields: [guestId], references: [id])
-  guestPass  GuestPass? @relation(fields: [guestPassId], references: [id], onDelete: SetNull)
-  recordedBy User       @relation(fields: [recordedByUserId], references: [id])
+  guest       Guest               @relation(fields: [guestId], references: [id])
+  guestPass   GuestPass?          @relation(fields: [guestPassId], references: [id], onDelete: SetNull)
+  recordedBy  User                @relation(fields: [recordedByUserId], references: [id])
+  allocations PaymentAllocation[]
 
   @@index([studioId, createdAt, paymentMethod])
   @@map("payments")
+}
+
+model PaymentAllocation {
+  id              String   @id @default(uuid())
+  paymentId       String   @map("payment_id")
+  membershipDueId String?  @map("membership_due_id")
+  passId          String?  @map("pass_id")
+  amountHuf       Int      @map("amount_huf")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  payment       Payment        @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  membershipDue MembershipDue? @relation(fields: [membershipDueId], references: [id], onDelete: SetNull)
+  pass          GuestPass?     @relation(fields: [passId], references: [id], onDelete: SetNull)
+
+  @@index([paymentId])
+  @@map("payment_allocations")
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  studioId   String   @default("default-studio") @map("studio_id")
+  userId     String   @map("user_id")
+  action     String
+  entityType String   @map("entity_type")
+  entityId   String   @map("entity_id")
+  details    String?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([studioId, createdAt])
+  @@map("audit_logs")
+}
+
+model Measurement {
+  id           String   @id @default(uuid())
+  guestId      String   @map("guest_id")
+  recordedById String?  @map("recorded_by_id")
+  measuredAt   DateTime @default(now()) @map("measured_at")
+  weightKg     Float?   @map("weight_kg")
+  bodyFatPct   Float?   @map("body_fat_pct")
+  muscleMassKg Float?   @map("muscle_mass_kg")
+  visceralFat  Float?   @map("visceral_fat")
+  waistCm      Float?   @map("waist_cm")
+  hipCm        Float?   @map("hip_cm")
+  thighCm      Float?   @map("thigh_cm")
+  armCm        Float?   @map("arm_cm")
+  chestCm      Float?   @map("chest_cm")
+  note         String?
+
+  guest      Guest @relation(fields: [guestId], references: [id], onDelete: Cascade)
+  recordedBy User? @relation(fields: [recordedById], references: [id], onDelete: SetNull)
+
+  @@index([guestId, measuredAt])
+  @@map("measurements")
+}
+
+model GuestPhoto {
+  id                  String   @id @default(uuid())
+  guestId             String   @map("guest_id")
+  serviceId           String?  @map("service_id")
+  takenAt             DateTime @default(now()) @map("taken_at")
+  fileUrl             String   @map("file_url")
+  mimeType            String   @default("image/webp") @map("mime_type")
+  originalSizeBytes   Int      @default(0) @map("original_size_bytes")
+  compressedSizeBytes Int      @default(0) @map("compressed_size_bytes")
+  width               Int      @default(0)
+  height              Int      @default(0)
+  visibilityRole      Role     @default(RECEPTIONIST) @map("visibility_role")
+  note                String?
+
+  guest   Guest    @relation(fields: [guestId], references: [id], onDelete: Cascade)
+  service Service? @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+
+  @@index([guestId, takenAt])
+  @@map("photos")
+}
+
+model GuestDocument {
+  id               String         @id @default(uuid())
+  guestId          String         @map("guest_id")
+  documentType     DocumentType   @default(GDPR_CONSENT) @map("document_type")
+  title            String
+  contentText      String         @map("content_text")
+  fieldsJson       String?        @map("fields_json")
+  signatureDataUrl String?        @map("signature_data_url")
+  signedAt         DateTime?      @map("signed_at")
+  status           DocumentStatus @default(PENDING_SIGNATURE)
+  createdAt        DateTime       @default(now()) @map("created_at")
+
+  guest Guest @relation(fields: [guestId], references: [id], onDelete: Cascade)
+
+  @@index([guestId, status])
+  @@map("documents")
+}
+
+model GuestNote {
+  id        String   @id @default(uuid())
+  guestId   String   @map("guest_id")
+  authorId  String   @map("author_id")
+  content   String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  guest  Guest @relation(fields: [guestId], references: [id], onDelete: Cascade)
+  author User  @relation(fields: [authorId], references: [id])
+
+  @@index([guestId, createdAt])
+  @@map("notes")
+}
+
+model MessageLog {
+  id             String        @id @default(uuid())
+  guestId        String        @map("guest_id")
+  recipientEmail String        @map("recipient_email")
+  subject        String
+  messageType    String        @map("message_type")
+  status         MessageStatus @default(SENT)
+  sentAt         DateTime      @default(now()) @map("sent_at")
+  errorDetails   String?       @map("error_details")
+
+  guest Guest @relation(fields: [guestId], references: [id], onDelete: Cascade)
+
+  @@index([guestId, sentAt])
+  @@map("message_logs")
 }
 
 model DisplayDevice {

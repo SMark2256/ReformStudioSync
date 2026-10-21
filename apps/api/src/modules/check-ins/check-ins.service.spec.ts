@@ -1,9 +1,14 @@
 import { BadRequestException, ConflictException } from '@nestjs/common';
-import { CheckInStatus, PassType } from '@reform/shared';
+import {
+  CheckInStatus,
+  DUPLICATE_SCAN_COOLDOWN_SECONDS,
+  PassType,
+  VisitType,
+} from '@reform/shared';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { CheckInsService } from './check-ins.service';
 
-describe('CheckInsService — Kritikus Beléptetési Végkimenetelek', () => {
+describe('CheckInsService — Kritikus Beléptetési és Köredzés vs. Kezelés Végkimenetelek (9. fejezet)', () => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let txMock: any;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -29,6 +34,9 @@ describe('CheckInsService — Kritikus Beléptetési Végkimenetelek', () => {
           createdAt: new Date(),
         })),
         update: vi.fn().mockResolvedValue({}),
+      },
+      visit: {
+        create: vi.fn().mockResolvedValue({ id: 'visit-1' }),
       },
       guest: {
         findUnique: vi.fn(),
@@ -62,6 +70,7 @@ describe('CheckInsService — Kritikus Beléptetési Végkimenetelek', () => {
       lastName: 'Kovács',
       barcode: 'RS100001',
       isActive: true,
+      memberships: [],
       passes: [
         {
           id: 'pass-10',
@@ -105,6 +114,7 @@ describe('CheckInsService — Kritikus Beléptetési Végkimenetelek', () => {
       lastName: 'Kovács',
       barcode: 'RS100001',
       isActive: true,
+      memberships: [],
       passes: [
         {
           id: 'pass-occ',
@@ -113,7 +123,7 @@ describe('CheckInsService — Kritikus Beléptetési Végkimenetelek', () => {
           totalPasses: 10,
           remainingPasses: 5,
           startDate: pastDate(10),
-          expirationDate: futureDate(5), // Hamarabb lejár, de alkalmas
+          expirationDate: futureDate(5),
           isActive: true,
           isFrozen: false,
           passTemplate: { name: '10 Alkalmas Bérlet' },
@@ -141,7 +151,6 @@ describe('CheckInsService — Kritikus Beléptetési Végkimenetelek', () => {
     expect(result.status).toBe(CheckInStatus.SUCCESS);
     expect(result.passType).toBe(PassType.TIME_BASED);
     expect(result.remainingPasses).toBe('Korlátlan');
-    // Nem nyúlhatott az alkalmas bérlethez!
     expect(txMock.guestPass.updateMany).not.toHaveBeenCalled();
   });
 
@@ -152,6 +161,7 @@ describe('CheckInsService — Kritikus Beléptetési Végkimenetelek', () => {
       lastName: 'Kovács',
       barcode: 'RS100001',
       isActive: true,
+      memberships: [],
       passes: [
         {
           id: 'pass-later',
@@ -201,6 +211,7 @@ describe('CheckInsService — Kritikus Beléptetési Végkimenetelek', () => {
       lastName: 'Nagy',
       barcode: 'RS100002',
       isActive: true,
+      memberships: [],
       passes: [
         {
           id: 'pass-last',
@@ -209,7 +220,7 @@ describe('CheckInsService — Kritikus Beléptetési Végkimenetelek', () => {
           totalPasses: 5,
           remainingPasses: 1,
           startDate: pastDate(28),
-          expirationDate: futureDate(2), // 2 nap múlva lejár
+          expirationDate: futureDate(2),
           isActive: true,
           isFrozen: false,
           passTemplate: { name: '5 Alkalmas Reformer Bérlet' },
@@ -227,20 +238,22 @@ describe('CheckInsService — Kritikus Beléptetési Végkimenetelek', () => {
     expect(result.warnings).toContain('LAST_OCCASION');
     expect(result.warnings).toContain('EXPIRING_SOON');
     expect(result.suggestedRenewalTemplateId).toBe('tpl-5');
-    // 0 alkalomnál a bérletet inaktiválni kell
     expect(txMock.guestPass.update).toHaveBeenCalledWith({
       where: { id: 'pass-last' },
       data: { isActive: false },
     });
   });
 
-  it('5. 60 mp-es Dupla Lehúzás Védelem (DUPLICATE_SCAN): 60 mp-en belül nem von le újabb alkalmat, kivéve forceDuplicate=true esetén', async () => {
+  it('5. 10 mp-es Dupla Lehúzás Védelem (DUPLICATE_SCAN): 10 mp-en belül nem von le újabb alkalmat, kivéve forceDuplicate=true esetén', async () => {
+    expect(DUPLICATE_SCAN_COOLDOWN_SECONDS).toBe(10);
+
     txMock.guest.findUnique.mockResolvedValue({
       id: 'guest-1',
       firstName: 'Anna',
       lastName: 'Kovács',
       barcode: 'RS100001',
       isActive: true,
+      memberships: [],
       passes: [
         {
           id: 'pass-10',
@@ -257,12 +270,12 @@ describe('CheckInsService — Kritikus Beléptetési Végkimenetelek', () => {
       ],
     });
 
-    // Volt egy sikeres belépés 15 másodperce
+    // Volt egy sikeres belépés 4 másodperce (10 mp-en belül)
     txMock.loggedCheckIn.findFirst.mockResolvedValue({
       id: 'recent-checkin-1',
       guestId: 'guest-1',
       status: 'SUCCESS',
-      createdAt: new Date(Date.now() - 15 * 1000),
+      createdAt: new Date(Date.now() - 4 * 1000),
       guestPass: {
         type: 'OCCASION_BASED',
         remainingPasses: 6,
@@ -273,7 +286,6 @@ describe('CheckInsService — Kritikus Beléptetési Végkimenetelek', () => {
       },
     });
 
-    // Alapértelmezett lehúzás -> DUPLICATE_SCAN, nincs levonás
     const duplicateRes = await service.processBarcodeCheckIn(
       { barcode: 'RS100001' },
       'staff-1',
@@ -281,7 +293,6 @@ describe('CheckInsService — Kritikus Beléptetési Végkimenetelek', () => {
     expect(duplicateRes.status).toBe(CheckInStatus.DUPLICATE_SCAN);
     expect(txMock.guestPass.updateMany).not.toHaveBeenCalled();
 
-    // Felülbírálás (forceDuplicate: true) -> SUCCESS és levonja az alkalmat
     const forcedRes = await service.processBarcodeCheckIn(
       { barcode: 'RS100001', forceDuplicate: true },
       'staff-1',
@@ -292,13 +303,13 @@ describe('CheckInsService — Kritikus Beléptetési Végkimenetelek', () => {
   });
 
   it('6. Elutasítások (DENIED): Fagyasztott bérlet, lejárt bérlet vagy ismeretlen vonalkód esetén nem történik levonás', async () => {
-    // 6/A: Fagyasztott bérlet
     txMock.guest.findUnique.mockResolvedValue({
       id: 'guest-frozen',
       firstName: 'Eszter',
       lastName: 'Tóth',
       barcode: 'RS100004',
       isActive: true,
+      memberships: [],
       passes: [
         {
           id: 'pass-frozen',
@@ -323,7 +334,6 @@ describe('CheckInsService — Kritikus Beléptetési Végkimenetelek', () => {
     expect(frozenRes.reason).toContain('fagyasztva');
     expect(txMock.guestPass.updateMany).not.toHaveBeenCalled();
 
-    // 6/B: Ismeretlen vonalkód -> BadRequestException
     txMock.guest.findUnique.mockResolvedValue(null);
     await expect(
       service.processBarcodeCheckIn({ barcode: 'UNKNOWN999' }, 'staff-1'),
@@ -337,6 +347,7 @@ describe('CheckInsService — Kritikus Beléptetési Végkimenetelek', () => {
       lastName: 'Kovács',
       barcode: 'RS100001',
       isActive: true,
+      memberships: [],
       passes: [
         {
           id: 'pass-race',
@@ -353,7 +364,6 @@ describe('CheckInsService — Kritikus Beléptetési Végkimenetelek', () => {
       ],
     });
 
-    // Egy párhuzamos tranzakció már elvitte az utolsó alkalmat
     txMock.guestPass.updateMany.mockResolvedValue({ count: 0 });
 
     await expect(
@@ -363,7 +373,6 @@ describe('CheckInsService — Kritikus Beléptetési Végkimenetelek', () => {
   });
 
   it('8. Beléptetés Sztornó (revokeCheckIn) és Offline Idempotencia (idempotencyKey)', async () => {
-    // 8/A: Sztornó visszaír +1 alkalmat és újra aktiválja a bérletet
     txMock.loggedCheckIn.findFirst.mockResolvedValue({
       id: 'checkin-to-revoke',
       studioId: 'default-studio',
@@ -390,7 +399,6 @@ describe('CheckInsService — Kritikus Beléptetési Végkimenetelek', () => {
     });
     expect(monitorGatewayMock.emitCheckInRevoked).toHaveBeenCalledTimes(1);
 
-    // 8/B: Offline Idempotencia — már feldolgozott idempotencyKey esetén nem von le újra
     txMock.loggedCheckIn.findUnique.mockResolvedValue({
       id: 'existing-offline-checkin',
       status: 'SUCCESS',
@@ -413,5 +421,60 @@ describe('CheckInsService — Kritikus Beléptetési Végkimenetelek', () => {
     );
     expect(idempotentRes.checkInId).toBe('existing-offline-checkin');
     expect(txMock.guestPass.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('9. Köredzéses érkezés (VisitType.CIRCUIT_TRAINING): NEM von le bérletalkalmat, ellenőrzi a tagdíj-tartozást a recepciónak, de a vendégmonitorra diszkrét CIRCUIT_GREETING-et küld', async () => {
+    txMock.guest.findUnique.mockResolvedValue({
+      id: 'guest-circuit',
+      firstName: 'Anna',
+      lastName: 'Kovács',
+      barcode: '100001',
+      isActive: true,
+      memberships: [
+        {
+          id: 'memb-1',
+          status: 'ACTIVE',
+          monthlyFeeHuf: 22000,
+          dueDay: 10,
+          dues: [
+            {
+              id: 'due-1',
+              status: 'PENDING',
+              amountHuf: 22000,
+              paidAmountHuf: 0,
+              dueDate: pastDate(3),
+            },
+          ],
+        },
+      ],
+      passes: [
+        {
+          id: 'pass-hypoxi',
+          passTemplateId: 'tpl-hypoxi',
+          type: 'OCCASION_BASED',
+          totalPasses: 10,
+          remainingPasses: 8,
+          startDate: pastDate(5),
+          expirationDate: futureDate(30),
+          isActive: true,
+          isFrozen: false,
+          passTemplate: { name: '10 Alkalmas Hypoxi Bérlet' },
+        },
+      ],
+    });
+
+    const res = await service.processBarcodeCheckIn(
+      { barcode: '100001', visitType: VisitType.CIRCUIT_TRAINING },
+      'staff-1',
+    );
+
+    expect(res.status).toBe(CheckInStatus.SUCCESS);
+    expect(res.mode).toBe('CIRCUIT_GREETING');
+    expect(res.overdueAmountHuf).toBe(22000);
+    expect(res.warnings).toContain('OVERDUE_DUES');
+    // Nem vonhatott le a Hypoxi alkalmas bérletből!
+    expect(txMock.guestPass.updateMany).not.toHaveBeenCalled();
+    expect(txMock.visit.create).toHaveBeenCalledTimes(1);
+    expect(monitorGatewayMock.emitCheckInResult).toHaveBeenCalledTimes(1);
   });
 });

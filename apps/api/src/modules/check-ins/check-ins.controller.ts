@@ -6,10 +6,10 @@ import { JwtAuthGuard } from '../../common/jwt-auth.guard';
 import { ScanCheckInDto, SyncOfflineScansDto } from './check-ins.dto';
 import { CheckInsService } from './check-ins.service';
 
-@ApiTags('Beléptetés & Sztornó (Check-Ins)')
+@ApiTags('Beléptetés & Sztornó (Check-Ins / Checkins)')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
-@Controller('check-ins')
+@Controller(['check-ins', 'checkins'])
 export class CheckInsController {
   constructor(private readonly checkInsService: CheckInsService) {}
 
@@ -19,10 +19,22 @@ export class CheckInsController {
     return this.checkInsService.listTodayCheckIns(user.studioId);
   }
 
+  @Post()
+  @ApiOperation({
+    summary: 'Köredzéses érkezés / beléptetés (POST /api/checkins)',
+  })
+  createCheckIn(@Body() dto: ScanCheckInDto, @CurrentUser() user: AuthUserDto) {
+    return this.checkInsService.processBarcodeCheckIn(
+      dto,
+      user.id,
+      user.studioId,
+    );
+  }
+
   @Post('scan')
   @ApiOperation({
     summary:
-      'Vonalkódos beléptetés atomi tranzakcióval, 60mp dupla lehúzás védelemmel és WebSocket push-sal',
+      'Vonalkódos beléptetés atomi tranzakcióval, 10mp dupla lehúzás védelemmel és WebSocket push-sal',
   })
   scan(@Body() dto: ScanCheckInDto, @CurrentUser() user: AuthUserDto) {
     return this.checkInsService.processBarcodeCheckIn(

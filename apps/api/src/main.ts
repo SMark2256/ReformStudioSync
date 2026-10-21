@@ -29,7 +29,7 @@ async function bootstrap() {
     .setDescription(
       'ReformStudioSync — Recepciós, Pénzügyi és Valós Idejű Vendégmonitor REST & WebSocket API',
     )
-    .setVersion('1.0.0')
+    .setVersion('0.1.0')
     .addBearerAuth()
     .build();
 

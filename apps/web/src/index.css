@@ -68,57 +68,153 @@
   background-color: rgba(30, 41, 59, 0.6) !important;
 }
 
-/* Státusz kártyák finomhangolása sötét módban */
-.reception-theme-dark .bg-emerald-50\/60,
-.reception-theme-dark .bg-emerald-50\/70,
-.reception-theme-dark .bg-emerald-50 {
+/* Státusz kártyák és jelvények finomhangolása sötét módban */
+.reception-theme-dark .bg-emerald-50\/60:not(.monitor-invariant *),
+.reception-theme-dark .bg-emerald-50\/70:not(.monitor-invariant *),
+.reception-theme-dark .bg-emerald-50\/50:not(.monitor-invariant *),
+.reception-theme-dark .bg-emerald-50:not(.monitor-invariant *),
+.reception-theme-dark .bg-emerald-100:not(.monitor-invariant *) {
   background-color: rgba(16, 185, 129, 0.14) !important;
   border-color: rgba(16, 185, 129, 0.35) !important;
 }
 
-.reception-theme-dark .text-emerald-800,
-.reception-theme-dark .text-emerald-700 {
+.reception-theme-dark .hover\:bg-emerald-100\/70:hover:not(.monitor-invariant *),
+.reception-theme-dark .hover\:bg-emerald-100:hover:not(.monitor-invariant *) {
+  background-color: rgba(16, 185, 129, 0.24) !important;
+  border-color: rgba(16, 185, 129, 0.5) !important;
+}
+
+.reception-theme-dark .text-emerald-900:not(.monitor-invariant *),
+.reception-theme-dark .text-emerald-800:not(.monitor-invariant *),
+.reception-theme-dark .text-emerald-700:not(.monitor-invariant *) {
   color: #6ee7b7 !important;
 }
 
-.reception-theme-dark .bg-amber-50\/70,
-.reception-theme-dark .bg-amber-50 {
+.reception-theme-dark .bg-amber-50\/70:not(.monitor-invariant *),
+.reception-theme-dark .bg-amber-50\/60:not(.monitor-invariant *),
+.reception-theme-dark .bg-amber-50\/50:not(.monitor-invariant *),
+.reception-theme-dark .bg-amber-50:not(.monitor-invariant *),
+.reception-theme-dark .bg-amber-100:not(.monitor-invariant *) {
   background-color: rgba(245, 158, 11, 0.14) !important;
   border-color: rgba(245, 158, 11, 0.35) !important;
 }
 
-.reception-theme-dark .text-amber-900,
-.reception-theme-dark .text-amber-800,
-.reception-theme-dark .text-amber-700 {
+.reception-theme-dark .hover\:bg-amber-100\/70:hover:not(.monitor-invariant *),
+.reception-theme-dark .hover\:bg-amber-100:hover:not(.monitor-invariant *) {
+  background-color: rgba(245, 158, 11, 0.24) !important;
+  border-color: rgba(245, 158, 11, 0.5) !important;
+}
+
+.reception-theme-dark .text-amber-900:not(.monitor-invariant *),
+.reception-theme-dark .text-amber-800:not(.monitor-invariant *),
+.reception-theme-dark .text-amber-700:not(.monitor-invariant *) {
   color: #fcd34d !important;
 }
 
-.reception-theme-dark .bg-rose-50\/70,
-.reception-theme-dark .bg-rose-50\/40,
-.reception-theme-dark .bg-rose-50 {
+.reception-theme-dark .bg-orange-50\/70:not(.monitor-invariant *),
+.reception-theme-dark .bg-orange-50\/60:not(.monitor-invariant *),
+.reception-theme-dark .bg-orange-50\/50:not(.monitor-invariant *),
+.reception-theme-dark .bg-orange-50:not(.monitor-invariant *),
+.reception-theme-dark .bg-orange-100:not(.monitor-invariant *) {
+  background-color: rgba(249, 115, 22, 0.14) !important;
+  border-color: rgba(249, 115, 22, 0.35) !important;
+}
+
+.reception-theme-dark .hover\:bg-orange-100\/70:hover:not(.monitor-invariant *),
+.reception-theme-dark .hover\:bg-orange-100:hover:not(.monitor-invariant *) {
+  background-color: rgba(249, 115, 22, 0.24) !important;
+  border-color: rgba(249, 115, 22, 0.5) !important;
+}
+
+.reception-theme-dark .text-orange-900:not(.monitor-invariant *),
+.reception-theme-dark .text-orange-800:not(.monitor-invariant *),
+.reception-theme-dark .text-orange-700:not(.monitor-invariant *) {
+  color: #fdba74 !important;
+}
+
+.reception-theme-dark .bg-rose-50\/70:not(.monitor-invariant *),
+.reception-theme-dark .bg-rose-50\/60:not(.monitor-invariant *),
+.reception-theme-dark .bg-rose-50\/50:not(.monitor-invariant *),
+.reception-theme-dark .bg-rose-50\/40:not(.monitor-invariant *),
+.reception-theme-dark .bg-rose-50:not(.monitor-invariant *),
+.reception-theme-dark .bg-rose-100:not(.monitor-invariant *) {
   background-color: rgba(244, 63, 94, 0.14) !important;
   border-color: rgba(244, 63, 94, 0.35) !important;
 }
 
-.reception-theme-dark .text-rose-800,
-.reception-theme-dark .text-rose-700 {
+.reception-theme-dark .hover\:bg-rose-100\/70:hover:not(.monitor-invariant *),
+.reception-theme-dark .hover\:bg-rose-100:hover:not(.monitor-invariant *) {
+  background-color: rgba(244, 63, 94, 0.24) !important;
+  border-color: rgba(244, 63, 94, 0.5) !important;
+}
+
+.reception-theme-dark .text-rose-900:not(.monitor-invariant *),
+.reception-theme-dark .text-rose-800:not(.monitor-invariant *),
+.reception-theme-dark .text-rose-700:not(.monitor-invariant *) {
   color: #fda4af !important;
 }
 
-.reception-theme-dark .bg-teal-50\/60 {
+.reception-theme-dark .bg-teal-50\/70:not(.monitor-invariant *),
+.reception-theme-dark .bg-teal-50\/60:not(.monitor-invariant *),
+.reception-theme-dark .bg-teal-50\/50:not(.monitor-invariant *),
+.reception-theme-dark .bg-teal-50:not(.monitor-invariant *),
+.reception-theme-dark .bg-teal-100:not(.monitor-invariant *) {
   background-color: rgba(20, 184, 166, 0.14) !important;
   border-color: rgba(20, 184, 166, 0.35) !important;
 }
 
-.reception-theme-dark .text-teal-900 {
+.reception-theme-dark .hover\:bg-teal-100\/70:hover:not(.monitor-invariant *),
+.reception-theme-dark .hover\:bg-teal-100:hover:not(.monitor-invariant *) {
+  background-color: rgba(20, 184, 166, 0.24) !important;
+  border-color: rgba(20, 184, 166, 0.5) !important;
+}
+
+.reception-theme-dark .text-teal-900:not(.monitor-invariant *),
+.reception-theme-dark .text-teal-800:not(.monitor-invariant *),
+.reception-theme-dark .text-teal-700:not(.monitor-invariant *) {
   color: #5eead4 !important;
 }
 
-.reception-theme-dark .bg-sky-50\/70 {
+.reception-theme-dark .bg-sky-50\/70:not(.monitor-invariant *),
+.reception-theme-dark .bg-sky-50\/60:not(.monitor-invariant *),
+.reception-theme-dark .bg-sky-50\/50:not(.monitor-invariant *),
+.reception-theme-dark .bg-sky-50:not(.monitor-invariant *),
+.reception-theme-dark .bg-sky-100:not(.monitor-invariant *) {
   background-color: rgba(14, 165, 233, 0.14) !important;
   border-color: rgba(14, 165, 233, 0.35) !important;
 }
 
-.reception-theme-dark .text-sky-900 {
+.reception-theme-dark .hover\:bg-sky-100\/70:hover:not(.monitor-invariant *),
+.reception-theme-dark .hover\:bg-sky-100:hover:not(.monitor-invariant *) {
+  background-color: rgba(14, 165, 233, 0.24) !important;
+  border-color: rgba(14, 165, 233, 0.5) !important;
+}
+
+.reception-theme-dark .text-sky-900:not(.monitor-invariant *),
+.reception-theme-dark .text-sky-800:not(.monitor-invariant *),
+.reception-theme-dark .text-sky-700:not(.monitor-invariant *) {
   color: #7dd3fc !important;
+}
+
+.reception-theme-dark .bg-indigo-50:not(.monitor-invariant *),
+.reception-theme-dark .bg-indigo-100:not(.monitor-invariant *) {
+  background-color: rgba(99, 102, 241, 0.15) !important;
+  border-color: rgba(99, 102, 241, 0.35) !important;
+}
+
+.reception-theme-dark .text-indigo-800:not(.monitor-invariant *),
+.reception-theme-dark .text-indigo-700:not(.monitor-invariant *) {
+  color: #a5b4fc !important;
+}
+
+.reception-theme-dark button.bg-slate-900:not(.monitor-invariant *),
+.reception-theme-dark a.bg-slate-900:not(.monitor-invariant *) {
+  background-color: #1e293b !important;
+  border: 1px solid #334155 !important;
+  color: #f8fafc !important;
+}
+
+.reception-theme-dark button.bg-slate-900:hover:not(.monitor-invariant *),
+.reception-theme-dark a.bg-slate-900:hover:not(.monitor-invariant *) {
+  background-color: #334155 !important;
 }

@@ -71,22 +71,22 @@ export const SellPassModal: React.FC<SellPassModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
-        <div className="flex items-center justify-between border-b border-slate-100 bg-slate-900 px-6 py-4 text-white">
+      <div className="w-full max-w-xl overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xl">
+        <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 px-6 py-4 text-slate-900 dark:text-white">
           <div className="flex items-center gap-2.5">
-            <Sparkles className="h-5 w-5 text-emerald-400" />
+            <Sparkles className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
             <div>
-              <h3 className="text-lg font-semibold">
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
                 Bérletértékesítés & Kassza Rögzítés
               </h3>
-              <p className="text-xs text-slate-300">
+              <p className="text-xs text-slate-500 dark:text-slate-400">
                 Vendég: {guest.lastName} {guest.firstName} ({guest.barcode})
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white"
+            className="rounded-lg p-1.5 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white"
           >
             <X className="h-5 w-5" />
           </button>

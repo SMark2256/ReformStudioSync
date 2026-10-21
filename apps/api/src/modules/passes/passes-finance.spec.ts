@@ -1,19 +1,24 @@
-import { PaymentMethod } from '@reform/shared';
+import { OverdueBucket, PaymentMethod } from '@reform/shared';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { FinanceService } from '../finance/finance.service';
 import { PassesService } from './passes.service';
 
-describe('PassesService & FinanceService — Kritikus Bérlet és Kassza Végkimenetelek', () => {
+describe('PassesService & FinanceService — Kritikus Bérlet, Kezeléslevonás, Tartozás és Kassza Végkimenetelek (9. fejezet)', () => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let txMock: any;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let prismaMock: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let monitorGatewayMock: any;
   let passesService: PassesService;
   let financeService: FinanceService;
 
   beforeEach(() => {
     txMock = {
       guest: {
+        findFirst: vi.fn(),
+      },
+      service: {
         findFirst: vi.fn(),
       },
       passTemplate: {
@@ -23,13 +28,33 @@ describe('PassesService & FinanceService — Kritikus Bérlet és Kassza Végkim
         findFirst: vi.fn(),
         create: vi.fn(),
         update: vi.fn(),
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
       },
       passUsageLog: {
-        create: vi.fn(),
+        findUnique: vi.fn().mockResolvedValue(null),
+        findFirst: vi.fn(),
+        create: vi.fn().mockResolvedValue({ id: 'usage-1' }),
+        update: vi.fn().mockResolvedValue({}),
+      },
+      loggedCheckIn: {
+        create: vi.fn().mockResolvedValue({ id: 'chk-treatment-1' }),
+      },
+      visit: {
+        create: vi.fn().mockResolvedValue({ id: 'visit-treatment-1' }),
+      },
+      auditLog: {
+        create: vi.fn().mockResolvedValue({ id: 'audit-1' }),
       },
       payment: {
         findFirst: vi.fn(),
         create: vi.fn(),
+        update: vi.fn(),
+      },
+      paymentAllocation: {
+        create: vi.fn().mockResolvedValue({ id: 'alloc-1' }),
+      },
+      membershipDue: {
+        findUnique: vi.fn(),
         update: vi.fn(),
       },
     };
@@ -40,9 +65,17 @@ describe('PassesService & FinanceService — Kritikus Bérlet és Kassza Végkim
       payment: {
         findMany: vi.fn(),
       },
+      membershipDue: {
+        findMany: vi.fn(),
+      },
     };
 
-    passesService = new PassesService(prismaMock);
+    monitorGatewayMock = {
+      emitCheckInResult: vi.fn(),
+      emitCheckInRevoked: vi.fn(),
+    };
+
+    passesService = new PassesService(prismaMock, monitorGatewayMock);
     financeService = new FinanceService(prismaMock);
   });
 
@@ -148,7 +181,6 @@ describe('PassesService & FinanceService — Kritikus Bérlet és Kassza Végkim
   });
 
   it('3. Napi Kasszazárás és Fizetés Sztornó (cancelPayment): a sztornózott fizetés inaktiválja a bérletet és nem számít bele a napi bevételbe', async () => {
-    // 3/A: Sztornózás inaktiválja a bérletet
     txMock.payment.findFirst.mockResolvedValue({
       id: 'pay-to-cancel',
       studioId: 'default-studio',
@@ -194,7 +226,6 @@ describe('PassesService & FinanceService — Kritikus Bérlet és Kassza Végkim
       data: { isActive: false },
     });
 
-    // 3/B: Napi kassza összesítés csak a nem sztornózott tételeket számolja
     prismaMock.payment.findMany.mockResolvedValue([
       {
         id: 'pay-1',
@@ -219,7 +250,7 @@ describe('PassesService & FinanceService — Kritikus Bérlet és Kassza Végkim
         recordedByUserId: 'staff-1',
         amount: 28000,
         paymentMethod: 'CASH',
-        isCancelled: true, // Sztornózott!
+        isCancelled: true,
         note: 'Sztornózva',
         createdAt: new Date(),
         guest: { firstName: 'Péter', lastName: 'Nagy' },
@@ -234,5 +265,164 @@ describe('PassesService & FinanceService — Kritikus Bérlet és Kassza Végkim
     expect(summary.byMethod.CASH).toBe(0);
     expect(summary.activeTransactionCount).toBe(1);
     expect(summary.cancelledTransactionCount).toBe(1);
+  });
+
+  it('4. Alkalmas kezelés levonás (deductTreatmentUsage) és visszavonás (reversePassUsage) indoklással + AuditLog', async () => {
+    txMock.guest.findFirst = vi.fn().mockResolvedValue({
+      id: 'guest-1',
+      firstName: 'Anna',
+      lastName: 'Kovács',
+      barcode: '100001',
+      isActive: true,
+    });
+    txMock.guestPass.findFirst.mockResolvedValue({
+      id: 'pass-hypoxi',
+      studioId: 'default-studio',
+      guestId: 'guest-1',
+      passTemplateId: 'tpl-hypoxi',
+      type: 'OCCASION_BASED',
+      totalPasses: 10,
+      remainingPasses: 3, // Levonás után 2 marad -> LOW_OCCASIONS figyelmeztetés!
+      expirationDate: new Date(Date.now() + 20 * 24 * 60 * 60 * 1000),
+      isActive: true,
+      isFrozen: false,
+      guest: { id: 'guest-1', firstName: 'Anna', lastName: 'Kovács', barcode: '100001' },
+      passTemplate: { name: '10 Alkalmas Hypoxi Bérlet' },
+    });
+    txMock.service.findFirst.mockResolvedValue({
+      id: 'srv-hypoxi',
+      name: 'Hypoxi Kezelés',
+    });
+
+    const deductRes = await passesService.deductTreatmentUsage(
+      {
+        guestId: 'guest-1',
+        passId: 'pass-hypoxi',
+        serviceId: 'srv-hypoxi',
+        operationKey: 'op-key-1',
+      },
+      'staff-1',
+    );
+
+    expect(deductRes.status).toBe('SUCCESS');
+    expect(deductRes.mode).toBe('TREATMENT_GREETING');
+    expect(deductRes.serviceName).toBe('Hypoxi Kezelés');
+    expect(deductRes.remainingPasses).toBe(2);
+    expect(deductRes.warnings).toContain('LOW_OCCASIONS');
+
+    // Visszavonás tesztelése
+    txMock.passUsageLog.findFirst.mockResolvedValue({
+      id: 'usage-1',
+      guestPassId: 'pass-hypoxi',
+      reversedAt: null,
+      service: { name: 'Hypoxi Kezelés' },
+      guestPass: {
+        id: 'pass-hypoxi',
+        studioId: 'default-studio',
+        guestId: 'guest-1',
+        type: 'OCCASION_BASED',
+        remainingPasses: 2,
+        guest: { firstName: 'Anna', lastName: 'Kovács' },
+      },
+    });
+    txMock.guestPass.update.mockResolvedValue({
+      id: 'pass-hypoxi',
+      remainingPasses: 3,
+      isActive: true,
+    });
+
+    const revRes = await passesService.reversePassUsage(
+      'usage-1',
+      { reversalReason: 'Téves kezelésválasztás' },
+      'staff-1',
+    );
+    expect(revRes.restoredRemainingPasses).toBe(3);
+    expect(txMock.auditLog.create).toHaveBeenCalledTimes(1);
+  });
+
+  it('5. Havi tagdíj késési kategóriák (1–5, 6–15, 15+ nap) és részbefizetés allokáció (recordPayment)', async () => {
+    const now = Date.now();
+    prismaMock.membership = {
+      findMany: vi.fn().mockResolvedValue([
+        {
+          id: 'm1',
+          guestId: 'g1',
+          status: 'ACTIVE',
+          guest: {
+            id: 'g1',
+            firstName: 'Péter',
+            lastName: 'Nagy',
+            barcode: '100002',
+            phone: '+36301112222',
+          },
+          dues: [
+            {
+              id: 'due-3days',
+              membershipId: 'm1',
+              period: '2026-10',
+              dueDate: new Date(now - 3 * 24 * 60 * 60 * 1000),
+              amountHuf: 22000,
+              paidAmountHuf: 0,
+              status: 'PENDING',
+            },
+          ],
+        },
+        {
+          id: 'm2',
+          guestId: 'g2',
+          status: 'ACTIVE',
+          guest: {
+            id: 'g2',
+            firstName: 'Zsófia',
+            lastName: 'Varga',
+            barcode: '100005',
+            phone: '+36303334444',
+          },
+          dues: [
+            {
+              id: 'due-10days',
+              membershipId: 'm2',
+              period: '2026-10',
+              dueDate: new Date(now - 10 * 24 * 60 * 60 * 1000),
+              amountHuf: 22000,
+              paidAmountHuf: 10000, // Részbefizetés történt!
+              status: 'PARTIAL',
+            },
+          ],
+        },
+        {
+          id: 'm3',
+          guestId: 'g3',
+          status: 'ACTIVE',
+          guest: {
+            id: 'g3',
+            firstName: 'Gábor',
+            lastName: 'Tóth',
+            barcode: '100004',
+            phone: '+36305556666',
+          },
+          dues: [
+            {
+              id: 'due-20days',
+              membershipId: 'm3',
+              period: '2026-09',
+              dueDate: new Date(now - 20 * 24 * 60 * 60 * 1000),
+              amountHuf: 20000,
+              paidAmountHuf: 0,
+              status: 'PENDING',
+            },
+          ],
+        },
+      ]),
+    };
+
+    const overdueReport = await financeService.getOverdueMemberships();
+    expect(overdueReport.buckets.DAYS_1_5).toHaveLength(1);
+    expect(overdueReport.buckets.DAYS_6_15).toHaveLength(1);
+    expect(overdueReport.buckets.DAYS_OVER_15).toHaveLength(1);
+    expect(overdueReport.totalOverdueHuf).toBe(22000 + 12000 + 20000);
+    expect(overdueReport.buckets.DAYS_OVER_15[0].overdueBucket).toBe(
+      OverdueBucket.DAYS_OVER_15,
+    );
   });
 });

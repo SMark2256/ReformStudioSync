@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { PassType, PaymentMethod } from '@reform/shared';
+import { PassType, PaymentMethod, ServiceCategory } from '@reform/shared';
 import {
   IsBoolean,
   IsDateString,
@@ -12,11 +12,37 @@ import {
   Min,
 } from 'class-validator';
 
+export class CreateServiceDto {
+  @ApiProperty({ example: 'Hypoxi Alakformálás' })
+  @IsString()
+  @IsNotEmpty({ message: 'A szolgáltatás nevének megadása kötelező.' })
+  name: string;
+
+  @ApiProperty({ enum: ServiceCategory, default: ServiceCategory.BODY_SHAPING })
+  @IsEnum(ServiceCategory)
+  category: ServiceCategory;
+
+  @ApiProperty({ example: 30 })
+  @IsInt()
+  @Min(5)
+  durationMinutes: number;
+
+  @ApiProperty({ example: 8500 })
+  @IsInt()
+  @Min(0)
+  priceHuf: number;
+}
+
 export class CreatePassTemplateDto {
   @ApiProperty({ example: '10 Alkalmas Reformer Bérlet' })
   @IsString()
   @IsNotEmpty({ message: 'A bérletsablon nevének megadása kötelező.' })
   name: string;
+
+  @ApiPropertyOptional({ description: 'Kapcsolódó szolgáltatás azonosítója' })
+  @IsOptional()
+  @IsString()
+  serviceId?: string | null;
 
   @ApiProperty({ enum: PassType })
   @IsEnum(PassType)
@@ -116,4 +142,40 @@ export class ToggleFreezePassDto {
   @IsOptional()
   @IsString()
   note?: string;
+}
+
+export class DeductPassUsageDto {
+  @ApiProperty({ description: 'Vendég azonosítója' })
+  @IsString()
+  @IsNotEmpty()
+  guestId: string;
+
+  @ApiProperty({ description: 'Kiválasztott aktív bérlet azonosítója' })
+  @IsString()
+  @IsNotEmpty()
+  passId: string;
+
+  @ApiProperty({ description: 'Kiválasztott kezelés (Service) azonosítója' })
+  @IsString()
+  @IsNotEmpty()
+  serviceId: string;
+
+  @ApiPropertyOptional({
+    description: 'Egyedi műveletazonosító dupla kérés / versenyhelyzet ellen',
+  })
+  @IsOptional()
+  @IsString()
+  operationKey?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  note?: string;
+}
+
+export class ReversePassUsageDto {
+  @ApiProperty({ example: 'Téves bérlet vagy kezelés kiválasztás' })
+  @IsString()
+  @IsNotEmpty({ message: 'A visszavonás indokának megadása kötelező.' })
+  reversalReason: string;
 }

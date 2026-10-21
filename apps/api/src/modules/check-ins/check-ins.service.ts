@@ -15,6 +15,7 @@ import {
   LoggedCheckInDto,
   OfflineSyncResponseDto,
   PassType,
+  VisitType,
 } from '@reform/shared';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MonitorGateway } from '../monitor/monitor.gateway';
@@ -27,6 +28,15 @@ export class CheckInsService {
     private readonly monitorGateway: MonitorGateway,
   ) {}
 
+  /**
+   * 2.3 Köredzéses érkezés (CIRCUIT_TRAINING) vagy általános vonalkódos beléptetés.
+   * - Ha a vendégnek van aktív havi köredzés tagsága (Membership) VAGY időkorlátos bérlete (TIME_BASED),
+   *   akkor köredzéses érkezést rögzítünk (visits + logged_check_ins) ALKALOMLEVONÁS NÉLKÜL.
+   * - A vendégmonitorra a 'CIRCUIT_GREETING' mód megy ki: "Üdvözlünk, [Név]! Jó edzést kívánunk!"
+   *   (nem mutat tartozást és nem mutat bérletszámot).
+   * - Ha csak alkalom alapú bérlete van (és nem kifejezetten CIRCUIT_TRAINING módot kértek),
+   *   akkor kompatibilitási okokból atomi alkalomlevonást is tud végezni.
+   */
   async processBarcodeCheckIn(
     dto: ScanCheckInDto,
     staffUserId: string,
@@ -48,6 +58,10 @@ export class CheckInsService {
         if (existingByKey) {
           return {
             checkInId: existingByKey.id,
+            mode:
+              existingByKey.visitType === 'CIRCUIT_TRAINING'
+                ? ('CIRCUIT_GREETING' as const)
+                : ('TREATMENT_GREETING' as const),
             status: existingByKey.status as unknown as CheckInStatus,
             guestId: existingByKey.guestId,
             barcode: existingByKey.guest.barcode,
@@ -82,6 +96,10 @@ export class CheckInsService {
             include: { passTemplate: true },
             orderBy: { expirationDate: 'asc' },
           },
+          memberships: {
+            include: { dues: true },
+            orderBy: { createdAt: 'desc' },
+          },
         },
       });
 
@@ -93,6 +111,7 @@ export class CheckInsService {
 
       const guestFullName = `${guest.lastName} ${guest.firstName}`;
 
+      // 10 másodperces dupla leolvasás védelem
       if (!dto.forceDuplicate) {
         const cooldownSince = new Date(
           now.getTime() - DUPLICATE_SCAN_COOLDOWN_SECONDS * 1000,
@@ -113,6 +132,7 @@ export class CheckInsService {
         if (recentCheckIn) {
           return {
             checkInId: recentCheckIn.id,
+            mode: 'CIRCUIT_GREETING',
             status: CheckInStatus.DUPLICATE_SCAN,
             guestId: guest.id,
             barcode: guest.barcode,
@@ -135,6 +155,80 @@ export class CheckInsService {
         }
       }
 
+      // Ellenőrizzük a havi tagságot és az esetleges elmaradásokat (tartozásokat) a recepciós számára
+      const activeMembership = (guest.memberships ?? []).find(
+        (m) => m.status === 'ACTIVE',
+      );
+      const pausedMembership = (guest.memberships ?? []).find(
+        (m) => m.status === 'PAUSED',
+      );
+
+      let overdueAmountHuf = 0;
+      let maxOverdueDays = 0;
+      for (const m of guest.memberships ?? []) {
+        for (const d of m.dues ?? []) {
+          if (d.status === 'PAID' || d.status === 'WAIVED') continue;
+          const rem = Math.max(0, d.amountHuf - d.paidAmountHuf);
+          if (rem > 0 && d.dueDate < now) {
+            overdueAmountHuf += rem;
+            const days = Math.ceil(
+              (now.getTime() - d.dueDate.getTime()) / (24 * 60 * 60 * 1000),
+            );
+            if (days > maxOverdueDays) maxOverdueDays = days;
+          }
+        }
+      }
+
+      const warnings: CheckInWarningCode[] = [];
+      if (overdueAmountHuf > 0) {
+        warnings.push('OVERDUE_DUES');
+      }
+      if (pausedMembership && !activeMembership) {
+        warnings.push('MEMBERSHIP_PAUSED');
+      }
+
+      // Ha kifejezetten köredzéses érkezés vagy van aktív havi tagsága: nincs alkalomlevonás!
+      if (dto.visitType === VisitType.CIRCUIT_TRAINING && activeMembership) {
+        await tx.visit
+          .create({
+            data: {
+              studioId,
+              guestId: guest.id,
+              visitType: 'CIRCUIT_TRAINING',
+              employeeId: staffUserId,
+            },
+          })
+          .catch(() => null);
+
+        const checkInRecord = await tx.loggedCheckIn.create({
+          data: {
+            studioId,
+            guestId: guest.id,
+            guestPassId: null,
+            userId: staffUserId,
+            visitType: 'CIRCUIT_TRAINING',
+            status: 'SUCCESS',
+            idempotencyKey: dto.idempotencyKey ?? null,
+          },
+        });
+
+        return {
+          checkInId: checkInRecord.id,
+          mode: 'CIRCUIT_GREETING',
+          status: CheckInStatus.SUCCESS,
+          guestId: guest.id,
+          barcode: guest.barcode,
+          guestName: guestFullName,
+          serviceName: 'Köredzés',
+          passName: `Havi Köredzés Tagság (${activeMembership.monthlyFeeHuf.toLocaleString('hu-HU')} Ft/hó)`,
+          remainingPasses: 'Korlátlan',
+          warnings,
+          overdueAmountHuf: overdueAmountHuf > 0 ? overdueAmountHuf : undefined,
+          overdueDays: maxOverdueDays > 0 ? maxOverdueDays : undefined,
+          timestamp: now.toISOString(),
+        } satisfies CheckInResultPayload;
+      }
+
       const validPasses = guest.passes.filter((p) => {
         if (!p.isActive || p.isFrozen) return false;
         if (p.startDate > now || p.expirationDate < now) return false;
@@ -150,13 +244,57 @@ export class CheckInsService {
 
       const activePass = validPasses[0];
 
+      // Ha nincs aktív bérlete, de van aktív havi tagsága -> köredzéses beléptetés alkalomlevonás nélkül
+      if (!activePass && activeMembership) {
+        await tx.visit
+          .create({
+            data: {
+              studioId,
+              guestId: guest.id,
+              visitType: 'CIRCUIT_TRAINING',
+              employeeId: staffUserId,
+            },
+          })
+          .catch(() => null);
+
+        const checkInRecord = await tx.loggedCheckIn.create({
+          data: {
+            studioId,
+            guestId: guest.id,
+            guestPassId: null,
+            userId: staffUserId,
+            visitType: 'CIRCUIT_TRAINING',
+            status: 'SUCCESS',
+            idempotencyKey: dto.idempotencyKey ?? null,
+          },
+        });
+
+        return {
+          checkInId: checkInRecord.id,
+          mode: 'CIRCUIT_GREETING',
+          status: CheckInStatus.SUCCESS,
+          guestId: guest.id,
+          barcode: guest.barcode,
+          guestName: guestFullName,
+          serviceName: 'Köredzés',
+          passName: `Havi Köredzés Tagság (${activeMembership.monthlyFeeHuf.toLocaleString('hu-HU')} Ft/hó)`,
+          remainingPasses: 'Korlátlan',
+          warnings,
+          overdueAmountHuf: overdueAmountHuf > 0 ? overdueAmountHuf : undefined,
+          overdueDays: maxOverdueDays > 0 ? maxOverdueDays : undefined,
+          timestamp: now.toISOString(),
+        } satisfies CheckInResultPayload;
+      }
+
       if (!activePass) {
         const hasFrozenPass = guest.passes.some(
           (p) => p.isActive && p.isFrozen && p.expirationDate >= now,
         );
         const deniedReason = hasFrozenPass
           ? 'A vendég bérlete jelenleg fagyasztva van (szünetel).'
-          : 'Nincs érvényes bérlet (lejárt vagy elfogytak az alkalmak)!';
+          : pausedMembership
+            ? 'A vendég havi tagsága jelenleg szüneteltetve van.'
+            : 'Nincs érvényes bérlet vagy aktív tagság (lejárt vagy elfogytak az alkalmak)!';
 
         const lastKnownPass = guest.passes[guest.passes.length - 1];
 
@@ -174,20 +312,26 @@ export class CheckInsService {
 
         return {
           checkInId: deniedLog.id,
+          mode: 'CIRCUIT_GREETING',
           status: CheckInStatus.DENIED,
           guestId: guest.id,
           barcode: guest.barcode,
           guestName: guestFullName,
           reason: deniedReason,
-          warnings: [],
+          warnings,
+          overdueAmountHuf: overdueAmountHuf > 0 ? overdueAmountHuf : undefined,
+          overdueDays: maxOverdueDays > 0 ? maxOverdueDays : undefined,
           suggestedRenewalTemplateId: lastKnownPass?.passTemplateId ?? null,
           timestamp: now.toISOString(),
         } satisfies CheckInResultPayload;
       }
 
       let newRemaining: number | 'Korlátlan' = 'Korlátlan';
+      const isCircuitMode =
+        dto.visitType === VisitType.CIRCUIT_TRAINING ||
+        activePass.type === 'TIME_BASED';
 
-      if (activePass.type === 'OCCASION_BASED') {
+      if (!isCircuitMode && activePass.type === 'OCCASION_BASED') {
         const atomicUpdate = await tx.guestPass.updateMany({
           where: {
             id: activePass.id,
@@ -219,11 +363,26 @@ export class CheckInsService {
         await tx.passUsageLog.create({
           data: {
             guestPassId: activePass.id,
+            guestId: guest.id,
+            employeeId: staffUserId,
             delta: -1,
             note: 'Vonalkódos beléptetés',
           },
         });
+      } else if (activePass.type === 'OCCASION_BASED') {
+        newRemaining = activePass.remainingPasses ?? 0;
       }
+
+      await tx.visit
+        .create({
+          data: {
+            studioId,
+            guestId: guest.id,
+            visitType: isCircuitMode ? 'CIRCUIT_TRAINING' : 'TREATMENT',
+            employeeId: staffUserId,
+          },
+        })
+        .catch(() => null);
 
       const checkInRecord = await tx.loggedCheckIn.create({
         data: {
@@ -231,18 +390,21 @@ export class CheckInsService {
           guestId: guest.id,
           guestPassId: activePass.id,
           userId: staffUserId,
+          visitType: isCircuitMode ? 'CIRCUIT_TRAINING' : 'TREATMENT',
           status: 'SUCCESS',
           idempotencyKey: dto.idempotencyKey ?? null,
         },
       });
 
-      const warnings: CheckInWarningCode[] = [];
       if (
         activePass.type === 'OCCASION_BASED' &&
-        typeof newRemaining === 'number' &&
-        newRemaining <= 1
+        typeof newRemaining === 'number'
       ) {
-        warnings.push('LAST_OCCASION');
+        if (newRemaining <= 1) {
+          warnings.push('LAST_OCCASION');
+        } else if (newRemaining === 2) {
+          warnings.push('LOW_OCCASIONS');
+        }
       }
 
       const daysUntilExpiration = Math.ceil(
@@ -255,22 +417,27 @@ export class CheckInsService {
 
       return {
         checkInId: checkInRecord.id,
+        mode: isCircuitMode ? 'CIRCUIT_GREETING' : 'TREATMENT_GREETING',
         status: CheckInStatus.SUCCESS,
         guestId: guest.id,
         barcode: guest.barcode,
         guestName: guestFullName,
+        serviceName: isCircuitMode
+          ? 'Köredzés'
+          : activePass.passTemplate.name,
         passName: activePass.passTemplate.name,
         passType: activePass.type as unknown as PassType,
         remainingPasses: newRemaining,
         totalPasses: activePass.totalPasses,
         expirationDate: activePass.expirationDate.toISOString(),
         warnings,
+        overdueAmountHuf: overdueAmountHuf > 0 ? overdueAmountHuf : undefined,
+        overdueDays: maxOverdueDays > 0 ? maxOverdueDays : undefined,
         suggestedRenewalTemplateId: activePass.passTemplateId,
         timestamp: now.toISOString(),
       } satisfies CheckInResultPayload;
     });
 
-    // Kizárólag a sikeres adatbázis tranzakció (COMMIT) után küldünk WebSocket eseményt
     this.monitorGateway.emitCheckInResult(resultPayload, studioId);
 
     return resultPayload;
@@ -301,7 +468,11 @@ export class CheckInsService {
 
       let restoredRemaining: number | 'Korlátlan' = 'Korlátlan';
 
-      if (checkIn.guestPass && checkIn.guestPass.type === 'OCCASION_BASED') {
+      if (
+        checkIn.guestPass &&
+        checkIn.guestPass.type === 'OCCASION_BASED' &&
+        checkIn.visitType !== 'CIRCUIT_TRAINING'
+      ) {
         const updatedPass = await tx.guestPass.update({
           where: { id: checkIn.guestPass.id },
           data: {
@@ -314,6 +485,7 @@ export class CheckInsService {
         await tx.passUsageLog.create({
           data: {
             guestPassId: checkIn.guestPass.id,
+            guestId: checkIn.guestId,
             delta: 1,
             note: 'Recepciós sztornó (téves beléptetés visszavonva)',
           },
@@ -376,7 +548,10 @@ export class CheckInsService {
       guestName: `${l.guest.lastName} ${l.guest.firstName}`,
       guestBarcode: l.guest.barcode,
       guestPassId: l.guestPassId,
-      passName: l.guestPass?.passTemplate?.name ?? null,
+      passName:
+        l.guestPass?.passTemplate?.name ??
+        (l.visitType === 'CIRCUIT_TRAINING' ? 'Köredzés érkezés' : null),
+      visitType: l.visitType as unknown as VisitType,
       userId: l.userId,
       staffName: l.user.name,
       status: l.status as unknown as CheckInStatus,

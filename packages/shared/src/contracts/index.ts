@@ -1,8 +1,17 @@
 import {
   CheckInStatus,
+  DocumentStatus,
+  DocumentType,
+  GuestStatus,
+  MembershipDueStatus,
+  MembershipStatus,
+  MessageStatus,
+  OverdueBucket,
   PassType,
   PaymentMethod,
   Role,
+  ServiceCategory,
+  VisitType,
 } from '../enums';
 import { CheckInResultPayload } from '../socket-events';
 
@@ -19,9 +28,22 @@ export interface LoginResponseDto {
   user: AuthUserDto;
 }
 
+export interface ServiceDto {
+  id: string;
+  studioId: string;
+  name: string;
+  category: ServiceCategory;
+  durationMinutes: number;
+  priceHuf: number;
+  isActive: boolean;
+  createdAt: string;
+}
+
 export interface PassTemplateDto {
   id: string;
   studioId: string;
+  serviceId?: string | null;
+  serviceName?: string | null;
   name: string;
   type: PassType;
   totalPasses: number | null;
@@ -34,8 +56,18 @@ export interface PassTemplateDto {
 export interface PassUsageLogDto {
   id: string;
   guestPassId: string;
+  guestId?: string;
+  guestName?: string;
+  serviceId?: string | null;
+  serviceName?: string | null;
+  passName?: string | null;
+  employeeId?: string | null;
+  employeeName?: string | null;
   delta: number;
+  remainingAfter?: number | null;
   usedAt: string;
+  reversedAt?: string | null;
+  reversalReason?: string | null;
   note: string | null;
 }
 
@@ -45,9 +77,13 @@ export interface GuestPassDto {
   guestId: string;
   passTemplateId: string;
   passTemplateName?: string;
+  serviceId?: string | null;
+  serviceName?: string | null;
   type: PassType;
   totalPasses: number | null;
   remainingPasses: number | null;
+  calculatedRemainingPasses?: number | null;
+  usedPassesCount?: number;
   startDate: string;
   expirationDate: string;
   isActive: boolean;
@@ -55,6 +91,158 @@ export interface GuestPassDto {
   frozenAt: string | null;
   createdAt: string;
   usageLogs?: PassUsageLogDto[];
+}
+
+export interface MembershipDueDto {
+  id: string;
+  membershipId: string;
+  guestId: string;
+  guestName?: string;
+  period: string; // YYYY-MM
+  dueDate: string;
+  amountHuf: number;
+  paidAmountHuf: number;
+  remainingHuf: number;
+  status: MembershipDueStatus;
+  overdueDays: number;
+  overdueBucket: OverdueBucket;
+  createdAt: string;
+}
+
+export interface MembershipDto {
+  id: string;
+  studioId: string;
+  guestId: string;
+  guestName?: string;
+  monthlyFeeHuf: number;
+  startDate: string;
+  dueDay: number;
+  status: MembershipStatus;
+  pausedAt: string | null;
+  terminatedAt: string | null;
+  createdAt: string;
+  dues: MembershipDueDto[];
+}
+
+export interface VisitDto {
+  id: string;
+  studioId: string;
+  guestId: string;
+  guestName: string;
+  guestBarcode: string;
+  checkedInAt: string;
+  visitType: VisitType;
+  serviceName?: string | null;
+  employeeId: string;
+  employeeName: string;
+}
+
+export interface PaymentAllocationDto {
+  id: string;
+  paymentId: string;
+  membershipDueId: string | null;
+  membershipPeriod?: string | null;
+  passId: string | null;
+  passName?: string | null;
+  amountHuf: number;
+}
+
+export interface PaymentDto {
+  id: string;
+  studioId: string;
+  guestId: string;
+  guestName: string;
+  guestPassId: string | null;
+  passName: string | null;
+  membershipDueId?: string | null;
+  membershipPeriod?: string | null;
+  recordedByUserId: string;
+  recordedByName: string;
+  amount: number;
+  paymentMethod: PaymentMethod;
+  isCancelled: boolean;
+  note: string | null;
+  createdAt: string;
+  allocations?: PaymentAllocationDto[];
+}
+
+export interface MeasurementDto {
+  id: string;
+  guestId: string;
+  measuredAt: string;
+  weightKg: number | null;
+  bodyFatPct: number | null;
+  muscleMassKg: number | null;
+  visceralFat: number | null;
+  waistCm: number | null;
+  hipCm: number | null;
+  thighCm: number | null;
+  armCm: number | null;
+  chestCm: number | null;
+  note: string | null;
+  recordedByName: string;
+}
+
+export interface GuestPhotoDto {
+  id: string;
+  guestId: string;
+  serviceId: string | null;
+  serviceName: string | null;
+  takenAt: string;
+  fileUrl: string;
+  mimeType: string;
+  originalSizeBytes: number;
+  compressedSizeBytes: number;
+  width: number;
+  height: number;
+  visibilityRole: Role;
+  note: string | null;
+}
+
+export interface GuestDocumentDto {
+  id: string;
+  guestId: string;
+  guestName?: string;
+  documentType: DocumentType;
+  title: string;
+  contentText: string;
+  fieldsJson?: Record<string, string>;
+  signatureDataUrl: string | null;
+  signedAt: string | null;
+  status: DocumentStatus;
+  createdAt: string;
+}
+
+export interface GuestNoteDto {
+  id: string;
+  guestId: string;
+  authorId: string;
+  authorName: string;
+  content: string;
+  createdAt: string;
+}
+
+export interface MessageLogDto {
+  id: string;
+  guestId: string;
+  guestName?: string;
+  recipientEmail: string;
+  subject: string;
+  messageType: string;
+  status: MessageStatus;
+  sentAt: string;
+  errorDetails?: string | null;
+}
+
+export interface AuditLogDto {
+  id: string;
+  userId: string;
+  userName: string;
+  action: string;
+  entityType: string;
+  entityId: string;
+  createdAt: string;
+  details: string;
 }
 
 export interface GuestDto {
@@ -65,11 +253,23 @@ export interface GuestDto {
   lastName: string;
   email: string | null;
   phone: string | null;
+  birthDate: string | null;
+  nameDay: string | null; // MM-DD format e.g. "07-26"
+  status: GuestStatus;
   notes: string | null;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
   passes?: GuestPassDto[];
+  memberships?: MembershipDto[];
+  treatmentHistory?: PassUsageLogDto[];
+  visits?: VisitDto[];
+  payments?: PaymentDto[];
+  measurements?: MeasurementDto[];
+  photos?: GuestPhotoDto[];
+  documents?: GuestDocumentDto[];
+  internalNotes?: GuestNoteDto[];
+  messageLogs?: MessageLogDto[];
 }
 
 export interface LoggedCheckInDto {
@@ -80,32 +280,20 @@ export interface LoggedCheckInDto {
   guestBarcode: string;
   guestPassId: string | null;
   passName?: string | null;
+  visitType?: VisitType;
+  serviceName?: string | null;
   userId: string;
   staffName?: string;
   status: CheckInStatus;
   reason: string | null;
-  createdAt: string;
-}
-
-export interface PaymentDto {
-  id: string;
-  studioId: string;
-  guestId: string;
-  guestName: string;
-  guestPassId: string | null;
-  passName: string | null;
-  recordedByUserId: string;
-  recordedByName: string;
-  amount: number;
-  paymentMethod: PaymentMethod;
-  isCancelled: boolean;
-  note: string | null;
+  reversalReason?: string | null;
   createdAt: string;
 }
 
 export interface DailyFinanceSummaryDto {
   date: string;
   totalRevenue: number;
+  monthlyRevenue?: number;
   byMethod: {
     CASH: number;
     POS_CARD: number;
@@ -116,10 +304,96 @@ export interface DailyFinanceSummaryDto {
   payments: PaymentDto[];
 }
 
+export interface OverdueSummaryItemDto {
+  dueId: string;
+  membershipId: string;
+  guestId: string;
+  guestName: string;
+  guestBarcode: string;
+  guestPhone: string | null;
+  period: string;
+  dueDate: string;
+  amountHuf: number;
+  paidAmountHuf: number;
+  remainingHuf: number;
+  overdueDays: number;
+  overdueBucket: OverdueBucket;
+}
+
+export interface OverdueReportDto {
+  totalOverdueHuf: number;
+  totalOverdueCount: number;
+  buckets: {
+    DAYS_1_5: OverdueSummaryItemDto[];
+    DAYS_6_15: OverdueSummaryItemDto[];
+    DAYS_OVER_15: OverdueSummaryItemDto[];
+  };
+  items: OverdueSummaryItemDto[];
+}
+
+export interface TodayDashboardDto {
+  date: string;
+  arrivalsCount: number;
+  circuitArrivalsCount: number;
+  treatmentsUsedCount: number;
+  passesSoldTodayCount: number;
+  todayRevenueHuf: number;
+  monthlyRevenueHuf: number;
+  overdueTotalHuf: number;
+  overdueCount: number;
+  overdueByBucket: {
+    DAYS_1_5: number;
+    DAYS_6_15: number;
+    DAYS_OVER_15: number;
+  };
+  expiringPasses: {
+    passId: string;
+    guestId: string;
+    guestName: string;
+    passName: string;
+    remainingPasses: number | null;
+    expirationDate: string;
+    daysLeft: number;
+  }[];
+  celebrants: {
+    guestId: string;
+    guestName: string;
+    barcode: string;
+    type: 'BIRTHDAY' | 'NAMEDAY' | 'BOTH';
+    detail: string;
+  }[];
+  serviceBreakdown: {
+    serviceName: string;
+    usageCount: number;
+  }[];
+}
+
 export interface ScanCheckInRequestDto {
   barcode: string;
+  visitType?: VisitType;
   forceDuplicate?: boolean;
   idempotencyKey?: string;
+}
+
+export interface DeductPassUsageRequestDto {
+  guestId: string;
+  passId: string;
+  serviceId: string;
+  operationKey?: string;
+  note?: string;
+}
+
+export interface ReversePassUsageRequestDto {
+  reversalReason: string;
+}
+
+export interface RecordPaymentRequestDto {
+  guestId: string;
+  amountHuf: number;
+  paymentMethod: PaymentMethod;
+  membershipDueId?: string | null;
+  passId?: string | null;
+  note?: string;
 }
 
 export interface OfflineScanItemDto {

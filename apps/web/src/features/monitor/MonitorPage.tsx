@@ -3,7 +3,6 @@ import {
   CheckInRevokedPayload,
 } from '@reform/shared';
 import {
-  ArrowLeft,
   Maximize2,
   Monitor,
   ShieldCheck,
@@ -11,9 +10,9 @@ import {
   Wifi,
 } from 'lucide-react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { useMonitorChannel } from '../../hooks/useMonitorChannel';
 import { api } from '../../lib/api';
+import { mockStudioEngine } from '../../lib/mock-engine';
 import { notify } from '../../lib/notify';
 import { soundFeedback } from '../../lib/sound';
 import { useAuthStore } from '../../stores/authStore';
@@ -28,6 +27,9 @@ export const MonitorPage: React.FC = () => {
     useState<CheckInRevokedPayload | null>(null);
   const [showPairingBox, setShowPairingBox] = useState<boolean>(false);
   const [pairingCodeInput, setPairingCodeInput] = useState<string>('');
+  const [isFullscreen, setIsFullscreen] = useState<boolean>(
+    Boolean(typeof document !== 'undefined' && document.fullscreenElement),
+  );
   const resetTimerRef = useRef<number | null>(null);
 
   const handleCheckInResult = useCallback((payload: CheckInResultPayload) => {
@@ -43,9 +45,12 @@ export const MonitorPage: React.FC = () => {
       soundFeedback.playError();
     }
 
+    const durationSeconds =
+      payload.greetingSeconds ?? mockStudioEngine.getMonitorGreetingSeconds();
+
     resetTimerRef.current = window.setTimeout(() => {
       setActiveResult(null);
-    }, 7000);
+    }, durationSeconds * 1000);
   }, []);
 
   const handleCheckInRevoked = useCallback((payload: CheckInRevokedPayload) => {
@@ -60,7 +65,19 @@ export const MonitorPage: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    const onFullscreenChange = () => {
+      setIsFullscreen(Boolean(document.fullscreenElement));
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsFullscreen(false);
+      }
+    };
+    document.addEventListener('fullscreenchange', onFullscreenChange);
+    window.addEventListener('keydown', onKeyDown);
     return () => {
+      document.removeEventListener('fullscreenchange', onFullscreenChange);
+      window.removeEventListener('keydown', onKeyDown);
       if (resetTimerRef.current) window.clearTimeout(resetTimerRef.current);
     };
   }, []);
@@ -89,79 +106,86 @@ export const MonitorPage: React.FC = () => {
   };
 
   const toggleFullscreen = () => {
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen().catch(() => {});
+    if (!document.fullscreenElement && !isFullscreen) {
+      setIsFullscreen(true);
+      setShowPairingBox(false);
+      document.documentElement.requestFullscreen().catch(() => {
+        // Fallback ha a böngésző blokkolja a natív fullscreen API-t: a header akkor is eltűnik
+      });
     } else {
-      document.exitFullscreen().catch(() => {});
+      setIsFullscreen(false);
+      if (document.fullscreenElement) {
+        document.exitFullscreen().catch(() => {});
+      }
     }
   };
 
   return (
     <div className="min-h-screen bg-slate-950 text-white p-4 sm:p-8 flex flex-col justify-between">
-      <header className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <Link
-            to="/reception"
-            className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 border border-slate-800 px-3 py-1.5 text-xs font-medium text-slate-300 hover:bg-slate-800 hover:text-white"
-          >
-            <ArrowLeft className="h-3.5 w-3.5" />
-            Recepció
-          </Link>
-          <div className="flex items-center gap-2 text-xs text-slate-400">
-            <Monitor className="h-4 w-4 text-emerald-400" />
-            <span>
-              Üzemmód:{' '}
-              <strong className="text-slate-200">
-                {deviceToken
-                  ? `Párosított Tablet (${deviceName})`
-                  : accessToken
-                    ? 'Recepciós PC Másodlagos Kijelző'
-                    : 'Helyi / Dual-Screen Szinkron'}
-              </strong>
-            </span>
+      {!isFullscreen && (
+        <header className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 text-xs text-slate-400">
+              <Monitor className="h-4 w-4 text-emerald-400" />
+              <span>
+                Üzemmód:{' '}
+                <strong className="text-slate-200">
+                  {deviceToken
+                    ? `Párosított Tablet (${deviceName})`
+                    : accessToken
+                      ? 'Recepciós PC Másodlagos Kijelző'
+                      : 'Helyi / Dual-Screen Szinkron'}
+                </strong>
+              </span>
+              <span className="rounded-md bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold uppercase text-emerald-300 border border-emerald-500/30">
+                V0.1
+              </span>
+            </div>
           </div>
-        </div>
 
-        <div className="flex items-center gap-2.5">
-          <span
-            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${
-              isConnected
-                ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
-                : 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
-            }`}
-          >
-            <Wifi className="h-3.5 w-3.5" />
-            {isConnected ? 'Socket + Helyi Szinkron Aktív' : 'Helyi Broadcast Szinkron Aktív'}
-          </span>
-
-          {wakeLockActive && (
-            <span className="hidden sm:inline-flex items-center gap-1 rounded-full bg-slate-900 border border-slate-800 px-2.5 py-1 text-[11px] text-slate-400">
-              <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
-              WakeLock Aktív
+          <div className="flex items-center gap-2.5">
+            <span
+              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${
+                isConnected
+                  ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
+                  : 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
+              }`}
+            >
+              <Wifi className="h-3.5 w-3.5" />
+              {isConnected
+                ? 'Socket + Helyi Szinkron Aktív'
+                : 'Helyi Broadcast Szinkron Aktív'}
             </span>
-          )}
 
-          <button
-            type="button"
-            onClick={() => setShowPairingBox((v) => !v)}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-800 bg-slate-900 px-3 py-1.5 text-xs font-medium text-slate-300 hover:bg-slate-800"
-          >
-            <Smartphone className="h-3.5 w-3.5 text-emerald-400" />
-            Tablet Párosító Kód
-          </button>
+            {wakeLockActive && (
+              <span className="hidden sm:inline-flex items-center gap-1 rounded-full bg-slate-900 border border-slate-800 px-2.5 py-1 text-[11px] text-slate-400">
+                <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
+                WakeLock Aktív
+              </span>
+            )}
 
-          <button
-            type="button"
-            onClick={toggleFullscreen}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500"
-          >
-            <Maximize2 className="h-3.5 w-3.5" />
-            Teljes Képernyő
-          </button>
-        </div>
-      </header>
+            <button
+              type="button"
+              onClick={() => setShowPairingBox((v) => !v)}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-800 bg-slate-900 px-3 py-1.5 text-xs font-medium text-slate-300 hover:bg-slate-800"
+            >
+              <Smartphone className="h-3.5 w-3.5 text-emerald-400" />
+              Tablet Párosító Kód
+            </button>
 
-      {showPairingBox && (
+            <button
+              type="button"
+              onClick={toggleFullscreen}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500"
+            >
+              <Maximize2 className="h-3.5 w-3.5" />
+              Teljes Képernyő
+            </button>
+          </div>
+        </header>
+      )}
+
+      {!isFullscreen && showPairingBox && (
         <form
           onSubmit={handlePairSubmit}
           className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-emerald-500/30 bg-slate-900/90 p-4"

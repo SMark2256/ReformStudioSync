@@ -5,13 +5,11 @@ import {
 } from '@reform/shared';
 import {
   AlertTriangle,
-  Calendar,
   CheckCircle2,
   Clock,
   RotateCcw,
   Sparkles,
   Ticket,
-  XCircle,
 } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
 
@@ -44,7 +42,7 @@ export const MonitorDisplayCard: React.FC<MonitorDisplayCardProps> = ({
           className={compact ? 'h-14 w-14 mb-3' : 'h-24 w-24 mb-6'}
         />
         <span className="rounded-full bg-white/20 px-4 py-1 text-xs font-bold uppercase tracking-widest">
-          Beléptetés Sztornózva
+          Rögzítés Visszavonva
         </span>
         <h2
           className={`mt-3 font-extrabold text-center ${
@@ -58,12 +56,7 @@ export const MonitorDisplayCard: React.FC<MonitorDisplayCardProps> = ({
             compact ? 'text-sm' : 'text-2xl'
           }`}
         >
-          Az alkalom jóváírva. Aktuális egyenleg:{' '}
-          <strong className="text-white">
-            {revokedBanner.restoredRemainingPasses === 'Korlátlan'
-              ? 'Korlátlan'
-              : `${revokedBanner.restoredRemainingPasses} alkalom`}
-          </strong>
+          Az előző rögzítés sztornózva lett. Kérjük, egyeztess a recepcióval.
         </p>
       </div>
     );
@@ -80,7 +73,7 @@ export const MonitorDisplayCard: React.FC<MonitorDisplayCardProps> = ({
           <div className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-emerald-400" />
             <span className="text-xs font-bold uppercase tracking-widest text-emerald-400">
-              ReformStudio • Vendégmonitor
+              RE-FORM STÚDIÓ • Vendégmonitor
             </span>
           </div>
           <div className="flex items-center gap-1.5 font-mono text-sm text-slate-300">
@@ -102,19 +95,19 @@ export const MonitorDisplayCard: React.FC<MonitorDisplayCardProps> = ({
               compact ? 'text-2xl' : 'text-5xl'
             }`}
           >
-            Üdvözlünk a ReformStudióban!
+            RE-FORM STÚDIÓ
           </h2>
           <p
-            className={`mt-3 max-w-md text-slate-300 ${
-              compact ? 'text-sm' : 'text-xl'
+            className={`mt-2 font-semibold text-emerald-300 ${
+              compact ? 'text-base' : 'text-2xl'
             }`}
           >
-            Kérjük, érintsd vagy mutasd fel a belépőkártyádat a recepción a beléptetéshez.
+            Üdvözlünk! Kérjük, érintsd le a belépőkártyádat a recepción.
           </p>
         </div>
 
         <div className="w-full border-t border-white/10 pt-3 flex items-center justify-between text-xs text-slate-400">
-          <span>Valós idejű szinkronizáció aktív</span>
+          <span>Adatvédett vendégkijelző</span>
           <span>
             {clock.toLocaleDateString('hu-HU', {
               year: 'numeric',
@@ -130,14 +123,19 @@ export const MonitorDisplayCard: React.FC<MonitorDisplayCardProps> = ({
 
   const isSuccess = activeResult.status === CheckInStatus.SUCCESS;
   const isDuplicate = activeResult.status === CheckInStatus.DUPLICATE_SCAN;
-  const hasWarnings =
-    activeResult.warnings && activeResult.warnings.length > 0;
+  const isCircuit = activeResult.mode === 'CIRCUIT_GREETING';
+
+  // Filter warnings strictly for privacy: never show OVERDUE_DUES on guest monitor
+  const safeWarnings = (activeResult.warnings ?? []).filter(
+    (w) => w === 'LAST_OCCASION' || w === 'LOW_OCCASIONS' || w === 'EXPIRING_SOON',
+  );
+  const hasSafeWarnings = !isCircuit && safeWarnings.length > 0;
 
   const bgClass = !isSuccess
     ? isDuplicate
       ? 'from-amber-500 via-amber-600 to-orange-700'
-      : 'from-rose-600 via-red-600 to-rose-800'
-    : hasWarnings
+      : 'from-slate-800 via-slate-900 to-rose-950'
+    : hasSafeWarnings
       ? 'from-emerald-600 via-teal-600 to-amber-600'
       : 'from-emerald-600 via-emerald-500 to-teal-700';
 
@@ -147,16 +145,19 @@ export const MonitorDisplayCard: React.FC<MonitorDisplayCardProps> = ({
         compact ? 'min-h-[340px] p-6' : 'min-h-[78vh] p-12'
       }`}
     >
+      {/* Top Bar: NEVER shows barcode or financial details */}
       <div className="flex w-full items-center justify-between">
         <span className="rounded-full bg-black/20 px-4 py-1 text-xs font-bold uppercase tracking-widest">
           {isSuccess
-            ? 'Sikeres Belépés'
+            ? isCircuit
+              ? 'Női Köredzés • Érkezés'
+              : 'Kezelés • Üdvözlés'
             : isDuplicate
-              ? 'Már Beléptetve (60 mp)'
-              : 'Belépés Elutasítva'}
+              ? 'Érkezés Már Rögzítve'
+              : 'Recepciós Egyeztetés'}
         </span>
-        <span className="font-mono text-xs text-white/80">
-          #{activeResult.barcode}
+        <span className="text-xs font-semibold text-white/80">
+          RE-FORM STÚDIÓ
         </span>
       </div>
 
@@ -165,12 +166,10 @@ export const MonitorDisplayCard: React.FC<MonitorDisplayCardProps> = ({
           <CheckCircle2
             className={compact ? 'h-14 w-14 mb-3' : 'h-24 w-24 mb-5'}
           />
-        ) : isDuplicate ? (
+        ) : (
           <AlertTriangle
             className={compact ? 'h-14 w-14 mb-3' : 'h-24 w-24 mb-5'}
           />
-        ) : (
-          <XCircle className={compact ? 'h-14 w-14 mb-3' : 'h-24 w-24 mb-5'} />
         )}
 
         <p
@@ -178,87 +177,91 @@ export const MonitorDisplayCard: React.FC<MonitorDisplayCardProps> = ({
             compact ? 'text-sm' : 'text-2xl'
           }`}
         >
-          {isSuccess ? 'Jó edzést kívánunk,' : 'Vendég:'}
+          Üdvözlünk,
         </p>
         <h1
           className={`mt-1 font-black tracking-tight ${
             compact ? 'text-3xl' : 'text-6xl'
           }`}
         >
-          {activeResult.guestName}
+          {activeResult.guestName}!
         </h1>
 
-        {activeResult.passName && (
-          <p
-            className={`mt-2 font-semibold text-white/90 ${
-              compact ? 'text-sm' : 'text-2xl'
-            }`}
-          >
-            {activeResult.passName}
-          </p>
-        )}
-
         {isSuccess || isDuplicate ? (
-          <div
-            className={`mt-5 grid grid-cols-2 gap-4 rounded-2xl bg-black/25 backdrop-blur-md border border-white/20 ${
-              compact ? 'px-5 py-3' : 'px-10 py-6'
-            }`}
-          >
-            <div className="text-center border-r border-white/20 pr-4">
-              <span className="block text-[11px] uppercase tracking-wider text-white/75">
-                Hátralévő Alkalmak
-              </span>
-              <span
-                className={`font-black ${compact ? 'text-2xl' : 'text-5xl'}`}
-              >
-                {activeResult.remainingPasses === 'Korlátlan'
-                  ? 'Korlátlan'
-                  : `${activeResult.remainingPasses} db`}
-              </span>
-            </div>
-            <div className="text-center pl-2 flex flex-col justify-center">
-              <span className="block text-[11px] uppercase tracking-wider text-white/75">
-                Érvényesség Vége
-              </span>
-              <span
-                className={`font-bold flex items-center justify-center gap-1.5 ${
-                  compact ? 'text-base mt-1' : 'text-2xl mt-2'
+          isCircuit ? (
+            /* 5.3 Köredzéses érkezés után: „Üdvözlünk, [Keresztnév]! Jó edzést kívánunk!” */
+            <div
+              className={`mt-6 rounded-2xl bg-black/25 backdrop-blur-md border border-white/20 ${
+                compact ? 'px-6 py-4' : 'px-12 py-7'
+              }`}
+            >
+              <p
+                className={`font-extrabold text-white ${
+                  compact ? 'text-xl' : 'text-4xl'
                 }`}
               >
-                <Calendar className="h-4 w-4" />
-                {activeResult.expirationDate
-                  ? new Date(activeResult.expirationDate).toLocaleDateString(
-                      'hu-HU',
-                    )
-                  : '—'}
-              </span>
+                Jó edzést kívánunk!
+              </p>
             </div>
-          </div>
+          ) : (
+            /* 5.3 Alkalmas kezelés levonása után: „Üdvözlünk, [Név]! [Kezelés neve]. Hátralévő alkalmak: [X]. Kellemes kezelést kívánunk!” */
+            <div
+              className={`mt-5 flex flex-col items-center gap-3 rounded-2xl bg-black/25 backdrop-blur-md border border-white/20 ${
+                compact ? 'px-6 py-4' : 'px-12 py-7'
+              }`}
+            >
+              <span
+                className={`font-extrabold text-emerald-200 ${
+                  compact ? 'text-lg' : 'text-3xl'
+                }`}
+              >
+                {activeResult.serviceName ?? activeResult.passName ?? 'Kezelés'}
+              </span>
+
+              <div className="my-1">
+                <span className="block text-xs uppercase tracking-wider text-white/80">
+                  Hátralévő alkalmak
+                </span>
+                <span
+                  className={`font-black text-white ${
+                    compact ? 'text-3xl' : 'text-6xl'
+                  }`}
+                >
+                  {activeResult.remainingPasses === 'Korlátlan'
+                    ? 'Korlátlan'
+                    : `${activeResult.remainingPasses}`}
+                </span>
+              </div>
+
+              <p
+                className={`font-bold text-white/95 ${
+                  compact ? 'text-base' : 'text-2xl'
+                }`}
+              >
+                Kellemes kezelést kívánunk!
+              </p>
+            </div>
+          )
         ) : (
+          /* Diszkrét elutasító üzenet pénzügyi részletek nélkül */
           <div className="mt-5 rounded-2xl bg-black/30 px-6 py-4 border border-white/20 max-w-md">
-            <p className={compact ? 'text-base font-bold' : 'text-2xl font-bold'}>
-              {activeResult.reason ?? 'Nincs érvényes bérlet!'}
-            </p>
-            <p className="mt-1 text-xs text-white/80">
-              Kérjük, fordulj a recepciós munkatársunkhoz új bérlet vásárlásához.
+            <p
+              className={compact ? 'text-base font-bold' : 'text-2xl font-bold'}
+            >
+              Kérjük, fordulj a recepciós munkatársunkhoz egyeztetésért!
             </p>
           </div>
         )}
 
-        {hasWarnings && (
+        {hasSafeWarnings && (
           <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
-            {activeResult.warnings.includes('LAST_OCCASION') && (
+            {(safeWarnings.includes('LAST_OCCASION') ||
+              safeWarnings.includes('LOW_OCCASIONS')) && (
               <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-400 px-3.5 py-1 text-xs font-extrabold text-slate-950 shadow">
                 <AlertTriangle className="h-3.5 w-3.5" />
                 {activeResult.remainingPasses === 0
                   ? 'Ez volt az utolsó alkalmad a bérleten!'
-                  : 'Már csak 1 alkalom maradt a bérleteden!'}
-              </span>
-            )}
-            {activeResult.warnings.includes('EXPIRING_SOON') && (
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-300 px-3.5 py-1 text-xs font-extrabold text-slate-950 shadow">
-                <Clock className="h-3.5 w-3.5" />
-                A bérleted 3 napon belül lejár!
+                  : `Már csak ${activeResult.remainingPasses} alkalom maradt a bérleteden!`}
               </span>
             )}
           </div>
