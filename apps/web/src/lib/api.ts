@@ -18,6 +18,7 @@ import {
   MembershipDueDto,
   MembershipStatus,
   MessageLogDto,
+  MonitorTestPingPayload,
   OfflineScanItemDto,
   OfflineSyncResponseDto,
   OverdueReportDto,
@@ -559,4 +560,89 @@ export const api = {
       mockStudioEngine.getDisplayDevices(),
     );
   },
+
+  regenerateDisplayPairingCode(deviceId: string): Promise<DisplayDeviceDto> {
+    return request<DisplayDeviceDto>(
+      `/auth/monitor/devices/${deviceId}/unpair`,
+      {
+        method: 'POST',
+      },
+      () => mockStudioEngine.regenerateDisplayPairingCode(deviceId),
+    ).then((res) => {
+      broadcastToLocalMonitors({
+        type: 'DEVICE_REVOKED',
+        payload: {
+          deviceId,
+          reason: 'A recepció új párosító kódot kért ehhez a kijelzőhöz.',
+          timestamp: new Date().toISOString(),
+        },
+      });
+      return res;
+    });
+  },
+
+  renameDisplayDevice(
+    deviceId: string,
+    name: string,
+  ): Promise<DisplayDeviceDto> {
+    return request(
+      `/auth/monitor/devices/${deviceId}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({ name }),
+      },
+      () => mockStudioEngine.renameDisplayDevice(deviceId, name),
+    );
+  },
+
+  deleteDisplayDevice(deviceId: string): Promise<{ deletedId: string }> {
+    return request<{ deletedId: string }>(
+      `/auth/monitor/devices/${deviceId}`,
+      {
+        method: 'DELETE',
+      },
+      () => mockStudioEngine.deleteDisplayDevice(deviceId),
+    ).then((res) => {
+      broadcastToLocalMonitors({
+        type: 'DEVICE_REVOKED',
+        payload: {
+          deviceId,
+          reason: 'A kijelző párosítását törölték a recepcióról.',
+          timestamp: new Date().toISOString(),
+        },
+      });
+      return res;
+    });
+  },
+
+  unpairSelfDevice(deviceToken: string): Promise<{ unpairedId: string }> {
+    return request(
+      '/auth/monitor/unpair-self',
+      {
+        method: 'POST',
+        body: JSON.stringify({ deviceToken }),
+      },
+      () => mockStudioEngine.unpairSelfDevice(deviceToken),
+    );
+  },
+
+  sendMonitorTestSignal(deviceId?: string): Promise<MonitorTestPingPayload> {
+    const senderName =
+      useAuthStore.getState().user?.name ?? 'Recepciós Munkatárs';
+    return request<MonitorTestPingPayload>(
+      '/auth/monitor/test-signal',
+      {
+        method: 'POST',
+        body: JSON.stringify({ deviceId }),
+      },
+      () => mockStudioEngine.sendMonitorTestSignal(deviceId, senderName),
+    ).then((res) => {
+      broadcastToLocalMonitors({
+        type: 'TEST_PING',
+        payload: res,
+      });
+      return res;
+    });
+  },
 };
+

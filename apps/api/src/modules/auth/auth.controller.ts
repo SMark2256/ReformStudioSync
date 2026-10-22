@@ -1,4 +1,13 @@
-import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AuthUserDto, Role } from '@reform/shared';
 import { CurrentUser } from '../../common/current-user.decorator';
@@ -9,6 +18,9 @@ import {
   CreateStaffUserDto,
   InitDisplayPairingDto,
   LoginDto,
+  SendMonitorTestSignalDto,
+  UnpairSelfDeviceDto,
+  UpdateDisplayDeviceDto,
   VerifyDisplayPairingDto,
 } from './auth.dto';
 import { AuthService } from './auth.service';
@@ -80,5 +92,67 @@ export class AuthController {
   @ApiOperation({ summary: 'Párosított ügyfélkijelzők listázása' })
   listDevices(@CurrentUser() user: AuthUserDto) {
     return this.authService.listDisplayDevices(user.studioId);
+  }
+
+  @Post('monitor/devices/:id/unpair')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary:
+      'Párosítás bontása és új 6 jegyű párosító kód generálása meglévő eszközhöz',
+  })
+  regeneratePairingCode(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthUserDto,
+  ) {
+    return this.authService.regenerateDisplayPairingCode(id, user.studioId);
+  }
+
+  @Patch('monitor/devices/:id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Kijelző eszköz átnevezése (egyedi név ellenőrzéssel)' })
+  renameDevice(
+    @Param('id') id: string,
+    @Body() dto: UpdateDisplayDeviceDto,
+    @CurrentUser() user: AuthUserDto,
+  ) {
+    return this.authService.renameDisplayDevice(id, dto, user.studioId);
+  }
+
+  @Delete('monitor/devices/:id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary:
+      'Folyamatban lévő párosító kód visszavonása vagy párosított eszköz végleges törlése',
+  })
+  deleteDevice(@Param('id') id: string, @CurrentUser() user: AuthUserDto) {
+    return this.authService.deleteDisplayDevice(id, user.studioId);
+  }
+
+  @Post('monitor/unpair-self')
+  @ApiOperation({
+    summary: 'Párosítás megszakítása közvetlenül a párosított Tabletről / Monitorról',
+  })
+  unpairSelf(@Body() dto: UnpairSelfDeviceDto) {
+    return this.authService.unpairSelfDevice(dto);
+  }
+
+  @Post('monitor/test-signal')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Teszt jel küldése a csatlakoztatott Vendégmonitorokra',
+  })
+  sendTestSignal(
+    @Body() dto: SendMonitorTestSignalDto,
+    @CurrentUser() user: AuthUserDto,
+  ) {
+    return this.authService.sendMonitorTestSignal(
+      dto,
+      user.name,
+      user.studioId,
+    );
   }
 }

@@ -13,6 +13,8 @@ export const SOCKET_EVENTS = {
   MONITOR_STATE: 'monitor:state',
   MONITOR_PING: 'monitor:ping',
   MONITOR_CONFIG: 'monitor:config',
+  MONITOR_TEST_PING: 'monitor:test-ping',
+  MONITOR_DEVICE_REVOKED: 'monitor:device-revoked',
   TABLET_DOCUMENT_PUSHED: 'tablet:document_pushed',
   TABLET_DOCUMENT_SIGNED: 'tablet:document_signed',
 } as const;
@@ -77,4 +79,18 @@ export interface ScannerEventPayload {
   rawBarcode?: string;
   sourceRoute?: string;
   scannedAt: string;
+}
+
+export interface MonitorTestPingPayload {
+  deviceId?: string | null;
+  deviceName?: string | null;
+  senderName?: string;
+  message: string;
+  timestamp: string;
+}
+
+export interface MonitorDeviceRevokedPayload {
+  deviceId: string;
+  reason?: string;
+  timestamp: string;
 }

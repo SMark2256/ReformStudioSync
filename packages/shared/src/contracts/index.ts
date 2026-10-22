@@ -407,12 +407,19 @@ export interface OfflineSyncResponseDto {
   results: CheckInResultPayload[];
 }
 
+export type DisplayDeviceStatus = 'PENDING_PAIRING' | 'PAIRED' | 'EXPIRED';
+
 export interface DisplayDeviceDto {
   id: string;
   name: string;
+  status: DisplayDeviceStatus;
   pairingCode: string | null;
+  pairingExpiresAt: string | null;
+  pairedAt: string | null;
   isActive: boolean;
-  lastSeenAt: string;
+  lastSeenAt: string | null;
+  lastActivityType: string | null;
+  isOnline?: boolean;
   createdAt: string;
 }
 
@@ -420,3 +427,4 @@ export interface PairDisplayResponseDto {
   deviceToken: string;
   device: DisplayDeviceDto;
 }
+

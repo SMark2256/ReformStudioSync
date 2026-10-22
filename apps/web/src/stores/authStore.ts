@@ -5,10 +5,16 @@ import { persist } from 'zustand/middleware';
 interface AuthState {
   accessToken: string | null;
   user: AuthUserDto | null;
+  deviceId: string | null;
   deviceToken: string | null;
   deviceName: string | null;
   setAuth: (accessToken: string, user: AuthUserDto) => void;
-  setDeviceAuth: (deviceToken: string, deviceName: string) => void;
+  setDeviceAuth: (
+    deviceToken: string,
+    deviceName: string,
+    deviceId?: string,
+  ) => void;
+  clearDeviceAuth: () => void;
   logout: () => void;
 }
 
@@ -25,11 +31,26 @@ export const useAuthStore = create<AuthState>()(
     (set) => ({
       accessToken: null,
       user: DEFAULT_DEMO_RECEPTIONIST,
+      deviceId: null,
       deviceToken: null,
       deviceName: null,
       setAuth: (accessToken, user) => set({ accessToken, user }),
-      setDeviceAuth: (deviceToken, deviceName) =>
-        set({ deviceToken, deviceName }),
+      setDeviceAuth: (deviceToken, deviceName, deviceId) =>
+        set({
+          deviceToken,
+          deviceName,
+          deviceId:
+            deviceId ??
+            (deviceToken.startsWith('mock-device-token-')
+              ? deviceToken.replace('mock-device-token-', '')
+              : null),
+        }),
+      clearDeviceAuth: () =>
+        set({
+          deviceId: null,
+          deviceToken: null,
+          deviceName: null,
+        }),
       logout: () =>
         set({
           accessToken: null,

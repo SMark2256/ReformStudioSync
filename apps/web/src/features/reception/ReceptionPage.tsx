@@ -19,12 +19,16 @@ import {
   Clock,
   CloudOff,
   CreditCard,
+  Edit3,
   ExternalLink,
   FileSignature,
   FlaskConical,
+  KeyRound,
+  LogOut,
   Monitor,
   Plus,
   QrCode,
+  Radio,
   RefreshCw,
   RotateCcw,
   Search,
@@ -33,6 +37,7 @@ import {
   Snowflake,
   Sparkles,
   Ticket,
+  Trash2,
   UserCheck,
   Users,
   Volume2,
@@ -65,10 +70,10 @@ import { SellPassModal } from './SellPassModal';
 type ActiveTab = 'desk' | 'guests' | 'finance' | 'admin';
 
 export const ReceptionPage: React.FC = () => {
-  const queryClient = useQueryClient();
-  const location = useLocation();
   const navigate = useNavigate();
-  const { user } = useAuthStore();
+  const location = useLocation();
+  const queryClient = useQueryClient();
+  const { user, logout } = useAuthStore();
   const { theme } = useThemeStore();
   const {
     queue: offlineQueue,
@@ -131,6 +136,16 @@ export const ReceptionPage: React.FC = () => {
   const [newTplDays, setNewTplDays] = useState<number>(60);
   const [newTplPrice, setNewTplPrice] = useState<number>(54000);
   const [newDeviceName, setNewDeviceName] = useState('Recepciós Tablet #1');
+  const [editingDeviceId, setEditingDeviceId] = useState<string | null>(null);
+  const [editingDeviceName, setEditingDeviceName] = useState<string>('');
+  const [nowTick, setNowTick] = useState<number>(() => Date.now());
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      setNowTick(Date.now());
+    }, 1000);
+    return () => window.clearInterval(interval);
+  }, []);
 
   const [newServiceName, setNewServiceName] = useState('');
   const [newServiceCat, setNewServiceCat] = useState<ServiceCategory>(
@@ -180,6 +195,7 @@ export const ReceptionPage: React.FC = () => {
   const devicesQuery = useQuery({
     queryKey: ['display-devices'],
     queryFn: () => api.getDisplayDevices(),
+    refetchInterval: activeTab === 'admin' ? 4000 : false,
   });
 
   const refreshAll = useCallback(() => {
@@ -452,9 +468,69 @@ export const ReceptionPage: React.FC = () => {
     onSuccess: (device) => {
       notify.success(
         `6 jegyű párosító kód generálva: ${device.pairingCode}`,
-        `Írd be ezt a kódot a(z) "${device.name}" eszköz /monitor oldalán!`,
+        `Írd be ezt a kódot (10 percig érvényes) a(z) "${device.name}" eszköz /monitor oldalán!`,
+      );
+      setNewDeviceName('');
+      refreshAll();
+    },
+    onError: (err) => {
+      notify.error('Nem sikerült kódot generálni', (err as Error).message);
+    },
+  });
+
+  const regenerateCodeMutation = useMutation({
+    mutationFn: (deviceId: string) => api.regenerateDisplayPairingCode(deviceId),
+    onSuccess: (device) => {
+      notify.info(
+        `Új 6 jegyű párosító kód generálva: ${device.pairingCode}`,
+        `A korábbi párosítás érvényét vesztette. Írd be az új kódot a(z) "${device.name}" eszközön!`,
       );
       refreshAll();
+    },
+    onError: (err) => {
+      notify.error('Kód újragenerálása sikertelen', (err as Error).message);
+    },
+  });
+
+  const renameDeviceMutation = useMutation({
+    mutationFn: (vars: { deviceId: string; name: string }) =>
+      api.renameDisplayDevice(vars.deviceId, vars.name),
+    onSuccess: (device) => {
+      notify.success(
+        'Kijelző sikeresen átnevezve!',
+        `Új név: ${device.name}`,
+      );
+      setEditingDeviceId(null);
+      setEditingDeviceName('');
+      refreshAll();
+    },
+    onError: (err) => {
+      notify.error('Átnevezés sikertelen', (err as Error).message);
+    },
+  });
+
+  const deleteDeviceMutation = useMutation({
+    mutationFn: (deviceId: string) => api.deleteDisplayDevice(deviceId),
+    onSuccess: () => {
+      notify.warning(
+        'Kijelző / Párosítás eltávolítva',
+        'A párosító kód vagy eszköz törlésre került és a kapcsolat megszakadt.',
+      );
+      refreshAll();
+    },
+    onError: (err) => {
+      notify.error('Törlés sikertelen', (err as Error).message);
+    },
+  });
+
+  const testSignalMutation = useMutation({
+    mutationFn: (deviceId?: string) => api.sendMonitorTestSignal(deviceId),
+    onSuccess: (res) => {
+      notify.success('Teszt jel elküldve!', res.message);
+      refreshAll();
+    },
+    onError: (err) => {
+      notify.error('Teszt jel küldése sikertelen', (err as Error).message);
     },
   });
 
@@ -704,6 +780,23 @@ export const ReceptionPage: React.FC = () => {
               <FlaskConical className="h-3.5 w-3.5" />
               Demo Oldal
             </Link>
+
+            <button
+              type="button"
+              onClick={() => {
+                logout();
+                notify.info(
+                  'Sikeres kijelentkezés',
+                  'A munkamenet lezárult.',
+                );
+                navigate('/login');
+              }}
+              className="inline-flex items-center gap-1 rounded-xl border border-slate-700 bg-slate-800 px-2.5 py-1.5 text-xs font-medium text-slate-300 hover:bg-slate-700 hover:text-white"
+              title="Kijelentkezés a recepciós munkamenetből"
+            >
+              <LogOut className="h-3.5 w-3.5 text-rose-400" />
+              Kilépés
+            </button>
           </div>
         </div>
       </header>
@@ -2106,14 +2199,17 @@ export const ReceptionPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Dual-Mode Monitor & Greeting Duration Config */}
-            <div className="lg:col-span-2 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
+            {/* Dual-Mode Monitor, Greeting Duration Config & Tablet Pairing */}
+            <div className="lg:col-span-2 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-sm space-y-5 transition-colors">
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <div className="flex items-center gap-2">
-                  <Smartphone className="h-5 w-5 text-emerald-600" />
-                  <h3 className="text-base font-bold text-slate-900">
-                    Vendégmonitor Beállítások & Önálló Tablet Párosítás (5.3)
+                  <Smartphone className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                  <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
+                    Vendégmonitorok & Önálló Tablet Párosítás
                   </h3>
+                  <span className="rounded-full bg-emerald-50 dark:bg-emerald-500/15 border border-emerald-200 dark:border-emerald-500/30 px-2.5 py-0.5 text-[11px] font-bold text-emerald-700 dark:text-emerald-300">
+                    Dual-Mode Szinkron
+                  </span>
                 </div>
 
                 <div className="flex items-center gap-2 rounded-xl bg-slate-100 dark:bg-slate-800 px-3.5 py-2 text-xs">
@@ -2141,60 +2237,391 @@ export const ReceptionPage: React.FC = () => {
                 </div>
               </div>
 
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  if (!newDeviceName.trim()) return;
-                  initPairingMutation.mutate(newDeviceName);
-                }}
-                className="flex gap-2"
-              >
-                <input
-                  type="text"
-                  value={newDeviceName}
-                  onChange={(e) => setNewDeviceName(e.target.value)}
-                  placeholder="Eszköz neve (pl. Pult iPad)"
-                  className="flex-1 rounded-xl border border-slate-200 px-3.5 py-2 text-sm"
-                />
-                <button
-                  type="submit"
-                  className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-500"
-                >
-                  Párosító Kód Generálása
-                </button>
-              </form>
-
-              <div className="divide-y divide-slate-100">
-                {(devicesQuery.data ?? []).map((dev) => (
-                  <div
-                    key={dev.id}
-                    className="flex items-center justify-between py-3 text-xs"
-                  >
-                    <div>
-                      <span className="font-bold text-slate-900 text-sm">
-                        {dev.name}
-                      </span>
-                      <p className="text-slate-500">
-                        Utolsó aktivitás:{' '}
-                        {new Date(dev.lastSeenAt).toLocaleString('hu-HU')}
-                      </p>
-                    </div>
-                    {dev.pairingCode ? (
-                      <div className="rounded-xl bg-amber-50 border border-amber-300 px-3 py-1.5 text-center">
-                        <span className="block text-[10px] uppercase text-amber-700 font-bold">
-                          Párosító kód
-                        </span>
-                        <span className="font-mono text-base font-black tracking-widest text-amber-900">
-                          {dev.pairingCode}
-                        </span>
-                      </div>
-                    ) : (
-                      <span className="rounded-full bg-emerald-100 px-2.5 py-1 font-bold text-emerald-800">
-                        Párosítva & Aktív
-                      </span>
-                    )}
+              {/* 1. Üzemmód: Azonos PC — Másodlagos Monitor (Bejelentkezett gépen kód nélkül) */}
+              <div className="rounded-2xl border border-emerald-200 dark:border-emerald-500/30 bg-emerald-50/60 dark:bg-emerald-500/10 p-4 space-y-3 transition-colors">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <span className="inline-flex items-center gap-1 rounded-md bg-emerald-600 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">
+                      1. Üzemmód • Ez a PC (Kód nem szükséges)
+                    </span>
+                    <h4 className="mt-1.5 text-sm font-bold text-slate-900 dark:text-slate-100">
+                      Másodlagos Monitor ugyanazon a gépen
+                    </h4>
+                    <p className="mt-0.5 text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                      Mivel ezen a gépen be vagy jelentkezve, a{' '}
+                      <code className="rounded bg-emerald-100/80 dark:bg-slate-800 px-1.5 py-0.5 font-mono font-bold text-slate-800 dark:text-emerald-300">
+                        /monitor
+                      </code>{' '}
+                      oldal <strong>párosító kód megadása nélkül azonnal működik</strong>.
+                      Nyisd meg új ablakban, húzd át a vendég felé néző kijelzőre,
+                      és nyomj Teljes Képernyőt!
+                    </p>
                   </div>
-                ))}
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={openSecondaryMonitorWindow}
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 dark:bg-emerald-600 px-3.5 py-2 text-xs font-bold text-white hover:bg-slate-800 dark:hover:bg-emerald-500 transition-colors"
+                  >
+                    <Monitor className="h-3.5 w-3.5 text-emerald-400 dark:text-white" />
+                    Vendégmonitor Megnyitása Új Ablakban
+                    <ExternalLink className="h-3 w-3 text-slate-400 dark:text-emerald-100" />
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={testSignalMutation.isPending}
+                    onClick={() => testSignalMutation.mutate(undefined)}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-300 dark:border-emerald-500/40 bg-white dark:bg-slate-900 px-3.5 py-2 text-xs font-bold text-emerald-800 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-500/20 disabled:opacity-50 transition-colors"
+                  >
+                    <Radio className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                    Teszt Jel Küldése a Kijelzőkre
+                  </button>
+                </div>
+              </div>
+
+              {/* 2. Üzemmód: Különálló Tablet / iPad / TV (Nem bejelentkezett eszközön 6 jegyű kóddal) */}
+              <div className="space-y-3 pt-1">
+                <div>
+                  <span className="inline-flex items-center gap-1 rounded-md bg-slate-800 dark:bg-slate-700 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-200">
+                    2. Üzemmód • Különálló Eszköz (Tablet / iPad / Smart TV)
+                  </span>
+                  <h4 className="mt-1.5 text-sm font-bold text-slate-900 dark:text-slate-100">
+                    Önálló kijelző párosítása 6 jegyű kóddal
+                  </h4>
+                  <p className="mt-0.5 text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                    Ha egy különálló tabletről (ahol nem vagy bejelentkezve)
+                    nyitod meg a{' '}
+                    <code className="rounded bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 font-mono font-bold text-slate-800 dark:text-emerald-300">
+                      /monitor
+                    </code>{' '}
+                    oldalt, a képernyő zárolva lesz, amíg be nem ütöd az itt
+                    generált 6 jegyű kódot. A kód <strong>10 percig érvényes</strong>,
+                    és a párosítás bármikor megszakítható.
+                  </p>
+                </div>
+
+                {(() => {
+                  const trimmedCandidate = newDeviceName.trim();
+                  const duplicateDevice = (devicesQuery.data ?? []).find(
+                    (d) =>
+                      trimmedCandidate.length > 0 &&
+                      d.name.trim().toLowerCase() ===
+                        trimmedCandidate.toLowerCase(),
+                  );
+
+                  return (
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        if (!trimmedCandidate) {
+                          notify.warning(
+                            'Hiányzó eszköznév',
+                            'Kérjük, adj nevet a párosítandó kijelzőnek!',
+                          );
+                          return;
+                        }
+                        if (duplicateDevice) {
+                          notify.error(
+                            'Ez a kijelzőnév már foglalt!',
+                            `Már létezik "${duplicateDevice.name}" nevű monitor. Ugyanolyan nevű monitort nem lehet kétszer létrehozni!`,
+                          );
+                          return;
+                        }
+                        initPairingMutation.mutate(trimmedCandidate);
+                      }}
+                      className="space-y-1.5"
+                    >
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        <input
+                          type="text"
+                          value={newDeviceName}
+                          onChange={(e) => setNewDeviceName(e.target.value)}
+                          placeholder="Egyedi eszköz neve (pl. Pult iPad #1)"
+                          className={`flex-1 rounded-xl border px-3.5 py-2 text-sm bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:outline-none transition-colors ${
+                            duplicateDevice
+                              ? 'border-rose-400 dark:border-rose-500/60 bg-rose-50/40 dark:bg-rose-500/10 focus:border-rose-500'
+                              : 'border-slate-200 dark:border-slate-700 focus:border-emerald-500'
+                          }`}
+                        />
+                        <button
+                          type="submit"
+                          disabled={
+                            initPairingMutation.isPending ||
+                            !trimmedCandidate ||
+                            Boolean(duplicateDevice)
+                          }
+                          className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-500 disabled:opacity-50 transition-colors"
+                        >
+                          <KeyRound className="h-3.5 w-3.5" />
+                          6 Jegyű Párosító Kód Generálása
+                        </button>
+                      </div>
+                      {duplicateDevice && (
+                        <p className="text-[11px] font-semibold text-rose-600 dark:text-rose-400 flex items-center gap-1">
+                          <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                          Már létezik „{duplicateDevice.name}” nevű kijelző! Adj
+                          meg másik nevet, vagy kezeld a meglévőt alább.
+                        </p>
+                      )}
+                    </form>
+                  );
+                })()}
+
+                {/* Eszközök listája */}
+                {(devicesQuery.data ?? []).length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 p-4 text-center text-xs text-slate-500 dark:text-slate-400">
+                    Jelenleg nincs különálló párosított tablet vagy folyamatban
+                    lévő párosító kód.
+                  </div>
+                ) : (
+                  <div className="space-y-2.5 pt-1">
+                    {(devicesQuery.data ?? []).map((dev) => {
+                      const expiresMs = dev.pairingExpiresAt
+                        ? new Date(dev.pairingExpiresAt).getTime()
+                        : null;
+                      const remainingSec =
+                        dev.pairingCode && expiresMs
+                          ? Math.max(
+                              0,
+                              Math.floor((expiresMs - nowTick) / 1000),
+                            )
+                          : null;
+                      const isExpired =
+                        Boolean(dev.pairingCode) &&
+                        (dev.status === 'EXPIRED' ||
+                          (remainingSec !== null && remainingSec <= 0));
+                      const isPending =
+                        Boolean(dev.pairingCode) && !isExpired;
+                      const isPaired = !dev.pairingCode;
+
+                      const minutesLeft =
+                        remainingSec !== null
+                          ? String(Math.floor(remainingSec / 60)).padStart(
+                              2,
+                              '0',
+                            )
+                          : '00';
+                      const secondsLeft =
+                        remainingSec !== null
+                          ? String(remainingSec % 60).padStart(2, '0')
+                          : '00';
+
+                      const isEditing = editingDeviceId === dev.id;
+
+                      return (
+                        <div
+                          key={dev.id}
+                          className={`rounded-xl border p-3.5 text-xs transition-colors ${
+                            isPaired
+                              ? 'border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-800/60'
+                              : isPending
+                                ? 'border-amber-300 dark:border-amber-500/40 bg-amber-50/50 dark:bg-amber-500/10'
+                                : 'border-rose-200 dark:border-rose-500/40 bg-rose-50/40 dark:bg-rose-500/10'
+                          }`}
+                        >
+                          <div className="flex flex-wrap items-start justify-between gap-2">
+                            <div className="space-y-1 flex-1 min-w-[200px]">
+                              {isEditing ? (
+                                <form
+                                  onSubmit={(e) => {
+                                    e.preventDefault();
+                                    const trimmed = editingDeviceName.trim();
+                                    if (!trimmed) return;
+                                    renameDeviceMutation.mutate({
+                                      deviceId: dev.id,
+                                      name: trimmed,
+                                    });
+                                  }}
+                                  className="flex items-center gap-1.5"
+                                >
+                                  <input
+                                    type="text"
+                                    value={editingDeviceName}
+                                    onChange={(e) =>
+                                      setEditingDeviceName(e.target.value)
+                                    }
+                                    autoFocus
+                                    className="rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-950 px-2.5 py-1 text-xs font-bold text-slate-900 dark:text-slate-100"
+                                  />
+                                  <button
+                                    type="submit"
+                                    disabled={renameDeviceMutation.isPending}
+                                    className="rounded-lg bg-emerald-600 px-2.5 py-1 text-[11px] font-bold text-white hover:bg-emerald-500"
+                                  >
+                                    Mentés
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setEditingDeviceId(null);
+                                      setEditingDeviceName('');
+                                    }}
+                                    className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2 py-1 text-[11px] text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700"
+                                  >
+                                    Mégse
+                                  </button>
+                                </form>
+                              ) : (
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <span className="font-bold text-slate-900 dark:text-slate-100 text-sm">
+                                    {dev.name}
+                                  </span>
+                                  {isPaired && (
+                                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 dark:bg-emerald-500/20 border border-transparent dark:border-emerald-500/30 px-2.5 py-0.5 text-[11px] font-bold text-emerald-800 dark:text-emerald-300">
+                                      <CheckCircle2 className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
+                                      Párosítva & Aktív
+                                    </span>
+                                  )}
+                                  {isPending && (
+                                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 dark:bg-amber-500/20 border border-transparent dark:border-amber-500/30 px-2.5 py-0.5 text-[11px] font-bold text-amber-800 dark:text-amber-300">
+                                      <Clock className="h-3 w-3 text-amber-600 dark:text-amber-400" />
+                                      Párosításra vár ({minutesLeft}:
+                                      {secondsLeft})
+                                    </span>
+                                  )}
+                                  {isExpired && (
+                                    <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 dark:bg-rose-500/20 border border-transparent dark:border-rose-500/30 px-2.5 py-0.5 text-[11px] font-bold text-rose-800 dark:text-rose-300">
+                                      <XCircle className="h-3 w-3 text-rose-600 dark:text-rose-400" />
+                                      Kód lejárt
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+
+                              {/* Egyértelmű aktivitás magyarázat */}
+                              {isPaired ? (
+                                <div className="space-y-0.5 text-[11px] text-slate-600 dark:text-slate-400">
+                                  {dev.pairedAt && (
+                                    <p>
+                                      Párosítva:{' '}
+                                      <span className="font-medium text-slate-800 dark:text-slate-200">
+                                        {new Date(dev.pairedAt).toLocaleString(
+                                          'hu-HU',
+                                        )}
+                                      </span>
+                                    </p>
+                                  )}
+                                  <p>
+                                    Utolsó aktivitás:{' '}
+                                    {dev.lastSeenAt ? (
+                                      <>
+                                        <span className="font-semibold text-slate-800 dark:text-slate-200">
+                                          {new Date(
+                                            dev.lastSeenAt,
+                                          ).toLocaleString('hu-HU')}
+                                        </span>{' '}
+                                        —{' '}
+                                        <span className="font-semibold text-emerald-700 dark:text-emerald-400">
+                                          {dev.lastActivityType ??
+                                            'Sikeresen párosítva'}
+                                        </span>
+                                      </>
+                                    ) : (
+                                      <span className="italic text-slate-400 dark:text-slate-500">
+                                        Még nem volt esemény
+                                      </span>
+                                    )}
+                                  </p>
+                                </div>
+                              ) : isPending ? (
+                                <p className="text-[11px] text-amber-900 dark:text-amber-300">
+                                  Még nincs párosítva • Nyisd meg a másik eszközön
+                                  a{' '}
+                                  <code className="rounded bg-amber-100/80 dark:bg-slate-800 px-1 py-0.5 font-mono font-bold text-amber-950 dark:text-amber-200">
+                                    /monitor
+                                  </code>{' '}
+                                  oldalt, és üsd be a 6 jegyű kódot!
+                                </p>
+                              ) : (
+                                <p className="text-[11px] text-rose-700 dark:text-rose-300">
+                                  A 6 jegyű párosító kód 10 perc után lejárt.
+                                  Kérhetsz új kódot, vagy törölheted a bejegyzést.
+                                </p>
+                              )}
+                            </div>
+
+                            {isPending && dev.pairingCode && (
+                              <div className="rounded-xl bg-amber-100/90 dark:bg-amber-500/20 border border-amber-300 dark:border-amber-500/40 px-3.5 py-2 text-center shadow-sm">
+                                <span className="block text-[10px] uppercase text-amber-800 dark:text-amber-300 font-bold">
+                                  6 jegyű párosító kód
+                                </span>
+                                <span className="font-mono text-lg font-black tracking-[0.25em] text-amber-950 dark:text-amber-100">
+                                  {dev.pairingCode}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Menedzsment gombok */}
+                          <div className="mt-3 flex flex-wrap items-center justify-end gap-1.5 border-t border-slate-200/80 dark:border-slate-700/80 pt-2.5">
+                            {isPaired && (
+                              <button
+                                type="button"
+                                disabled={testSignalMutation.isPending}
+                                onClick={() =>
+                                  testSignalMutation.mutate(dev.id)
+                                }
+                                className="inline-flex items-center gap-1 rounded-lg border border-emerald-300 dark:border-emerald-500/40 bg-white dark:bg-slate-900 px-2.5 py-1 text-[11px] font-bold text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-500/20 transition-colors"
+                                title="Teszt felvillantás küldése erre a kijelzőre"
+                              >
+                                <Radio className="h-3 w-3" />
+                                Teszt jel
+                              </button>
+                            )}
+
+                            {!isEditing && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingDeviceId(dev.id);
+                                  setEditingDeviceName(dev.name);
+                                }}
+                                className="inline-flex items-center gap-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                              >
+                                <Edit3 className="h-3 w-3" />
+                                Átnevezés
+                              </button>
+                            )}
+
+                            <button
+                              type="button"
+                              disabled={regenerateCodeMutation.isPending}
+                              onClick={() =>
+                                regenerateCodeMutation.mutate(dev.id)
+                              }
+                              className="inline-flex items-center gap-1 rounded-lg border border-amber-300 dark:border-amber-500/40 bg-white dark:bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-amber-800 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-500/20 transition-colors"
+                              title={
+                                isPaired
+                                  ? 'Jelenlegi párosítás bontása és új 6 jegyű kód kérése'
+                                  : 'Új 6 jegyű párosító kód generálása (10 perc)'
+                              }
+                            >
+                              <RefreshCw className="h-3 w-3" />
+                              {isPaired
+                                ? 'Párosítás bontása / Új kód'
+                                : 'Új kód kérése'}
+                            </button>
+
+                            <button
+                              type="button"
+                              disabled={deleteDeviceMutation.isPending}
+                              onClick={() => deleteDeviceMutation.mutate(dev.id)}
+                              className="inline-flex items-center gap-1 rounded-lg border border-rose-200 dark:border-rose-500/40 bg-rose-50 dark:bg-rose-500/15 px-2.5 py-1 text-[11px] font-bold text-rose-700 dark:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-500/25 transition-colors"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                              {isPending
+                                ? 'Párosítás megszakítása'
+                                : 'Törlés'}
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </div>
           </div>

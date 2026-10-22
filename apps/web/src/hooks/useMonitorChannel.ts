@@ -2,7 +2,9 @@ import {
   CheckInResultPayload,
   CheckInRevokedPayload,
   MONITOR_BROADCAST_CHANNEL,
+  MonitorDeviceRevokedPayload,
   MonitorStatePayload,
+  MonitorTestPingPayload,
   SCANNER_BROADCAST_CHANNEL,
   ScannerEventPayload,
   SOCKET_EVENTS,
@@ -15,7 +17,9 @@ import { useAuthStore } from '../stores/authStore';
 export type MonitorBroadcastMessage =
   | { type: 'CHECKIN_RESULT'; payload: CheckInResultPayload }
   | { type: 'CHECKIN_REVOKED'; payload: CheckInRevokedPayload }
-  | { type: 'SCAN_TRIGGERED'; payload: ScannerEventPayload };
+  | { type: 'SCAN_TRIGGERED'; payload: ScannerEventPayload }
+  | { type: 'TEST_PING'; payload: MonitorTestPingPayload }
+  | { type: 'DEVICE_REVOKED'; payload: MonitorDeviceRevokedPayload };
 
 export function broadcastToLocalMonitors(message: MonitorBroadcastMessage) {
   if (typeof window === 'undefined' || !('BroadcastChannel' in window)) return;
@@ -42,11 +46,17 @@ export function broadcastToScannerChannel(message: MonitorBroadcastMessage) {
 interface UseMonitorChannelOptions {
   onCheckInResult?: (payload: CheckInResultPayload) => void;
   onCheckInRevoked?: (payload: CheckInRevokedPayload) => void;
+  onTestPing?: (payload: MonitorTestPingPayload) => void;
+  onDeviceRevoked?: (payload: MonitorDeviceRevokedPayload) => void;
   enableWakeLock?: boolean;
+  enabled?: boolean;
 }
 
 export function useMonitorChannel(options: UseMonitorChannelOptions = {}) {
-  const { accessToken, deviceToken } = useAuthStore();
+  const { accessToken, deviceToken, deviceId } = useAuthStore();
+  const isAuthorized = Boolean(accessToken || deviceToken);
+  const channelEnabled = (options.enabled ?? true) && isAuthorized;
+
   const [isConnected, setIsConnected] = useState<boolean>(false);
   const [connectedDisplays, setConnectedDisplays] = useState<number>(1);
   const [wakeLockActive, setWakeLockActive] = useState<boolean>(false);
@@ -65,8 +75,33 @@ export function useMonitorChannel(options: UseMonitorChannelOptions = {}) {
     [options],
   );
 
+  const handleTestPing = useCallback(
+    (payload: MonitorTestPingPayload) => {
+      if (
+        payload.deviceId &&
+        deviceId &&
+        !accessToken &&
+        payload.deviceId !== deviceId
+      ) {
+        return;
+      }
+      options.onTestPing?.(payload);
+    },
+    [options, deviceId, accessToken],
+  );
+
+  const handleDeviceRevoked = useCallback(
+    (payload: MonitorDeviceRevokedPayload) => {
+      if (deviceId && payload.deviceId === deviceId) {
+        options.onDeviceRevoked?.(payload);
+      }
+    },
+    [options, deviceId],
+  );
+
   // 1. Azonos PC-n futó másodlagos ablak (<1ms késleltetésű BroadcastChannel)
   useEffect(() => {
+    if (!channelEnabled) return;
     if (typeof window === 'undefined' || !('BroadcastChannel' in window)) return;
     const channel = new BroadcastChannel(MONITOR_BROADCAST_CHANNEL);
 
@@ -75,24 +110,39 @@ export function useMonitorChannel(options: UseMonitorChannelOptions = {}) {
         handleResult(event.data.payload);
       } else if (event.data?.type === 'CHECKIN_REVOKED') {
         handleRevoked(event.data.payload);
+      } else if (event.data?.type === 'TEST_PING') {
+        handleTestPing(event.data.payload);
+      } else if (event.data?.type === 'DEVICE_REVOKED') {
+        handleDeviceRevoked(event.data.payload);
       }
     };
 
     return () => {
       channel.close();
     };
-  }, [handleResult, handleRevoked]);
+  }, [
+    channelEnabled,
+    handleResult,
+    handleRevoked,
+    handleTestPing,
+    handleDeviceRevoked,
+  ]);
 
   // 2. Socket.io kapcsolat (Recepciós PC és különálló Tablet/TV szinkronizáció)
   useEffect(() => {
+    const token = deviceToken || accessToken;
+    if (!channelEnabled || !token) {
+      setIsConnected(false);
+      return;
+    }
+
     const wsBaseUrl =
       import.meta.env.VITE_WS_URL ||
       import.meta.env.VITE_API_URL?.replace('/api', '') ||
       'http://localhost:3001';
 
-    const token = deviceToken || accessToken;
     const socket: Socket = io(`${wsBaseUrl}${SOCKET_NAMESPACE}`, {
-      auth: token ? { token } : {},
+      auth: { token },
       transports: ['websocket', 'polling'],
       reconnectionAttempts: 10,
       reconnectionDelay: 2000,
@@ -121,14 +171,43 @@ export function useMonitorChannel(options: UseMonitorChannelOptions = {}) {
       },
     );
 
+    socket.on(
+      SOCKET_EVENTS.MONITOR_TEST_PING,
+      (payload: MonitorTestPingPayload) => {
+        handleTestPing(payload);
+      },
+    );
+
+    socket.on(
+      SOCKET_EVENTS.MONITOR_DEVICE_REVOKED,
+      (payload: MonitorDeviceRevokedPayload) => {
+        handleDeviceRevoked(payload);
+      },
+    );
+
+    const heartbeatInterval = window.setInterval(() => {
+      if (socket.connected) {
+        socket.emit(SOCKET_EVENTS.MONITOR_PING);
+      }
+    }, 30000);
+
     return () => {
+      window.clearInterval(heartbeatInterval);
       socket.disconnect();
     };
-  }, [accessToken, deviceToken, handleResult, handleRevoked]);
+  }, [
+    channelEnabled,
+    accessToken,
+    deviceToken,
+    handleResult,
+    handleRevoked,
+    handleTestPing,
+    handleDeviceRevoked,
+  ]);
 
   // 3. Screen Wake Lock API (hogy a Tablet / Monitor ne aludjon el)
   useEffect(() => {
-    if (!options.enableWakeLock) return;
+    if (!options.enableWakeLock || !channelEnabled) return;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let wakeLockSentinel: any = null;
 
@@ -162,11 +241,12 @@ export function useMonitorChannel(options: UseMonitorChannelOptions = {}) {
         wakeLockSentinel.release().catch(() => {});
       }
     };
-  }, [options.enableWakeLock]);
+  }, [options.enableWakeLock, channelEnabled]);
 
   return {
     isConnected,
     connectedDisplays,
     wakeLockActive,
+    isAuthorized,
   };
 }
