@@ -3,6 +3,7 @@ import { Lock, Sparkles, PlayCircle } from 'lucide-react';
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ThemeToggleButton } from '../../components/ThemeToggleButton';
+import { VersionBadge } from '../../components/VersionChangelogModal';
 import { api } from '../../lib/api';
 import { notify } from '../../lib/notify';
 import { useAuthStore } from '../../stores/authStore';
@@ -66,9 +67,7 @@ export const LoginPage: React.FC = () => {
                 <h1 className="text-xl font-extrabold tracking-tight text-slate-900 dark:text-white">
                   ReformStudioSync
                 </h1>
-                <span className="rounded-md bg-emerald-500/15 px-2 py-0.5 text-[10px] font-bold uppercase text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
-                  V0.1
-                </span>
+                <VersionBadge />
               </div>
               <p className="text-xs text-slate-500 dark:text-slate-400">
                 Recepciós & Valós Idejű Vendégmonitor Rendszer

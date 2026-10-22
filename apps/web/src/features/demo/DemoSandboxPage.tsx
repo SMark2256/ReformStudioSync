@@ -33,6 +33,7 @@ import {
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { ThemeToggleButton } from '../../components/ThemeToggleButton';
+import { VersionBadge } from '../../components/VersionChangelogModal';
 import { normalizeScannedCode } from '../../hooks/useBarcodeScanner';
 import { broadcastToScannerChannel } from '../../hooks/useMonitorChannel';
 import { mockStudioEngine } from '../../lib/mock-engine';
@@ -323,9 +324,7 @@ export const DemoSandboxPage: React.FC = () => {
                 <h1 className="text-base font-extrabold text-slate-900 dark:text-white">
                   RE-FORM Stúdió — Interaktív Demo & Tesztkörnyezet
                 </h1>
-                <span className="rounded-md bg-emerald-500/15 px-2 py-0.5 text-[10px] font-bold uppercase text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
-                  V0.1
-                </span>
+                <VersionBadge />
               </div>
               <p className="text-xs text-slate-500 dark:text-slate-400">
                 Köredzés (0 levonás) vs. Alkalmas Kezelés (Hypoxi -1), 10 mp dupla védelem, Vendégkartoték és adatvédett Vendégmonitor.

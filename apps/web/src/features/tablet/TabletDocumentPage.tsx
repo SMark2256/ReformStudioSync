@@ -12,6 +12,7 @@ import {
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ThemeToggleButton } from '../../components/ThemeToggleButton';
+import { VersionBadge } from '../../components/VersionChangelogModal';
 import { api } from '../../lib/api';
 import { notify } from '../../lib/notify';
 import { useThemeStore } from '../../stores/themeStore';
@@ -182,9 +183,7 @@ export const TabletDocumentPage: React.FC = () => {
                   <h1 className="text-base font-extrabold text-slate-900 dark:text-white">
                     RE-FORM Stúdió • Tablet Dokumentum-Kitöltő & Aláíró Nézet
                   </h1>
-                  <span className="rounded-md bg-emerald-500/15 px-2 py-0.5 text-[10px] font-bold uppercase text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
-                    V0.1
-                  </span>
+                  <VersionBadge />
                 </div>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
                   Érintőképernyős GDPR, egészségügyi és kezelési nyilatkozat aláírás
