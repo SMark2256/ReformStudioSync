@@ -1,12 +1,48 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { DEFAULT_STUDIO_ID, GuestDto, PassType } from '@reform/shared';
+import {
+  DEFAULT_STUDIO_ID,
+  DocumentStatus,
+  DocumentType,
+  GuestDocumentDto,
+  GuestDto,
+  GuestNoteDto,
+  GuestPassDto,
+  GuestPhotoDto,
+  GuestStatus,
+  MeasurementDto,
+  MembershipDueStatus,
+  MembershipStatus,
+  MessageLogDto,
+  MessageStatus,
+  OverdueBucket,
+  PassType,
+  PaymentMethod,
+  Role,
+} from '@reform/shared';
 import { randomInt } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
-import { CreateGuestDto, UpdateGuestDto } from './guests.dto';
+import {
+  CreateGuestDocumentDto,
+  CreateGuestDto,
+  CreateGuestNoteDto,
+  CreateGuestPhotoDto,
+  CreateMeasurementDto,
+  SendGuestMessageDto,
+  SignGuestDocumentDto,
+  UpdateGuestDto,
+} from './guests.dto';
+
+function computeOverdueBucket(days: number): OverdueBucket {
+  if (days <= 0) return OverdueBucket.NONE;
+  if (days <= 5) return OverdueBucket.DAYS_1_5;
+  if (days <= 15) return OverdueBucket.DAYS_6_15;
+  return OverdueBucket.DAYS_OVER_15;
+}
 
 @Injectable()
 export class GuestsService {
@@ -21,6 +57,59 @@ export class GuestsService {
       if (!exists) return candidate;
     }
     return `RS${Date.now().toString().slice(-6)}`;
+  }
+
+  private getFullGuestIncludes() {
+    return {
+      passes: {
+        include: {
+          passTemplate: { include: { service: true } },
+          service: true,
+          usageLogs: {
+            include: { service: true, employee: true },
+            orderBy: { usedAt: 'desc' as const },
+          },
+        },
+        orderBy: { expirationDate: 'asc' as const },
+      },
+      memberships: {
+        include: {
+          dues: { orderBy: { dueDate: 'desc' as const } },
+        },
+        orderBy: { createdAt: 'desc' as const },
+      },
+      payments: {
+        include: {
+          guestPass: { include: { passTemplate: true } },
+          recordedBy: true,
+          allocations: {
+            include: {
+              membershipDue: true,
+              pass: { include: { passTemplate: true } },
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' as const },
+      },
+      measurements: {
+        include: { recordedBy: true },
+        orderBy: { measuredAt: 'desc' as const },
+      },
+      photos: {
+        include: { service: true },
+        orderBy: { takenAt: 'desc' as const },
+      },
+      documents: {
+        orderBy: { createdAt: 'desc' as const },
+      },
+      internalNotes: {
+        include: { author: true },
+        orderBy: { createdAt: 'desc' as const },
+      },
+      messageLogs: {
+        orderBy: { sentAt: 'desc' as const },
+      },
+    };
   }
 
   async findAll(
@@ -44,18 +133,7 @@ export class GuestsService {
             }
           : {}),
       },
-      include: {
-        passes: {
-          include: {
-            passTemplate: true,
-            usageLogs: {
-              orderBy: { usedAt: 'desc' },
-              take: 15,
-            },
-          },
-          orderBy: { expirationDate: 'asc' },
-        },
-      },
+      include: this.getFullGuestIncludes(),
       orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
     });
 
@@ -65,17 +143,7 @@ export class GuestsService {
   async findOne(id: string, studioId = DEFAULT_STUDIO_ID): Promise<GuestDto> {
     const guest = await this.prisma.guest.findFirst({
       where: { id, studioId },
-      include: {
-        passes: {
-          include: {
-            passTemplate: true,
-            usageLogs: {
-              orderBy: { usedAt: 'desc' },
-            },
-          },
-          orderBy: { createdAt: 'desc' },
-        },
-      },
+      include: this.getFullGuestIncludes(),
     });
 
     if (!guest) {
@@ -83,6 +151,14 @@ export class GuestsService {
     }
 
     return this.mapGuest(guest);
+  }
+
+  async findGuestPasses(
+    guestId: string,
+    studioId = DEFAULT_STUDIO_ID,
+  ): Promise<GuestPassDto[]> {
+    const guest = await this.findOne(guestId, studioId);
+    return guest.passes ?? [];
   }
 
   async create(
@@ -112,13 +188,12 @@ export class GuestsService {
         lastName: dto.lastName.trim(),
         email: dto.email?.trim() || null,
         phone: dto.phone?.trim() || null,
+        birthDate: dto.birthDate ? new Date(dto.birthDate) : null,
+        nameDay: dto.nameDay?.trim() || null,
+        status: dto.status ?? GuestStatus.ACTIVE,
         notes: dto.notes?.trim() || null,
       },
-      include: {
-        passes: {
-          include: { passTemplate: true, usageLogs: true },
-        },
-      },
+      include: this.getFullGuestIncludes(),
     });
 
     return this.mapGuest(created);
@@ -162,20 +237,344 @@ export class GuestsService {
         ...(dto.barcode !== undefined ? { barcode: dto.barcode.trim() } : {}),
         ...(dto.email !== undefined ? { email: dto.email?.trim() || null } : {}),
         ...(dto.phone !== undefined ? { phone: dto.phone?.trim() || null } : {}),
+        ...(dto.birthDate !== undefined
+          ? { birthDate: dto.birthDate ? new Date(dto.birthDate) : null }
+          : {}),
+        ...(dto.nameDay !== undefined
+          ? { nameDay: dto.nameDay?.trim() || null }
+          : {}),
+        ...(dto.status !== undefined ? { status: dto.status } : {}),
         ...(dto.notes !== undefined ? { notes: dto.notes?.trim() || null } : {}),
       },
-      include: {
-        passes: {
-          include: { passTemplate: true, usageLogs: true },
-        },
-      },
+      include: this.getFullGuestIncludes(),
     });
 
     return this.mapGuest(updated);
   }
 
+  async addMeasurement(
+    guestId: string,
+    dto: CreateMeasurementDto,
+    staffUserId: string,
+  ): Promise<MeasurementDto> {
+    const created = await this.prisma.measurement.create({
+      data: {
+        guestId,
+        recordedById: staffUserId,
+        measuredAt: dto.measuredAt ? new Date(dto.measuredAt) : new Date(),
+        weightKg: dto.weightKg ?? null,
+        bodyFatPct: dto.bodyFatPct ?? null,
+        muscleMassKg: dto.muscleMassKg ?? null,
+        visceralFat: dto.visceralFat ?? null,
+        waistCm: dto.waistCm ?? null,
+        hipCm: dto.hipCm ?? null,
+        thighCm: dto.thighCm ?? null,
+        armCm: dto.armCm ?? null,
+        chestCm: dto.chestCm ?? null,
+        note: dto.note?.trim() || null,
+      },
+      include: { recordedBy: true },
+    });
+
+    return {
+      id: created.id,
+      guestId: created.guestId,
+      measuredAt: created.measuredAt.toISOString(),
+      weightKg: created.weightKg,
+      bodyFatPct: created.bodyFatPct,
+      muscleMassKg: created.muscleMassKg,
+      visceralFat: created.visceralFat,
+      waistCm: created.waistCm,
+      hipCm: created.hipCm,
+      thighCm: created.thighCm,
+      armCm: created.armCm,
+      chestCm: created.chestCm,
+      note: created.note,
+      recordedByName: created.recordedBy?.name ?? 'Recepció',
+    };
+  }
+
+  async addPhoto(
+    guestId: string,
+    dto: CreateGuestPhotoDto,
+  ): Promise<GuestPhotoDto> {
+    // Szerveroldali méret-ellenőrzés (max ~600 KB optimalizált WebP/JPEG adatfolyam)
+    const maxCompressedBytes = 750 * 1024;
+    if (
+      dto.compressedSizeBytes &&
+      dto.compressedSizeBytes > maxCompressedBytes
+    ) {
+      throw new BadRequestException(
+        'A feltöltött kép mérete meghaladja a megengedett optimalizált határt (750 KB). Kérjük, használd az automatikus WebP tömörítést!',
+      );
+    }
+
+    const created = await this.prisma.guestPhoto.create({
+      data: {
+        guestId,
+        serviceId: dto.serviceId || null,
+        fileUrl: dto.fileUrl,
+        mimeType: dto.mimeType || 'image/webp',
+        originalSizeBytes: dto.originalSizeBytes ?? 0,
+        compressedSizeBytes: dto.compressedSizeBytes ?? 0,
+        width: dto.width ?? 0,
+        height: dto.height ?? 0,
+        visibilityRole: dto.visibilityRole ?? Role.RECEPTIONIST,
+        note: dto.note?.trim() || null,
+      },
+      include: { service: true },
+    });
+
+    return {
+      id: created.id,
+      guestId: created.guestId,
+      serviceId: created.serviceId,
+      serviceName: created.service?.name ?? null,
+      takenAt: created.takenAt.toISOString(),
+      fileUrl: created.fileUrl,
+      mimeType: created.mimeType,
+      originalSizeBytes: created.originalSizeBytes,
+      compressedSizeBytes: created.compressedSizeBytes,
+      width: created.width,
+      height: created.height,
+      visibilityRole: created.visibilityRole as unknown as Role,
+      note: created.note,
+    };
+  }
+
+  async createDocument(
+    guestId: string,
+    dto: CreateGuestDocumentDto,
+  ): Promise<GuestDocumentDto> {
+    const isSigned = Boolean(dto.signatureDataUrl);
+    const created = await this.prisma.guestDocument.create({
+      data: {
+        guestId,
+        documentType: dto.documentType,
+        title: dto.title.trim(),
+        contentText: dto.contentText.trim(),
+        fieldsJson: dto.fieldsJson ? JSON.stringify(dto.fieldsJson) : null,
+        signatureDataUrl: dto.signatureDataUrl ?? null,
+        signedAt: isSigned ? new Date() : null,
+        status: isSigned
+          ? DocumentStatus.SIGNED
+          : DocumentStatus.PENDING_SIGNATURE,
+      },
+      include: { guest: true },
+    });
+
+    return {
+      id: created.id,
+      guestId: created.guestId,
+      guestName: `${created.guest.lastName} ${created.guest.firstName}`,
+      documentType: created.documentType as unknown as DocumentType,
+      title: created.title,
+      contentText: created.contentText,
+      fieldsJson: created.fieldsJson ? JSON.parse(created.fieldsJson) : undefined,
+      signatureDataUrl: created.signatureDataUrl,
+      signedAt: created.signedAt ? created.signedAt.toISOString() : null,
+      status: created.status as unknown as DocumentStatus,
+      createdAt: created.createdAt.toISOString(),
+    };
+  }
+
+  async signDocument(
+    documentId: string,
+    dto: SignGuestDocumentDto,
+  ): Promise<GuestDocumentDto> {
+    const existing = await this.prisma.guestDocument.findUnique({
+      where: { id: documentId },
+      include: { guest: true },
+    });
+    if (!existing) {
+      throw new NotFoundException('A dokumentum nem található.');
+    }
+
+    const updated = await this.prisma.guestDocument.update({
+      where: { id: documentId },
+      data: {
+        signatureDataUrl: dto.signatureDataUrl,
+        fieldsJson: dto.fieldsJson
+          ? JSON.stringify(dto.fieldsJson)
+          : existing.fieldsJson,
+        signedAt: new Date(),
+        status: DocumentStatus.SIGNED,
+      },
+      include: { guest: true },
+    });
+
+    return {
+      id: updated.id,
+      guestId: updated.guestId,
+      guestName: `${updated.guest.lastName} ${updated.guest.firstName}`,
+      documentType: updated.documentType as unknown as DocumentType,
+      title: updated.title,
+      contentText: updated.contentText,
+      fieldsJson: updated.fieldsJson ? JSON.parse(updated.fieldsJson) : undefined,
+      signatureDataUrl: updated.signatureDataUrl,
+      signedAt: updated.signedAt ? updated.signedAt.toISOString() : null,
+      status: updated.status as unknown as DocumentStatus,
+      createdAt: updated.createdAt.toISOString(),
+    };
+  }
+
+  async listPendingDocuments(): Promise<GuestDocumentDto[]> {
+    const docs = await this.prisma.guestDocument.findMany({
+      where: { status: DocumentStatus.PENDING_SIGNATURE },
+      include: { guest: true },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return docs.map((d) => ({
+      id: d.id,
+      guestId: d.guestId,
+      guestName: `${d.guest.lastName} ${d.guest.firstName}`,
+      documentType: d.documentType as unknown as DocumentType,
+      title: d.title,
+      contentText: d.contentText,
+      fieldsJson: d.fieldsJson ? JSON.parse(d.fieldsJson) : undefined,
+      signatureDataUrl: d.signatureDataUrl,
+      signedAt: d.signedAt ? d.signedAt.toISOString() : null,
+      status: d.status as unknown as DocumentStatus,
+      createdAt: d.createdAt.toISOString(),
+    }));
+  }
+
+  async addInternalNote(
+    guestId: string,
+    dto: CreateGuestNoteDto,
+    staffUserId: string,
+  ): Promise<GuestNoteDto> {
+    const created = await this.prisma.guestNote.create({
+      data: {
+        guestId,
+        authorId: staffUserId,
+        content: dto.content.trim(),
+      },
+      include: { author: true },
+    });
+
+    return {
+      id: created.id,
+      guestId: created.guestId,
+      authorId: created.authorId,
+      authorName: created.author.name,
+      content: created.content,
+      createdAt: created.createdAt.toISOString(),
+    };
+  }
+
+  async sendGuestEmailLog(
+    guestId: string,
+    dto: SendGuestMessageDto,
+  ): Promise<MessageLogDto> {
+    const guest = await this.prisma.guest.findUnique({
+      where: { id: guestId },
+    });
+    if (!guest) {
+      throw new NotFoundException('A vendég nem található.');
+    }
+
+    const created = await this.prisma.messageLog.create({
+      data: {
+        guestId,
+        recipientEmail: guest.email || 'nincs-megadva@reform.hu',
+        subject: dto.subject.trim(),
+        messageType: dto.messageType.trim(),
+        status: guest.email ? MessageStatus.DELIVERED : MessageStatus.FAILED,
+        errorDetails: guest.email
+          ? null
+          : 'A vendégnek nincs rögzített e-mail címe.',
+      },
+    });
+
+    return {
+      id: created.id,
+      guestId: created.guestId,
+      recipientEmail: created.recipientEmail,
+      subject: created.subject,
+      messageType: created.messageType,
+      status: created.status as unknown as MessageStatus,
+      sentAt: created.sentAt.toISOString(),
+      errorDetails: created.errorDetails,
+    };
+  }
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private mapGuest(g: any): GuestDto {
+    const now = new Date();
+    const guestFullName = `${g.lastName} ${g.firstName}`;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const passes: GuestPassDto[] = (g.passes ?? []).map((p: any) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const usageLogs = (p.usageLogs ?? []).map((l: any) => ({
+        id: l.id,
+        guestPassId: l.guestPassId,
+        guestId: l.guestId ?? g.id,
+        guestName: guestFullName,
+        serviceId: l.serviceId ?? null,
+        serviceName:
+          l.service?.name ??
+          p.service?.name ??
+          p.passTemplate?.service?.name ??
+          p.passTemplate?.name ??
+          null,
+        passName: p.passTemplate?.name ?? null,
+        employeeId: l.employeeId ?? null,
+        employeeName: l.employee?.name ?? 'Recepciós Munkatárs',
+        delta: l.delta,
+        usedAt: l.usedAt.toISOString(),
+        reversedAt: l.reversedAt ? l.reversedAt.toISOString() : null,
+        reversalReason: l.reversalReason ?? null,
+        note: l.note,
+      }));
+
+      const usedPassesCount = usageLogs.filter(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (u: any) => u.delta < 0 && !u.reversedAt,
+      ).length;
+      const calculatedRemainingPasses =
+        p.totalPasses !== null && p.totalPasses !== undefined
+          ? Math.max(0, p.totalPasses - usedPassesCount)
+          : null;
+
+      return {
+        id: p.id,
+        studioId: p.studioId,
+        guestId: p.guestId,
+        passTemplateId: p.passTemplateId,
+        passTemplateName: p.passTemplate?.name,
+        serviceId: p.serviceId ?? p.passTemplate?.serviceId ?? null,
+        serviceName:
+          p.service?.name ?? p.passTemplate?.service?.name ?? null,
+        type: p.type as PassType,
+        totalPasses: p.totalPasses,
+        remainingPasses: p.remainingPasses,
+        calculatedRemainingPasses,
+        usedPassesCount,
+        startDate: p.startDate.toISOString(),
+        expirationDate: p.expirationDate.toISOString(),
+        isActive: p.isActive,
+        isFrozen: p.isFrozen,
+        frozenAt: p.frozenAt ? p.frozenAt.toISOString() : null,
+        createdAt: p.createdAt.toISOString(),
+        usageLogs,
+      };
+    });
+
+    const treatmentHistory = passes
+      .flatMap((p) =>
+        (p.usageLogs ?? []).map((u) => ({
+          ...u,
+          remainingAfter: p.remainingPasses,
+        })),
+      )
+      .filter((u) => u.delta < 0)
+      .sort(
+        (a, b) => new Date(b.usedAt).getTime() - new Date(a.usedAt).getTime(),
+      );
+
     return {
       id: g.id,
       studioId: g.studioId,
@@ -184,37 +583,153 @@ export class GuestsService {
       lastName: g.lastName,
       email: g.email,
       phone: g.phone,
+      birthDate: g.birthDate ? g.birthDate.toISOString().slice(0, 10) : null,
+      nameDay: g.nameDay ?? null,
+      status: (g.status as GuestStatus) ?? GuestStatus.ACTIVE,
       notes: g.notes,
       isActive: g.isActive,
       createdAt: g.createdAt.toISOString(),
       updatedAt: g.updatedAt.toISOString(),
-      passes: (g.passes ?? []).map(
+      passes,
+      treatmentHistory,
+      memberships: (g.memberships ?? []).map(
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (p: any) => ({
-          id: p.id,
-          studioId: p.studioId,
-          guestId: p.guestId,
-          passTemplateId: p.passTemplateId,
-          passTemplateName: p.passTemplate?.name,
-          type: p.type as PassType,
-          totalPasses: p.totalPasses,
-          remainingPasses: p.remainingPasses,
-          startDate: p.startDate.toISOString(),
-          expirationDate: p.expirationDate.toISOString(),
-          isActive: p.isActive,
-          isFrozen: p.isFrozen,
-          frozenAt: p.frozenAt ? p.frozenAt.toISOString() : null,
-          createdAt: p.createdAt.toISOString(),
-          usageLogs: (p.usageLogs ?? []).map(
+        (m: any) => ({
+          id: m.id,
+          studioId: m.studioId,
+          guestId: m.guestId,
+          guestName: guestFullName,
+          monthlyFeeHuf: m.monthlyFeeHuf,
+          startDate: m.startDate.toISOString(),
+          dueDay: m.dueDay,
+          status: m.status as MembershipStatus,
+          pausedAt: m.pausedAt ? m.pausedAt.toISOString() : null,
+          terminatedAt: m.terminatedAt ? m.terminatedAt.toISOString() : null,
+          createdAt: m.createdAt.toISOString(),
+          dues: (m.dues ?? []).map(
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            (l: any) => ({
-              id: l.id,
-              guestPassId: l.guestPassId,
-              delta: l.delta,
-              usedAt: l.usedAt.toISOString(),
-              note: l.note,
-            }),
+            (d: any) => {
+              const remainingHuf = Math.max(0, d.amountHuf - d.paidAmountHuf);
+              const overdueDays =
+                remainingHuf > 0 && d.dueDate < now
+                  ? Math.ceil(
+                      (now.getTime() - d.dueDate.getTime()) /
+                        (24 * 60 * 60 * 1000),
+                    )
+                  : 0;
+              return {
+                id: d.id,
+                membershipId: d.membershipId,
+                guestId: g.id,
+                guestName: guestFullName,
+                period: d.period,
+                dueDate: d.dueDate.toISOString(),
+                amountHuf: d.amountHuf,
+                paidAmountHuf: d.paidAmountHuf,
+                remainingHuf,
+                status: d.status as MembershipDueStatus,
+                overdueDays,
+                overdueBucket: computeOverdueBucket(overdueDays),
+                createdAt: d.createdAt.toISOString(),
+              };
+            },
           ),
+        }),
+      ),
+      payments: (g.payments ?? []).map(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (pay: any) => ({
+          id: pay.id,
+          studioId: pay.studioId,
+          guestId: pay.guestId,
+          guestName: guestFullName,
+          guestPassId: pay.guestPassId,
+          passName: pay.guestPass?.passTemplate?.name ?? null,
+          recordedByUserId: pay.recordedByUserId,
+          recordedByName: pay.recordedBy?.name ?? 'Recepció',
+          amount: Number(pay.amount),
+          paymentMethod: pay.paymentMethod as PaymentMethod,
+          isCancelled: pay.isCancelled,
+          note: pay.note,
+          createdAt: pay.createdAt.toISOString(),
+        }),
+      ),
+      measurements: (g.measurements ?? []).map(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (ms: any) => ({
+          id: ms.id,
+          guestId: ms.guestId,
+          measuredAt: ms.measuredAt.toISOString(),
+          weightKg: ms.weightKg,
+          bodyFatPct: ms.bodyFatPct,
+          muscleMassKg: ms.muscleMassKg,
+          visceralFat: ms.visceralFat,
+          waistCm: ms.waistCm,
+          hipCm: ms.hipCm,
+          thighCm: ms.thighCm,
+          armCm: ms.armCm,
+          chestCm: ms.chestCm,
+          note: ms.note,
+          recordedByName: ms.recordedBy?.name ?? 'Recepciós Munkatárs',
+        }),
+      ),
+      photos: (g.photos ?? []).map(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (ph: any) => ({
+          id: ph.id,
+          guestId: ph.guestId,
+          serviceId: ph.serviceId,
+          serviceName: ph.service?.name ?? null,
+          takenAt: ph.takenAt.toISOString(),
+          fileUrl: ph.fileUrl,
+          mimeType: ph.mimeType,
+          originalSizeBytes: ph.originalSizeBytes,
+          compressedSizeBytes: ph.compressedSizeBytes,
+          width: ph.width,
+          height: ph.height,
+          visibilityRole: ph.visibilityRole as Role,
+          note: ph.note,
+        }),
+      ),
+      documents: (g.documents ?? []).map(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (doc: any) => ({
+          id: doc.id,
+          guestId: doc.guestId,
+          guestName: guestFullName,
+          documentType: doc.documentType as DocumentType,
+          title: doc.title,
+          contentText: doc.contentText,
+          fieldsJson: doc.fieldsJson ? JSON.parse(doc.fieldsJson) : undefined,
+          signatureDataUrl: doc.signatureDataUrl,
+          signedAt: doc.signedAt ? doc.signedAt.toISOString() : null,
+          status: doc.status as DocumentStatus,
+          createdAt: doc.createdAt.toISOString(),
+        }),
+      ),
+      internalNotes: (g.internalNotes ?? []).map(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (nt: any) => ({
+          id: nt.id,
+          guestId: nt.guestId,
+          authorId: nt.authorId,
+          authorName: nt.author?.name ?? 'Recepciós Munkatárs',
+          content: nt.content,
+          createdAt: nt.createdAt.toISOString(),
+        }),
+      ),
+      messageLogs: (g.messageLogs ?? []).map(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (ml: any) => ({
+          id: ml.id,
+          guestId: ml.guestId,
+          guestName: guestFullName,
+          recipientEmail: ml.recipientEmail,
+          subject: ml.subject,
+          messageType: ml.messageType,
+          status: ml.status as MessageStatus,
+          sentAt: ml.sentAt.toISOString(),
+          errorDetails: ml.errorDetails,
         }),
       ),
     };

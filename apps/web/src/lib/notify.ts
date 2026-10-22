@@ -1,4 +1,8 @@
-import { CheckInResultPayload, CheckInStatus } from '@reform/shared';
+import {
+  CheckInResultPayload,
+  CheckInStatus,
+  DUPLICATE_SCAN_COOLDOWN_SECONDS,
+} from '@reform/shared';
 import { toast } from 'sonner';
 import { soundFeedback } from './sound';
 
@@ -51,34 +55,51 @@ export const notify = {
         soundFeedback.playSuccess();
       }
 
-      const remainingText =
-        payload.remainingPasses === 'Korlátlan'
+      const isCircuit = payload.mode === 'CIRCUIT_GREETING';
+      const remainingText = isCircuit
+        ? 'Köredzés érkezés (0 levonás)'
+        : payload.remainingPasses === 'Korlátlan'
           ? 'Korlátlan bérlet'
-          : `Maradt: ${payload.remainingPasses} / ${payload.totalPasses ?? '?'} alkalom`;
+          : `Hátralévő alkalmak: ${payload.remainingPasses} / ${payload.totalPasses ?? '?'} db`;
 
       const warningMessages: string[] = [];
       if (payload.warnings?.includes('LAST_OCCASION')) {
         warningMessages.push(
           payload.remainingPasses === 0
-            ? 'Utolsó alkalom felhasználva!'
+            ? 'Bérlet kimerült (0 alkalom maradt)!'
             : 'Már csak 1 alkalom maradt!',
         );
       }
+      if (payload.warnings?.includes('LOW_OCCASIONS')) {
+        warningMessages.push('Már csak 2 alkalom maradt a bérleten!');
+      }
       if (payload.warnings?.includes('EXPIRING_SOON')) {
-        warningMessages.push('A bérlet 3 napon belül lejár!');
+        warningMessages.push('A bérlet hamarosan lejár!');
+      }
+      if (
+        payload.warnings?.includes('OVERDUE_DUES') &&
+        payload.overdueAmountHuf
+      ) {
+        warningMessages.push(
+          `Tagdíj elmaradás: ${payload.overdueAmountHuf.toLocaleString('hu-HU')} Ft (${payload.overdueDays ?? 1} nap késés)!`,
+        );
       }
 
       const description = [
-        payload.passName ? `${payload.passName} • ${remainingText}` : remainingText,
+        payload.serviceName
+          ? `${payload.serviceName} • ${remainingText}`
+          : payload.passName
+            ? `${payload.passName} • ${remainingText}`
+            : remainingText,
         ...warningMessages,
       ].join(' — ');
 
       if (hasWarnings && payload.guestId && callbacks?.onOpenSellModal) {
-        toast.warning(`Beléptetve (Figyelem!): ${payload.guestName}`, {
+        toast.warning(`Rögzítve (Figyelem!): ${payload.guestName}`, {
           description,
           duration: 7500,
           action: {
-            label: 'Megújítás 1 kattintással',
+            label: 'Bérlet megújítás',
             onClick: () =>
               callbacks.onOpenSellModal?.(
                 payload.guestId!,
@@ -87,31 +108,36 @@ export const notify = {
           },
         });
       } else {
-        toast.success(`Sikeres beléptetés: ${payload.guestName}`, {
-          description,
-          duration: 5500,
-          action:
-            payload.checkInId && callbacks?.onRevoke
-              ? {
-                  label: 'Sztornó (Visszavonás)',
-                  onClick: () => callbacks.onRevoke?.(payload.checkInId!),
-                }
-              : undefined,
-        });
+        toast.success(
+          isCircuit
+            ? `Köredzés érkezés: ${payload.guestName}`
+            : `Kezelés levonva: ${payload.guestName}`,
+          {
+            description,
+            duration: 5500,
+            action:
+              payload.checkInId && callbacks?.onRevoke
+                ? {
+                    label: 'Sztornó (Visszavonás)',
+                    onClick: () => callbacks.onRevoke?.(payload.checkInId!),
+                  }
+                : undefined,
+          },
+        );
       }
       return;
     }
 
     if (payload.status === CheckInStatus.DUPLICATE_SCAN) {
       soundFeedback.playWarning();
-      toast.warning(`Dupla leolvasás védelem: ${payload.guestName}`, {
+      toast.warning(`Dupla leolvasás védelem (${DUPLICATE_SCAN_COOLDOWN_SECONDS} mp): ${payload.guestName}`, {
         description:
           payload.reason ??
-          'A vendég 60 másodpercen belül már be lett léptetve. Nem történt új levonás.',
+          `A vendég ${DUPLICATE_SCAN_COOLDOWN_SECONDS} másodpercen belül már be lett léptetve. Nem történt új levonás.`,
         duration: 7000,
         action: callbacks?.onForceDuplicate
           ? {
-              label: 'Mégis levonás (+1 fő)',
+              label: 'Mégis rögzítés',
               onClick: () => callbacks.onForceDuplicate?.(payload.barcode),
             }
           : undefined,

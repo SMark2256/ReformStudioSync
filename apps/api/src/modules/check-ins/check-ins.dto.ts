@@ -1,13 +1,15 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { VisitType } from '@reform/shared';
+import { Type } from 'class-transformer';
 import {
   IsArray,
   IsBoolean,
+  IsEnum,
   IsNotEmpty,
   IsOptional,
   IsString,
   ValidateNested,
 } from 'class-validator';
-import { Type } from 'class-transformer';
 
 export class ScanCheckInDto {
   @ApiProperty({ example: '100001' })
@@ -16,9 +18,19 @@ export class ScanCheckInDto {
   barcode: string;
 
   @ApiPropertyOptional({
+    enum: VisitType,
+    default: VisitType.CIRCUIT_TRAINING,
+    description:
+      'Köredzéses érkezés (CIRCUIT_TRAINING - nincs alkalomlevonás) vagy kezelési érkezés.',
+  })
+  @IsOptional()
+  @IsEnum(VisitType)
+  visitType?: VisitType;
+
+  @ApiPropertyOptional({
     default: false,
     description:
-      'Ha true, a 60 másodperces dupla lehúzás védelmet felülbírálva levon még egy alkalmat.',
+      'Ha true, a 10 másodperces dupla lehúzás védelmet felülbírálva rögzíti az eseményt.',
   })
   @IsOptional()
   @IsBoolean()

@@ -1,18 +1,26 @@
 import {
   CheckInResultPayload,
   CheckInStatus,
+  DUPLICATE_SCAN_COOLDOWN_SECONDS,
   GuestDto,
+  OverdueBucket,
   PassType,
   PaymentMethod,
+  ServiceCategory,
+  VisitType,
 } from '@reform/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   AlertTriangle,
+  ArrowLeft,
   Barcode,
+  Cake,
   CheckCircle2,
+  Clock,
   CloudOff,
   CreditCard,
   ExternalLink,
+  FileSignature,
   FlaskConical,
   Monitor,
   Plus,
@@ -25,6 +33,7 @@ import {
   Snowflake,
   Sparkles,
   Ticket,
+  UserCheck,
   Users,
   Volume2,
   VolumeX,
@@ -32,11 +41,12 @@ import {
   XCircle,
 } from 'lucide-react';
 import React, { useCallback, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { ThemeToggleButton } from '../../components/ThemeToggleButton';
 import { useBarcodeScanner } from '../../hooks/useBarcodeScanner';
 import { useMonitorChannel } from '../../hooks/useMonitorChannel';
 import { api } from '../../lib/api';
+import { mockStudioEngine } from '../../lib/mock-engine';
 import { notify } from '../../lib/notify';
 import { soundFeedback } from '../../lib/sound';
 import { useAuthStore } from '../../stores/authStore';
@@ -44,12 +54,16 @@ import { useOfflineQueueStore } from '../../stores/offlineQueueStore';
 import { useThemeStore } from '../../stores/themeStore';
 import { DigitalPassCardModal } from '../guests/DigitalPassCardModal';
 import { GuestModal } from '../guests/GuestModal';
+import { DeductTreatmentModal } from './DeductTreatmentModal';
+import { RecordPaymentModal } from './RecordPaymentModal';
 import { SellPassModal } from './SellPassModal';
 
 type ActiveTab = 'desk' | 'guests' | 'finance' | 'admin';
 
 export const ReceptionPage: React.FC = () => {
   const queryClient = useQueryClient();
+  const location = useLocation();
+  const navigate = useNavigate();
   const { user } = useAuthStore();
   const { theme } = useThemeStore();
   const {
@@ -67,12 +81,26 @@ export const ReceptionPage: React.FC = () => {
     null,
   );
   const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
+  const [greetingSeconds, setGreetingSeconds] = useState<number>(() =>
+    mockStudioEngine.getMonitorGreetingSeconds(),
+  );
 
   // Modals
   const [sellModalState, setSellModalState] = useState<{
     isOpen: boolean;
     guest: GuestDto | null;
     preselectedTemplateId?: string | null;
+  }>({ isOpen: false, guest: null });
+
+  const [deductModalState, setDeductModalState] = useState<{
+    isOpen: boolean;
+    guest: GuestDto | null;
+  }>({ isOpen: false, guest: null });
+
+  const [paymentModalState, setPaymentModalState] = useState<{
+    isOpen: boolean;
+    guest: GuestDto | null;
+    preselectedDueId?: string | null;
   }>({ isOpen: false, guest: null });
 
   const [guestModalState, setGuestModalState] = useState<{
@@ -94,12 +122,24 @@ export const ReceptionPage: React.FC = () => {
   const [newTplPrice, setNewTplPrice] = useState<number>(54000);
   const [newDeviceName, setNewDeviceName] = useState('Recepciós Tablet #1');
 
-  const { isConnected, connectedDisplays } = useMonitorChannel();
+  const [newServiceName, setNewServiceName] = useState('');
+  const [newServiceCat, setNewServiceCat] = useState<ServiceCategory>(
+    ServiceCategory.BODY_SHAPING,
+  );
+  const [newServiceDuration, setNewServiceDuration] = useState<number>(30);
+  const [newServicePrice, setNewServicePrice] = useState<number>(7500);
+
+  const { connectedDisplays } = useMonitorChannel();
 
   // Queries
   const guestsQuery = useQuery({
     queryKey: ['guests', guestSearch],
     queryFn: () => api.getGuests(guestSearch),
+  });
+
+  const servicesQuery = useQuery({
+    queryKey: ['services'],
+    queryFn: () => api.getServices(true),
   });
 
   const templatesQuery = useQuery({
@@ -110,6 +150,16 @@ export const ReceptionPage: React.FC = () => {
   const todayCheckInsQuery = useQuery({
     queryKey: ['today-checkins'],
     queryFn: () => api.getTodayCheckIns(),
+  });
+
+  const todayDashboardQuery = useQuery({
+    queryKey: ['today-dashboard'],
+    queryFn: () => api.getTodayDashboard(),
+  });
+
+  const overdueQuery = useQuery({
+    queryKey: ['overdue-memberships'],
+    queryFn: () => api.getOverdueMemberships(),
   });
 
   const financeQuery = useQuery({
@@ -124,11 +174,20 @@ export const ReceptionPage: React.FC = () => {
 
   const refreshAll = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ['guests'] });
+    queryClient.invalidateQueries({ queryKey: ['services'] });
     queryClient.invalidateQueries({ queryKey: ['today-checkins'] });
+    queryClient.invalidateQueries({ queryKey: ['today-dashboard'] });
+    queryClient.invalidateQueries({ queryKey: ['overdue-memberships'] });
     queryClient.invalidateQueries({ queryKey: ['daily-finance'] });
     queryClient.invalidateQueries({ queryKey: ['pass-templates'] });
     queryClient.invalidateQueries({ queryKey: ['display-devices'] });
   }, [queryClient]);
+
+  // Keep open guest modal fresh when queries refresh
+  const activeModalGuest = guestModalState.guest
+    ? (guestsQuery.data ?? []).find((g) => g.id === guestModalState.guest?.id) ??
+      guestModalState.guest
+    : null;
 
   // Helper to open Sell Pass Modal by guestId
   const openSellModalByGuestId = useCallback(
@@ -159,17 +218,55 @@ export const ReceptionPage: React.FC = () => {
   });
 
   const scanMutation = useMutation({
-    mutationFn: (vars: { barcode: string; forceDuplicate?: boolean }) =>
-      api.scanCheckIn(vars),
+    mutationFn: (vars: {
+      barcode: string;
+      forceDuplicate?: boolean;
+      visitType?: VisitType;
+    }) =>
+      api.scanCheckIn({
+        barcode: vars.barcode,
+        forceDuplicate: vars.forceDuplicate,
+        visitType: vars.visitType ?? VisitType.CIRCUIT_TRAINING,
+      }),
     onSuccess: (res) => {
       setLastCheckIn(res);
       notify.checkInResult(res, {
         onRevoke: (checkInId) => revokeMutation.mutate(checkInId),
         onForceDuplicate: (barcode) =>
-          scanMutation.mutate({ barcode, forceDuplicate: true }),
+          scanMutation.mutate({
+            barcode,
+            forceDuplicate: true,
+            visitType: VisitType.CIRCUIT_TRAINING,
+          }),
         onOpenSellModal: (guestId, suggestedTemplateId) =>
           openSellModalByGuestId(guestId, suggestedTemplateId),
       });
+      refreshAll();
+    },
+  });
+
+  const deductTreatmentMutation = useMutation({
+    mutationFn: api.deductPassUsage,
+    onSuccess: (res) => {
+      setLastCheckIn(res);
+      setDeductModalState({ isOpen: false, guest: null });
+      notify.checkInResult(res, {
+        onRevoke: (checkInId) => revokeMutation.mutate(checkInId),
+        onOpenSellModal: (guestId, suggestedTemplateId) =>
+          openSellModalByGuestId(guestId, suggestedTemplateId),
+      });
+      refreshAll();
+    },
+  });
+
+  const recordPaymentMutation = useMutation({
+    mutationFn: api.recordPayment,
+    onSuccess: (payment) => {
+      notify.success(
+        `Befizetés rögzítve: ${payment.guestName}`,
+        `${payment.amount.toLocaleString('hu-HU')} Ft (${payment.note ?? 'Befizetés'})`,
+      );
+      setPaymentModalState({ isOpen: false, guest: null });
       refreshAll();
     },
   });
@@ -188,7 +285,10 @@ export const ReceptionPage: React.FC = () => {
         return;
       }
 
-      scanMutation.mutate({ barcode: code });
+      scanMutation.mutate({
+        barcode: code,
+        visitType: VisitType.CIRCUIT_TRAINING,
+      });
     },
     [isOnline, enqueueScan, scanMutation],
   );
@@ -252,6 +352,8 @@ export const ReceptionPage: React.FC = () => {
       barcode?: string;
       email?: string;
       phone?: string;
+      birthDate?: string | null;
+      nameDay?: string | null;
       notes?: string;
     }) => {
       if (data.id) {
@@ -264,7 +366,9 @@ export const ReceptionPage: React.FC = () => {
         vars.id ? 'Vendég adatai frissítve!' : 'Új vendég sikeresen felvéve!',
         `${savedGuest.lastName} ${savedGuest.firstName} (Kártya: ${savedGuest.barcode})`,
       );
-      setGuestModalState({ isOpen: false, guest: null });
+      if (!vars.id) {
+        closeGuestSheet();
+      }
       refreshAll();
     },
   });
@@ -304,7 +408,7 @@ export const ReceptionPage: React.FC = () => {
     onSuccess: (cancelled) => {
       notify.warning(
         `Fizetési tétel sztornózva: ${cancelled.guestName}`,
-        `${cancelled.amount.toLocaleString('hu-HU')} Ft levonva a napi kasszából, a bérlet deaktiválva.`,
+        `${cancelled.amount.toLocaleString('hu-HU')} Ft levonva a napi kasszából.`,
       );
       refreshAll();
     },
@@ -318,6 +422,18 @@ export const ReceptionPage: React.FC = () => {
         `${tpl.name} (${tpl.price.toLocaleString('hu-HU')} Ft)`,
       );
       setNewTplName('');
+      refreshAll();
+    },
+  });
+
+  const createServiceMutation = useMutation({
+    mutationFn: api.createService,
+    onSuccess: (srv) => {
+      notify.success(
+        'Új szolgáltatás létrehozva!',
+        `${srv.name} (${srv.durationMinutes} perc)`,
+      );
+      setNewServiceName('');
       refreshAll();
     },
   });
@@ -345,53 +461,129 @@ export const ReceptionPage: React.FC = () => {
     );
   };
 
+  const lastIdentifiedGuest = lastCheckIn?.guestId
+    ? (guestsQuery.data ?? []).find((g) => g.id === lastCheckIn.guestId) ?? null
+    : null;
+
+  const dashboard = todayDashboardQuery.data;
+
+  const openGuestSheet = (guest: GuestDto | null) => {
+    setGuestModalState({ isOpen: true, guest });
+    navigate(location.pathname, {
+      state: {
+        mainTab: activeTab,
+        guestSheetOpen: true,
+        guestId: guest?.id ?? '__NEW__',
+        guestSnapshot: guest,
+        guestSubTab: 'overview',
+      },
+    });
+  };
+
+  const closeGuestSheet = () => {
+    setGuestModalState({ isOpen: false, guest: null });
+    navigate(location.pathname, {
+      state: {
+        mainTab: activeTab,
+        guestSheetOpen: false,
+        guestId: null,
+        guestSnapshot: null,
+        guestSubTab: 'overview',
+      },
+    });
+  };
+
+  const handleSelectMainTab = (nextTab: ActiveTab) => {
+    if (!guestModalState.isOpen && nextTab === activeTab) return;
+    setGuestModalState({ isOpen: false, guest: null });
+    setActiveTab(nextTab);
+    navigate(location.pathname, {
+      state: {
+        mainTab: nextTab,
+        guestSheetOpen: false,
+        guestId: null,
+        guestSnapshot: null,
+        guestSubTab: 'overview',
+      },
+    });
+  };
+
+  useEffect(() => {
+    const st =
+      (location.state as {
+        mainTab?: ActiveTab;
+        guestSheetOpen?: boolean;
+        guestId?: string | null;
+        guestSnapshot?: GuestDto | null;
+      } | null) ?? null;
+
+    if (!st) {
+      setActiveTab('desk');
+      setGuestModalState({ isOpen: false, guest: null });
+      return;
+    }
+
+    setActiveTab(st.mainTab ?? 'desk');
+    if (st.guestSheetOpen) {
+      const matched =
+        st.guestId && st.guestId !== '__NEW__'
+          ? ((guestsQuery.data ?? []).find((g) => g.id === st.guestId) ??
+              st.guestSnapshot ??
+              null)
+          : null;
+      setGuestModalState({ isOpen: true, guest: matched });
+    } else {
+      setGuestModalState({ isOpen: false, guest: null });
+    }
+  }, [location.key, location.state]);
+
   return (
     <div
-      className={`min-h-screen bg-slate-50 flex flex-col transition-colors duration-200 ${
+      className={`min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col transition-colors duration-200 ${
         theme === 'dark' ? 'reception-theme-dark dark' : ''
       }`}
     >
       {/* Top Navigation Bar */}
-      <header className="sticky top-0 z-30 border-b border-slate-200 bg-slate-900 text-white shadow-sm">
+      <header className="sticky top-0 z-30 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/20 border border-emerald-500/30">
-              <Sparkles className="h-5 w-5 text-emerald-400" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/15 border border-emerald-500/30">
+              <Sparkles className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-base font-extrabold tracking-tight">
-                  ReformStudioSync
+                <h1 className="text-base font-extrabold tracking-tight text-slate-900 dark:text-white">
+                  RE-FORM Stúdió
                 </h1>
-                <span className="rounded-md bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold uppercase text-emerald-300">
-                  Recepció v1.0
+                <span className="rounded-md bg-emerald-500/15 px-2 py-0.5 text-[10px] font-bold uppercase text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
+                  V0.1
                 </span>
               </div>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-slate-500 dark:text-slate-400">
                 Bejelentkezve: {user?.name ?? 'Recepciós Munkatárs'}
               </p>
             </div>
           </div>
 
           {/* Center Tabs */}
-          <nav className="flex items-center gap-1 rounded-xl bg-slate-800 p-1">
+          <nav className="flex items-center gap-1 rounded-xl bg-slate-100 dark:bg-slate-800 p-1">
             {[
               { id: 'desk', label: 'Recepciós Pult', icon: Barcode },
               { id: 'guests', label: 'Vendégkartoték', icon: Users },
-              { id: 'finance', label: 'Napi Kassza', icon: Wallet },
-              { id: 'admin', label: 'Sablonok & Monitorok', icon: Settings },
+              { id: 'finance', label: 'Pénzügy & Tartozások', icon: Wallet },
+              { id: 'admin', label: 'Szolgáltatások & Monitor', icon: Settings },
             ].map((tab) => {
               const Icon = tab.icon;
-              const active = activeTab === tab.id;
+              const active = !guestModalState.isOpen && activeTab === tab.id;
               return (
                 <button
                   key={tab.id}
                   type="button"
-                  onClick={() => setActiveTab(tab.id as ActiveTab)}
+                  onClick={() => handleSelectMainTab(tab.id as ActiveTab)}
                   className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
                     active
                       ? 'bg-emerald-600 text-white shadow'
-                      : 'text-slate-300 hover:bg-slate-700 hover:text-white'
+                      : 'text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-white'
                   }`}
                 >
                   <Icon className="h-3.5 w-3.5" />
@@ -409,13 +601,13 @@ export const ReceptionPage: React.FC = () => {
               title="Kattints az Offline / Online mód szimulálásához"
               className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold border transition-all ${
                 isOnline
-                  ? 'border-emerald-500/30 bg-emerald-500/15 text-emerald-300'
-                  : 'border-amber-500/40 bg-amber-500/20 text-amber-300'
+                  ? 'border-emerald-500/30 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
+                  : 'border-amber-500/40 bg-amber-500/20 text-amber-800 dark:text-amber-300'
               }`}
             >
               {isOnline ? (
                 <>
-                  <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                  <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
                   Online ({connectedDisplays} kijelző)
                 </>
               ) : (
@@ -436,24 +628,33 @@ export const ReceptionPage: React.FC = () => {
                   next ? 'Hangjelzések bekapcsolva' : 'Hangjelzések némítva',
                 );
               }}
-              className="rounded-xl border border-slate-700 bg-slate-800 p-2 text-slate-300 hover:text-white"
+              className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 p-2 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700"
               title="Hangjelzés ki/bekapcsolása"
             >
               {soundEnabled ? (
-                <Volume2 className="h-4 w-4 text-emerald-400" />
+                <Volume2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
               ) : (
-                <VolumeX className="h-4 w-4 text-slate-500" />
+                <VolumeX className="h-4 w-4 text-slate-400" />
               )}
             </button>
 
             <ThemeToggleButton />
 
+            <Link
+              to="/tablet"
+              className="inline-flex items-center gap-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-white hover:bg-slate-200 dark:hover:bg-slate-700"
+              title="Tablet dokumentum-kitöltő és aláíró nézet"
+            >
+              <FileSignature className="h-3.5 w-3.5 text-amber-500 dark:text-amber-400" />
+              Tablet Aláíró
+            </Link>
+
             <button
               type="button"
               onClick={openSecondaryMonitorWindow}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-slate-800 border border-slate-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-700"
+              className="inline-flex items-center gap-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-white hover:bg-slate-200 dark:hover:bg-slate-700"
             >
-              <Monitor className="h-3.5 w-3.5 text-emerald-400" />
+              <Monitor className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
               Vendégmonitor
               <ExternalLink className="h-3 w-3 text-slate-400" />
             </button>
@@ -490,427 +691,718 @@ export const ReceptionPage: React.FC = () => {
       )}
 
       {/* Main Content */}
-      <main className="mx-auto w-full max-w-7xl flex-1 p-4 sm:p-6">
+      <main className="mx-auto w-full max-w-7xl flex-1 p-4 sm:p-6 space-y-4">
+        {guestModalState.isOpen ? (
+          <GuestModal
+            isOpen={guestModalState.isOpen}
+            guest={activeModalGuest}
+            services={servicesQuery.data ?? []}
+            backLabel="Vissza a vendégkartotékra"
+            onClose={closeGuestSheet}
+            onSaveGuest={(data) => saveGuestMutation.mutate(data)}
+            onExtendPass={(passId, additionalDays, note) =>
+              extendPassMutation.mutate({ passId, additionalDays, note })
+            }
+            onToggleFreezePass={(passId, note) =>
+              toggleFreezeMutation.mutate({ passId, note })
+            }
+            onOpenDigitalCard={(g) => setDigitalCardGuest(g)}
+            onRefreshAll={refreshAll}
+          />
+        ) : (
+          <>
         {activeTab === 'desk' && (
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-            {/* Left Column: Scanner Bar & Last Check-In Card */}
-            <div className="lg:col-span-7 space-y-6">
-              {/* Barcode Scanner Input Box */}
-              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <Barcode className="h-5 w-5 text-emerald-600" />
-                    <h2 className="text-base font-bold text-slate-900">
-                      Gyors Vonalkódos Beléptetés
-                    </h2>
-                  </div>
-                  <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700 border border-emerald-200">
-                    USB/HID Scanner Aktív (Fókuszfüggetlen)
+          <div className="space-y-6">
+            {/* 5.1 Recepciós Főképernyő — 5 Kötelező Gyorsgomb + Napi KPI Sáv */}
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+              <button
+                type="button"
+                onClick={() => {
+                  const g = lastIdentifiedGuest ?? guestsQuery.data?.[0];
+                  if (g) handleBarcodeScan(g.barcode);
+                }}
+                className="flex items-center gap-3 rounded-2xl border border-emerald-200 dark:border-emerald-800 bg-white dark:bg-slate-900 p-3.5 text-left shadow-sm hover:border-emerald-500 transition"
+              >
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300">
+                  <UserCheck className="h-5 w-5" />
+                </div>
+                <div>
+                  <span className="text-xs font-bold text-slate-900 dark:text-white block">
+                    1. Beléptetés
+                  </span>
+                  <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                    Köredzés (0 levonás)
                   </span>
                 </div>
+              </button>
 
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    if (!manualBarcode.trim()) return;
-                    handleBarcodeScan(manualBarcode);
-                    setManualBarcode('');
-                  }}
-                  className="flex gap-2.5"
+              <button
+                type="button"
+                onClick={() =>
+                  setDeductModalState({
+                    isOpen: true,
+                    guest: lastIdentifiedGuest,
+                  })
+                }
+                className="flex items-center gap-3 rounded-2xl border border-emerald-200 dark:border-emerald-800 bg-white dark:bg-slate-900 p-3.5 text-left shadow-sm hover:border-emerald-500 transition"
+              >
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-teal-100 dark:bg-teal-900/50 text-teal-700 dark:text-teal-300">
+                  <Ticket className="h-5 w-5" />
+                </div>
+                <div>
+                  <span className="text-xs font-bold text-slate-900 dark:text-white block">
+                    2. Alkalom levonása
+                  </span>
+                  <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                    Kezelés (pl. Hypoxi -1)
+                  </span>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() =>
+                  setSellModalState({
+                    isOpen: true,
+                    guest: lastIdentifiedGuest ?? guestsQuery.data?.[0] ?? null,
+                  })
+                }
+                className="flex items-center gap-3 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3.5 text-left shadow-sm hover:border-emerald-500 transition"
+              >
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300">
+                  <Sparkles className="h-5 w-5" />
+                </div>
+                <div>
+                  <span className="text-xs font-bold text-slate-900 dark:text-white block">
+                    3. Új bérlet
+                  </span>
+                  <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                    Bérlet értékesítés
+                  </span>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() =>
+                  setPaymentModalState({
+                    isOpen: true,
+                    guest: lastIdentifiedGuest,
+                  })
+                }
+                className="flex items-center gap-3 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3.5 text-left shadow-sm hover:border-emerald-500 transition"
+              >
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300">
+                  <Wallet className="h-5 w-5" />
+                </div>
+                <div>
+                  <span className="text-xs font-bold text-slate-900 dark:text-white block">
+                    4. Befizetés
+                  </span>
+                  <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                    Tagdíj / Részbefizetés
+                  </span>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => openGuestSheet(null)}
+                className="flex items-center gap-3 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3.5 text-left shadow-sm hover:border-emerald-500 transition"
+              >
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                  <Plus className="h-5 w-5" />
+                </div>
+                <div>
+                  <span className="text-xs font-bold text-slate-900 dark:text-white block">
+                    5. Új vendég
+                  </span>
+                  <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                    Kartoték & Vonalkód
+                  </span>
+                </div>
+              </button>
+            </div>
+
+            {/* Napi KPI mutatók (4.1): Érkezések, Bevételek, Tartozások (1-5, 6-15, 15+), Lejáró bérletek, Születés- és névnapok */}
+            {dashboard && (
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-sm">
+                  <span className="text-[11px] font-bold uppercase text-slate-500 dark:text-slate-400">
+                    Mai Forgalom & Kezelések
+                  </span>
+                  <div className="mt-1 flex items-baseline gap-2">
+                    <span className="text-2xl font-black text-slate-900 dark:text-white">
+                      {dashboard.arrivalsCount +
+                        dashboard.treatmentsUsedCount}{' '}
+                      fő
+                    </span>
+                    <span className="text-xs text-slate-500">
+                      ({dashboard.circuitArrivalsCount} köredzés •{' '}
+                      {dashboard.treatmentsUsedCount} kezelés)
+                    </span>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-sm">
+                  <span className="text-[11px] font-bold uppercase text-slate-500 dark:text-slate-400">
+                    Mai / Havi Bevétel
+                  </span>
+                  <div className="mt-1 flex items-baseline justify-between">
+                    <span className="text-xl font-black text-emerald-600 dark:text-emerald-400">
+                      {dashboard.todayRevenueHuf.toLocaleString('hu-HU')} Ft
+                    </span>
+                    <span className="text-xs text-slate-500">
+                      Havi: {dashboard.monthlyRevenueHuf.toLocaleString('hu-HU')} Ft
+                    </span>
+                  </div>
+                </div>
+
+                <div
+                  onClick={() => handleSelectMainTab('finance')}
+                  className="cursor-pointer rounded-2xl border border-rose-200 dark:border-rose-800/70 bg-rose-50/50 dark:bg-rose-950/30 p-4 shadow-sm hover:border-rose-400 transition"
                 >
-                  <input
-                    type="text"
-                    value={manualBarcode}
-                    onChange={(e) => setManualBarcode(e.target.value)}
-                    placeholder="Csippantsd le a kártyát bárhol, vagy írd be a kódot (pl. 100001)..."
-                    className="flex-1 rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-mono focus:border-emerald-600 focus:outline-none"
-                  />
-                  <button
-                    type="submit"
-                    className="rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-emerald-500"
-                  >
-                    Beléptetés
-                  </button>
-                </form>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold uppercase text-rose-700 dark:text-rose-300">
+                      Lejárt Tagdíj Tartozások ({dashboard.overdueCount} fő)
+                    </span>
+                    <AlertTriangle className="h-4 w-4 text-rose-600" />
+                  </div>
+                  <p className="mt-1 text-xl font-black text-rose-700 dark:text-rose-300">
+                    {dashboard.overdueTotalHuf.toLocaleString(
+                      'hu-HU',
+                    )}{' '}
+                    Ft
+                  </p>
+                  <div className="mt-1 flex gap-2 text-[10px] font-semibold text-rose-800 dark:text-rose-200">
+                    <span>1–5 nap: {dashboard.overdueByBucket.DAYS_1_5}</span>
+                    <span>•</span>
+                    <span>6–15 nap: {dashboard.overdueByBucket.DAYS_6_15}</span>
+                    <span>•</span>
+                    <span>15+ nap: {dashboard.overdueByBucket.DAYS_OVER_15}</span>
+                  </div>
+                </div>
 
-                {/* Quick Scan Pills */}
-                <div className="mt-3 flex flex-wrap items-center gap-1.5 text-xs">
-                  <span className="text-slate-400 mr-1">Gyors tesztkódok:</span>
-                  {[
-                    { code: '100001', label: 'Kovács Anna (Érvényes)' },
-                    { code: '100002', label: 'Nagy Péter (Utolsó 1 alk.)' },
-                    { code: '100003', label: 'Szabó Eszter (Korlátlan)' },
-                    { code: '100004', label: 'Tóth Gábor (Lejárt)' },
-                    { code: '100006', label: 'Horváth Dóra (Fagyasztott)' },
-                  ].map((item) => (
-                    <button
-                      key={item.code}
-                      type="button"
-                      onClick={() => handleBarcodeScan(item.code)}
-                      className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 font-medium text-slate-700 hover:border-emerald-400 hover:bg-emerald-50 hover:text-emerald-800"
-                    >
-                      {item.label}
-                    </button>
-                  ))}
+                <div className="rounded-2xl border border-amber-200 dark:border-amber-800/70 bg-amber-50/50 dark:bg-amber-950/30 p-4 shadow-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold uppercase text-amber-800 dark:text-amber-300">
+                      Mai Ünnepeltek & Figyelmeztetések
+                    </span>
+                    <Cake className="h-4 w-4 text-amber-600" />
+                  </div>
+                  <div className="mt-1.5 space-y-1 text-xs">
+                    {dashboard.celebrants.length > 0 ? (
+                      dashboard.celebrants.map((c, idx) => (
+                        <div
+                          key={`${c.guestId}-${idx}`}
+                          className="font-bold text-amber-900 dark:text-amber-200 flex items-center gap-1"
+                        >
+                          🎉 {c.guestName}:{' '}
+                          {c.type === 'BIRTHDAY'
+                            ? 'Boldog születésnapot!'
+                            : `Boldog névnapot (${c.detail})!`}
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-slate-500">
+                        Ma nincs születés- vagy névnapos vendég.
+                      </span>
+                    )}
+                    {dashboard.expiringPasses.length > 0 && (
+                      <div className="text-[11px] text-amber-800 dark:text-amber-300 font-medium">
+                        ⚠️ {dashboard.expiringPasses.length} bérlet hamarosan lejár / 1-2 alkalmas!
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
+            )}
 
-              {/* Last Check-In Result Card with 1-Click Sztornó & 1-Click Renewal */}
-              <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-sm font-bold uppercase tracking-wider text-slate-500">
-                    Utolsó Beléptetés Állapota & Műveletek
-                  </h3>
-                  {lastCheckIn && (
-                    <span className="font-mono text-xs text-slate-400">
-                      {new Date(lastCheckIn.timestamp).toLocaleTimeString(
-                        'hu-HU',
-                      )}
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+              {/* Left Column: Scanner Bar & Last Check-In Card */}
+              <div className="lg:col-span-7 space-y-6">
+                {/* Barcode Scanner Input Box */}
+                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <Barcode className="h-5 w-5 text-emerald-600" />
+                      <div>
+                        <h2 className="text-base font-bold text-slate-900">
+                          Vonalkódos Köredzés Érkezés (2.3) & Vendégazonosítás
+                        </h2>
+                        <p className="text-xs text-slate-500">
+                          Köredzés csippantáskor 0 alkalom vonódik le ({DUPLICATE_SCAN_COOLDOWN_SECONDS} mp dupla leolvasás védelem). Alkalmas kezeléshez kattints az „Alkalom levonása” gombra!
+                        </p>
+                      </div>
+                    </div>
+                    <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700 border border-emerald-200 shrink-0">
+                      USB/HID Aktív
                     </span>
-                  )}
+                  </div>
+
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      if (!manualBarcode.trim()) return;
+                      handleBarcodeScan(manualBarcode);
+                      setManualBarcode('');
+                    }}
+                    className="flex gap-2.5"
+                  >
+                    <input
+                      type="text"
+                      value={manualBarcode}
+                      onChange={(e) => setManualBarcode(e.target.value)}
+                      placeholder="Csippantsd le a kártyát bárhol, vagy írd be a kódot (pl. 100001)..."
+                      className="flex-1 rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-mono focus:border-emerald-600 focus:outline-none"
+                    />
+                    <button
+                      type="submit"
+                      className="rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-emerald-500"
+                    >
+                      Köredzés Beléptetés
+                    </button>
+                  </form>
+
+                  {/* Quick Scan Pills */}
+                  <div className="mt-3 flex flex-wrap items-center gap-1.5 text-xs">
+                    <span className="text-slate-400 mr-1">Gyors tesztkódok:</span>
+                    {[
+                      { code: '100001', label: 'Kovács Anna (Havi tagság + Hypoxi)' },
+                      { code: '100002', label: 'Nagy Péter (1–5 nap késés + 1 alk.)' },
+                      { code: '100003', label: 'Szabó Eszter (Érvényes)' },
+                      { code: '100004', label: 'Tóth Gábor (15+ nap tartozás)' },
+                      { code: '100005', label: 'Varga Zsófia (6–15 nap részfiz.)' },
+                      { code: '100006', label: 'Horváth Dóra (Szüneteltetett)' },
+                    ].map((item) => (
+                      <button
+                        key={item.code}
+                        type="button"
+                        onClick={() => handleBarcodeScan(item.code)}
+                        className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 font-medium text-slate-700 hover:border-emerald-400 hover:bg-emerald-50 hover:text-emerald-800"
+                      >
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
-                {!lastCheckIn ? (
-                  <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 py-12 text-center">
-                    <Ticket className="h-10 w-10 text-slate-300 mb-2" />
-                    <p className="text-sm font-medium text-slate-600">
-                      Még nem történt beléptetés ebben a munkamenetben.
-                    </p>
-                    <p className="text-xs text-slate-400 mt-1">
-                      Olvass be egy vonalkódot vagy válassz a fenti tesztgombok közül.
-                    </p>
-                  </div>
-                ) : (
-                  <div
-                    className={`rounded-2xl border p-5 ${
-                      lastCheckIn.status === CheckInStatus.SUCCESS
-                        ? 'border-emerald-200 bg-emerald-50/60'
-                        : lastCheckIn.status === CheckInStatus.DUPLICATE_SCAN
-                          ? 'border-amber-200 bg-amber-50/70'
-                          : 'border-rose-200 bg-rose-50/70'
-                    }`}
-                  >
-                    <div className="flex flex-wrap items-start justify-between gap-4">
-                      <div className="flex items-start gap-3">
-                        {lastCheckIn.status === CheckInStatus.SUCCESS ? (
-                          <CheckCircle2 className="h-8 w-8 text-emerald-600 shrink-0 mt-0.5" />
-                        ) : lastCheckIn.status ===
-                          CheckInStatus.DUPLICATE_SCAN ? (
-                          <AlertTriangle className="h-8 w-8 text-amber-600 shrink-0 mt-0.5" />
-                        ) : (
-                          <XCircle className="h-8 w-8 text-rose-600 shrink-0 mt-0.5" />
+                {/* Last Identified Guest Card (5.1) */}
+                <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-sm font-bold uppercase tracking-wider text-slate-500">
+                      Utoljára Azonosított Vendég Kártya & Gyorsműveletek
+                    </h3>
+                    {lastCheckIn && (
+                      <span className="font-mono text-xs text-slate-400">
+                        {new Date(lastCheckIn.timestamp).toLocaleTimeString(
+                          'hu-HU',
                         )}
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <h4 className="text-xl font-extrabold text-slate-900">
-                              {lastCheckIn.guestName}
-                            </h4>
-                            <span className="rounded-md bg-white px-2 py-0.5 font-mono text-xs text-slate-600 border border-slate-200">
-                              #{lastCheckIn.barcode}
-                            </span>
-                          </div>
-                          <p className="mt-1 text-sm font-medium text-slate-700">
-                            {lastCheckIn.passName ??
-                              lastCheckIn.reason ??
-                              'Nincs aktív bérlet'}
-                          </p>
-                          {(lastCheckIn.status === CheckInStatus.SUCCESS ||
-                            lastCheckIn.status ===
-                              CheckInStatus.DUPLICATE_SCAN) && (
-                            <p className="mt-1 text-xs text-slate-600">
-                              Maradék alkalmak:{' '}
-                              <strong className="text-slate-900">
-                                {lastCheckIn.remainingPasses === 'Korlátlan'
-                                  ? 'Korlátlan'
-                                  : `${lastCheckIn.remainingPasses} / ${lastCheckIn.totalPasses ?? '?'} db`}
-                              </strong>{' '}
-                              • Érvényes:{' '}
-                              <strong>
-                                {lastCheckIn.expirationDate
-                                  ? new Date(
-                                      lastCheckIn.expirationDate,
-                                    ).toLocaleDateString('hu-HU')
-                                  : '—'}
-                              </strong>
-                            </p>
-                          )}
-                        </div>
-                      </div>
+                      </span>
+                    )}
+                  </div>
 
-                      <div className="flex flex-wrap items-center gap-2">
-                        {lastCheckIn.status === CheckInStatus.SUCCESS &&
-                          lastCheckIn.checkInId && (
+                  {!lastCheckIn ? (
+                    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 py-10 text-center">
+                      <Ticket className="h-10 w-10 text-slate-300 mb-2" />
+                      <p className="text-sm font-medium text-slate-600">
+                        Még nem történt vendégazonosítás ebben a munkamenetben.
+                      </p>
+                      <p className="text-xs text-slate-400 mt-1">
+                        Olvass be egy vonalkódot vagy válassz a fenti tesztgombok közül.
+                      </p>
+                    </div>
+                  ) : (
+                    <div
+                      className={`rounded-2xl border p-5 ${
+                        lastCheckIn.status === CheckInStatus.SUCCESS
+                          ? 'border-emerald-200 bg-emerald-50/60'
+                          : lastCheckIn.status === CheckInStatus.DUPLICATE_SCAN
+                            ? 'border-amber-200 bg-amber-50/70'
+                            : 'border-rose-200 bg-rose-50/70'
+                      }`}
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-4">
+                        <div className="flex items-start gap-3">
+                          {lastCheckIn.status === CheckInStatus.SUCCESS ? (
+                            <CheckCircle2 className="h-8 w-8 text-emerald-600 shrink-0 mt-0.5" />
+                          ) : lastCheckIn.status ===
+                            CheckInStatus.DUPLICATE_SCAN ? (
+                            <AlertTriangle className="h-8 w-8 text-amber-600 shrink-0 mt-0.5" />
+                          ) : (
+                            <XCircle className="h-8 w-8 text-rose-600 shrink-0 mt-0.5" />
+                          )}
+                          <div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <h4 className="text-xl font-extrabold text-slate-900">
+                                {lastCheckIn.guestName}
+                              </h4>
+                              <span className="rounded-md bg-white px-2 py-0.5 font-mono text-xs text-slate-600 border border-slate-200">
+                                #{lastCheckIn.barcode}
+                              </span>
+                              <span className="rounded-full bg-emerald-700 px-2.5 py-0.5 text-[10px] font-bold uppercase text-white">
+                                {lastCheckIn.mode === 'CIRCUIT_GREETING'
+                                  ? 'Köredzés (0 levonás)'
+                                  : `Kezelés: ${lastCheckIn.serviceName ?? 'Alkalom levonás'}`}
+                              </span>
+                            </div>
+
+                            <p className="mt-1 text-sm font-medium text-slate-700">
+                              {lastCheckIn.passName ??
+                                lastCheckIn.reason ??
+                                'Nincs aktív bérlet'}
+                            </p>
+
+                            {lastCheckIn.overdueAmountHuf &&
+                              lastCheckIn.overdueAmountHuf > 0 && (
+                                <div className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-rose-100 border border-rose-300 px-2.5 py-1 text-xs font-bold text-rose-800">
+                                  <AlertTriangle className="h-3.5 w-3.5" />
+                                  Havi tagdíj elmaradás (Csak recepción látható!):{' '}
+                                  {lastCheckIn.overdueAmountHuf.toLocaleString(
+                                    'hu-HU',
+                                  )}{' '}
+                                  Ft ({lastCheckIn.overdueDays ?? 1} nap késés)
+                                </div>
+                              )}
+
+                            {(lastCheckIn.status === CheckInStatus.SUCCESS ||
+                              lastCheckIn.status ===
+                                CheckInStatus.DUPLICATE_SCAN) &&
+                              lastCheckIn.mode !== 'CIRCUIT_GREETING' && (
+                                <p className="mt-1 text-xs text-slate-600">
+                                  Maradék alkalmak:{' '}
+                                  <strong className="text-slate-900">
+                                    {lastCheckIn.remainingPasses === 'Korlátlan'
+                                      ? 'Korlátlan'
+                                      : `${lastCheckIn.remainingPasses} / ${lastCheckIn.totalPasses ?? '?'} db`}
+                                  </strong>{' '}
+                                  • Érvényes:{' '}
+                                  <strong>
+                                    {lastCheckIn.expirationDate
+                                      ? new Date(
+                                          lastCheckIn.expirationDate,
+                                        ).toLocaleDateString('hu-HU')
+                                      : '—'}
+                                  </strong>
+                                </p>
+                              )}
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-2">
+                          {lastIdentifiedGuest && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  openGuestSheet(lastIdentifiedGuest)
+                                }
+                                className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-3.5 py-2 text-xs font-bold text-white shadow-sm hover:bg-slate-800"
+                              >
+                                <Users className="h-3.5 w-3.5" />
+                                Adatlap
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setDeductModalState({
+                                    isOpen: true,
+                                    guest: lastIdentifiedGuest,
+                                  })
+                                }
+                                className="inline-flex items-center gap-1.5 rounded-xl bg-teal-600 px-3.5 py-2 text-xs font-bold text-white shadow-sm hover:bg-teal-500"
+                              >
+                                <Ticket className="h-3.5 w-3.5" />
+                                Kezelés Levonása (pl. Hypoxi)
+                              </button>
+                            </>
+                          )}
+
+                          {lastCheckIn.status === CheckInStatus.SUCCESS &&
+                            lastCheckIn.checkInId && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  revokeMutation.mutate(lastCheckIn.checkInId!)
+                                }
+                                className="inline-flex items-center gap-1.5 rounded-xl border border-amber-300 bg-white px-3.5 py-2 text-xs font-bold text-amber-800 shadow-sm hover:bg-amber-50"
+                              >
+                                <RotateCcw className="h-3.5 w-3.5" />
+                                Sztornó / Visszavonás
+                              </button>
+                            )}
+
+                          {lastCheckIn.status ===
+                            CheckInStatus.DUPLICATE_SCAN && (
                             <button
                               type="button"
                               onClick={() =>
-                                revokeMutation.mutate(lastCheckIn.checkInId!)
+                                scanMutation.mutate({
+                                  barcode: lastCheckIn.barcode,
+                                  forceDuplicate: true,
+                                })
                               }
-                              className="inline-flex items-center gap-1.5 rounded-xl border border-amber-300 bg-white px-3.5 py-2 text-xs font-bold text-amber-800 shadow-sm hover:bg-amber-50"
+                              className="inline-flex items-center gap-1.5 rounded-xl bg-amber-600 px-3.5 py-2 text-xs font-bold text-white shadow-sm hover:bg-amber-500"
                             >
-                              <RotateCcw className="h-3.5 w-3.5" />
-                              Beléptetés Sztornó (+1 vissza)
+                              Mégis rögzítés
                             </button>
                           )}
 
-                        {lastCheckIn.status ===
-                          CheckInStatus.DUPLICATE_SCAN && (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              scanMutation.mutate({
-                                barcode: lastCheckIn.barcode,
-                                forceDuplicate: true,
-                              })
-                            }
-                            className="inline-flex items-center gap-1.5 rounded-xl bg-amber-600 px-3.5 py-2 text-xs font-bold text-white shadow-sm hover:bg-amber-500"
-                          >
-                            Mégis levonás (+1 vendég)
-                          </button>
-                        )}
-
-                        {lastCheckIn.guestId && (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              openSellModalByGuestId(
-                                lastCheckIn.guestId!,
-                                lastCheckIn.suggestedRenewalTemplateId,
-                              )
-                            }
-                            className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-emerald-500"
-                          >
-                            <Sparkles className="h-3.5 w-3.5" />
-                            {lastCheckIn.warnings?.length ||
-                            lastCheckIn.status === CheckInStatus.DENIED
-                              ? 'Bérlet Megújítása 1 Kattintással'
-                              : 'Új Bérlet Eladása'}
-                          </button>
-                        )}
+                          {lastCheckIn.guestId && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                openSellModalByGuestId(
+                                  lastCheckIn.guestId!,
+                                  lastCheckIn.suggestedRenewalTemplateId,
+                                )
+                              }
+                              className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-2 text-xs font-bold text-white shadow-sm hover:bg-emerald-500"
+                            >
+                              <Sparkles className="h-3.5 w-3.5" />
+                              Új Bérlet Eladása
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
+                  )}
+                </div>
+
+                {/* Quick Guest Search on Reception Desk */}
+                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm font-bold text-slate-900">
+                      Vendég Gyorskereső (Név, telefon, e-mail vagy vonalkód)
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={() => openGuestSheet(null)}
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-800"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      Új Vendég
+                    </button>
                   </div>
-                )}
+
+                  <div className="relative mb-3">
+                    <Search className="absolute left-3.5 top-2.5 h-4 w-4 text-slate-400" />
+                    <input
+                      type="text"
+                      value={guestSearch}
+                      onChange={(e) => setGuestSearch(e.target.value)}
+                      placeholder="Keresés név, telefonszám vagy vonalkód alapján..."
+                      className="w-full rounded-xl border border-slate-200 pl-10 pr-4 py-2 text-sm focus:border-emerald-600 focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="divide-y divide-slate-100 max-h-80 overflow-y-auto">
+                    {(guestsQuery.data ?? []).map((g) => {
+                      const activePass = (g.passes ?? []).find(
+                        (p) =>
+                          p.isActive &&
+                          !p.isFrozen &&
+                          new Date(p.expirationDate) >= new Date() &&
+                          (p.type === PassType.TIME_BASED ||
+                            (p.remainingPasses ?? 0) > 0),
+                      );
+                      const frozenPass = (g.passes ?? []).find(
+                        (p) => p.isFrozen,
+                      );
+
+                      return (
+                        <div
+                          key={g.id}
+                          className="flex flex-wrap items-center justify-between gap-2 py-2.5"
+                        >
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => openGuestSheet(g)}
+                                className="font-bold text-sm text-slate-900 hover:text-emerald-600 underline-offset-2 hover:underline"
+                              >
+                                {g.lastName} {g.firstName}
+                              </button>
+                              <span className="font-mono text-xs text-slate-500">
+                                #{g.barcode}
+                              </span>
+                              {frozenPass && (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-bold text-sky-800">
+                                  <Snowflake className="h-3 w-3" />
+                                  Fagyasztva
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-slate-500">
+                              {activePass
+                                ? `${activePass.passTemplateName} (${
+                                    activePass.type === PassType.TIME_BASED
+                                      ? 'Korlátlan'
+                                      : `${activePass.remainingPasses} alk.`
+                                  })`
+                                : 'Nincs aktív bérlet'}
+                            </p>
+                          </div>
+
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => handleBarcodeScan(g.barcode)}
+                              className="rounded-lg bg-emerald-600 px-2.5 py-1.5 text-xs font-bold text-white hover:bg-emerald-500"
+                              title="Köredzés érkezés rögzítése (0 levonás)"
+                            >
+                              Köredzés
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setDeductModalState({ isOpen: true, guest: g })
+                              }
+                              className="rounded-lg bg-teal-600 px-2.5 py-1.5 text-xs font-bold text-white hover:bg-teal-500"
+                              title="Kezelés kiválasztása és 1 alkalom levonása"
+                            >
+                              Kezelés -1
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => openGuestSheet(g)}
+                              className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                            >
+                              Adatlap
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setDigitalCardGuest(g)}
+                              className="rounded-lg border border-slate-200 p-1.5 text-slate-600 hover:bg-slate-100"
+                              title="Digitális Kártya (QR & Vonalkód)"
+                            >
+                              <QrCode className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
 
-              {/* Quick Guest Search on Reception Desk */}
-              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-bold text-slate-900">
-                    Vendég Gyorskereső (Ha otthon maradt a kártya)
+              {/* Right Column: Live Today's Check-Ins & Quick Cash Summary */}
+              <div className="lg:col-span-5 space-y-6">
+                {/* Quick Finance Summary Card */}
+                <div className="rounded-2xl border border-slate-200 bg-slate-900 p-5 text-white shadow-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold uppercase tracking-wider text-emerald-400">
+                      Mai Kassza Gyorsösszesítő
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleSelectMainTab('finance')}
+                      className="text-xs text-slate-300 underline hover:text-white"
+                    >
+                      Tartozások & Részletes zárás →
+                    </button>
+                  </div>
+                  <p className="mt-2 text-3xl font-black">
+                    {(financeQuery.data?.totalRevenue ?? 0).toLocaleString(
+                      'hu-HU',
+                    )}{' '}
+                    Ft
+                  </p>
+                  <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
+                    <div className="rounded-xl bg-slate-800 p-2.5">
+                      <span className="text-slate-400 block">Készpénz</span>
+                      <strong className="text-white">
+                        {(financeQuery.data?.byMethod.CASH ?? 0).toLocaleString(
+                          'hu-HU',
+                        )}{' '}
+                        Ft
+                      </strong>
+                    </div>
+                    <div className="rounded-xl bg-slate-800 p-2.5">
+                      <span className="text-slate-400 block">Bankkártya</span>
+                      <strong className="text-white">
+                        {(
+                          financeQuery.data?.byMethod.POS_CARD ?? 0
+                        ).toLocaleString('hu-HU')}{' '}
+                        Ft
+                      </strong>
+                    </div>
+                    <div className="rounded-xl bg-slate-800 p-2.5">
+                      <span className="text-slate-400 block">Átutalás</span>
+                      <strong className="text-white">
+                        {(
+                          financeQuery.data?.byMethod.BANK_TRANSFER ?? 0
+                        ).toLocaleString('hu-HU')}{' '}
+                        Ft
+                      </strong>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Today's Check-In & Treatment Log */}
+                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                  <h3 className="text-sm font-bold text-slate-900 mb-3">
+                    Mai Érkezési & Kezelési Napló ({todayCheckInsQuery.data?.length ?? 0})
                   </h3>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setGuestModalState({ isOpen: true, guest: null })
-                    }
-                    className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-800"
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                    Új Vendég
-                  </button>
-                </div>
-
-                <div className="relative mb-3">
-                  <Search className="absolute left-3.5 top-2.5 h-4 w-4 text-slate-400" />
-                  <input
-                    type="text"
-                    value={guestSearch}
-                    onChange={(e) => setGuestSearch(e.target.value)}
-                    placeholder="Keresés név, telefonszám vagy vonalkód alapján..."
-                    className="w-full rounded-xl border border-slate-200 pl-10 pr-4 py-2 text-sm focus:border-emerald-600 focus:outline-none"
-                  />
-                </div>
-
-                <div className="divide-y divide-slate-100 max-h-72 overflow-y-auto">
-                  {(guestsQuery.data ?? []).map((g) => {
-                    const activePass = (g.passes ?? []).find(
-                      (p) =>
-                        p.isActive &&
-                        !p.isFrozen &&
-                        new Date(p.expirationDate) >= new Date(),
-                    );
-                    const frozenPass = (g.passes ?? []).find(
-                      (p) => p.isFrozen,
-                    );
-
-                    return (
+                  <div className="divide-y divide-slate-100 max-h-[420px] overflow-y-auto">
+                    {(todayCheckInsQuery.data ?? []).map((log) => (
                       <div
-                        key={g.id}
-                        className="flex flex-wrap items-center justify-between gap-2 py-2.5"
+                        key={log.id}
+                        className="flex items-center justify-between gap-2 py-2.5 text-xs"
                       >
                         <div>
-                          <div className="flex items-center gap-2">
-                            <span className="font-bold text-sm text-slate-900">
-                              {g.lastName} {g.firstName}
+                          <div className="flex items-center gap-1.5">
+                            <span
+                              className={`h-2 w-2 rounded-full ${
+                                log.status === CheckInStatus.SUCCESS
+                                  ? 'bg-emerald-500'
+                                  : log.status === CheckInStatus.CANCELLED
+                                    ? 'bg-amber-500'
+                                    : 'bg-rose-500'
+                              }`}
+                            />
+                            <span className="font-bold text-slate-900">
+                              {log.guestName}
                             </span>
-                            <span className="font-mono text-xs text-slate-500">
-                              #{g.barcode}
+                            <span className="font-mono text-slate-400">
+                              #{log.guestBarcode}
                             </span>
-                            {frozenPass && (
-                              <span className="inline-flex items-center gap-1 rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-bold text-sky-800">
-                                <Snowflake className="h-3 w-3" />
-                                Fagyasztva
+                            {log.serviceName && (
+                              <span className="rounded bg-teal-50 dark:bg-teal-900/40 px-1.5 py-0.5 text-[10px] font-bold text-teal-700 dark:text-teal-300">
+                                {log.serviceName}
                               </span>
                             )}
                           </div>
-                          <p className="text-xs text-slate-500">
-                            {activePass
-                              ? `${activePass.passTemplateName} (${
-                                  activePass.type === PassType.TIME_BASED
-                                    ? 'Korlátlan'
-                                    : `${activePass.remainingPasses} alk.`
-                                })`
-                              : 'Nincs aktív bérlet'}
+                          <p className="text-slate-500 mt-0.5">
+                            {log.status === CheckInStatus.CANCELLED
+                              ? `VISSZAVONVA (${log.reversalReason ?? 'Sztornó'})`
+                              : log.passName ?? log.reason ?? log.status}
                           </p>
                         </div>
 
-                        <div className="flex items-center gap-1.5">
-                          <button
-                            type="button"
-                            onClick={() => handleBarcodeScan(g.barcode)}
-                            className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-500"
-                          >
-                            Beléptetés
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setSellModalState({
-                                isOpen: true,
-                                guest: g,
-                                preselectedTemplateId:
-                                  activePass?.passTemplateId,
-                              })
-                            }
-                            className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-                          >
-                            Bérlet Eladás
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setDigitalCardGuest(g)}
-                            className="rounded-lg border border-slate-200 p-1.5 text-slate-600 hover:bg-slate-100"
-                            title="Digitális Kártya (QR & Vonalkód)"
-                          >
-                            <QrCode className="h-4 w-4" />
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-
-            {/* Right Column: Live Today's Check-Ins & Quick Cash Summary */}
-            <div className="lg:col-span-5 space-y-6">
-              {/* Quick Finance Summary Card */}
-              <div className="rounded-2xl border border-slate-200 bg-slate-900 p-5 text-white shadow-sm">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold uppercase tracking-wider text-emerald-400">
-                    Mai Kassza Gyorsösszesítő
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab('finance')}
-                    className="text-xs text-slate-300 underline hover:text-white"
-                  >
-                    Részletes zárás →
-                  </button>
-                </div>
-                <p className="mt-2 text-3xl font-black">
-                  {(financeQuery.data?.totalRevenue ?? 0).toLocaleString(
-                    'hu-HU',
-                  )}{' '}
-                  Ft
-                </p>
-                <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
-                  <div className="rounded-xl bg-slate-800 p-2.5">
-                    <span className="text-slate-400 block">Készpénz</span>
-                    <strong className="text-white">
-                      {(financeQuery.data?.byMethod.CASH ?? 0).toLocaleString(
-                        'hu-HU',
-                      )}{' '}
-                      Ft
-                    </strong>
-                  </div>
-                  <div className="rounded-xl bg-slate-800 p-2.5">
-                    <span className="text-slate-400 block">Bankkártya</span>
-                    <strong className="text-white">
-                      {(
-                        financeQuery.data?.byMethod.POS_CARD ?? 0
-                      ).toLocaleString('hu-HU')}{' '}
-                      Ft
-                    </strong>
-                  </div>
-                  <div className="rounded-xl bg-slate-800 p-2.5">
-                    <span className="text-slate-400 block">Átutalás</span>
-                    <strong className="text-white">
-                      {(
-                        financeQuery.data?.byMethod.BANK_TRANSFER ?? 0
-                      ).toLocaleString('hu-HU')}{' '}
-                      Ft
-                    </strong>
-                  </div>
-                </div>
-              </div>
-
-              {/* Today's Check-In Log */}
-              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                <h3 className="text-sm font-bold text-slate-900 mb-3">
-                  Mai Beléptetési Napló ({todayCheckInsQuery.data?.length ?? 0})
-                </h3>
-                <div className="divide-y divide-slate-100 max-h-[420px] overflow-y-auto">
-                  {(todayCheckInsQuery.data ?? []).map((log) => (
-                    <div
-                      key={log.id}
-                      className="flex items-center justify-between gap-2 py-2.5 text-xs"
-                    >
-                      <div>
-                        <div className="flex items-center gap-1.5">
-                          <span
-                            className={`h-2 w-2 rounded-full ${
-                              log.status === CheckInStatus.SUCCESS
-                                ? 'bg-emerald-500'
-                                : log.status === CheckInStatus.CANCELLED
-                                  ? 'bg-amber-500'
-                                  : 'bg-rose-500'
-                            }`}
-                          />
-                          <span className="font-bold text-slate-900">
-                            {log.guestName}
-                          </span>
+                        <div className="flex items-center gap-2">
                           <span className="font-mono text-slate-400">
-                            #{log.guestBarcode}
+                            {new Date(log.createdAt).toLocaleTimeString('hu-HU', {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
                           </span>
+                          {log.status === CheckInStatus.SUCCESS && (
+                            <button
+                              type="button"
+                              onClick={() => revokeMutation.mutate(log.id)}
+                              className="rounded-lg border border-amber-200 bg-amber-50 px-2 py-1 font-semibold text-amber-800 hover:bg-amber-100"
+                              title="Visszavonás (Sztornó)"
+                            >
+                              Sztornó
+                            </button>
+                          )}
                         </div>
-                        <p className="text-slate-500 mt-0.5">
-                          {log.status === CheckInStatus.CANCELLED
-                            ? 'SZTORNÓZVA (Alkalom visszaírva)'
-                            : log.passName ?? log.reason ?? log.status}
-                        </p>
                       </div>
-
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-slate-400">
-                          {new Date(log.createdAt).toLocaleTimeString('hu-HU', {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}
-                        </span>
-                        {log.status === CheckInStatus.SUCCESS && (
-                          <button
-                            type="button"
-                            onClick={() => revokeMutation.mutate(log.id)}
-                            className="rounded-lg border border-amber-200 bg-amber-50 px-2 py-1 font-semibold text-amber-800 hover:bg-amber-100"
-                            title="Beléptetés visszavonása (Sztornó)"
-                          >
-                            Sztornó
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
@@ -918,21 +1410,19 @@ export const ReceptionPage: React.FC = () => {
         )}
 
         {activeTab === 'guests' && (
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
+          <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-sm space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <h2 className="text-lg font-bold text-slate-900">
-                  Vendégkartoték, Digitális Kártyák és Bérlet Hosszabbítás / Fagyasztás
+                <h2 className="text-lg font-bold text-slate-900 dark:text-white">
+                  Vendégkartoték
                 </h2>
-                <p className="text-xs text-slate-500">
-                  Kattints a "Kartoték & Hosszabbítás" gombra egyedi bérlet +N napos hosszabbításához vagy fagyasztásához.
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Áttekintés, Havi Tagságok, Bérletek, Kezelések, Befizetések, Mérések, Fényképek és Dokumentumok.
                 </p>
               </div>
               <button
                 type="button"
-                onClick={() =>
-                  setGuestModalState({ isOpen: true, guest: null })
-                }
+                onClick={() => openGuestSheet(null)}
                 className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-500"
               >
                 <Plus className="h-4 w-4" />
@@ -956,15 +1446,18 @@ export const ReceptionPage: React.FC = () => {
                 <thead>
                   <tr className="border-b border-slate-200 text-xs uppercase text-slate-500">
                     <th className="py-3 px-3">Vendég</th>
-                    <th className="py-3 px-3">Kártya / Vonalkód</th>
+                    <th className="py-3 px-3">Kártya</th>
                     <th className="py-3 px-3">Elérhetőség</th>
-                    <th className="py-3 px-3">Aktuális Bérlet Státusz</th>
+                    <th className="py-3 px-3">Tagság & Bérletek</th>
                     <th className="py-3 px-3 text-right">Műveletek</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {(guestsQuery.data ?? []).map((g) => {
-                    const latestPass = (g.passes ?? [])[0];
+                    const activePasses = (g.passes ?? []).filter(
+                      (p) => p.isActive,
+                    );
+                    const activeMembership = (g.memberships ?? [])[0];
                     return (
                       <tr key={g.id} className="hover:bg-slate-50/80">
                         <td className="py-3 px-3">
@@ -978,49 +1471,62 @@ export const ReceptionPage: React.FC = () => {
                           )}
                         </td>
                         <td className="py-3 px-3 font-mono text-xs font-semibold text-slate-700">
-                          {g.barcode}
+                          #{g.barcode}
                         </td>
                         <td className="py-3 px-3 text-xs text-slate-600">
                           <div>{g.phone ?? '—'}</div>
                           <div className="text-slate-400">{g.email ?? ''}</div>
                         </td>
-                        <td className="py-3 px-3 text-xs">
-                          {latestPass ? (
+                        <td className="py-3 px-3 text-xs space-y-1">
+                          {activeMembership && (
                             <div>
-                              <span className="font-semibold text-slate-900">
-                                {latestPass.passTemplateName}
-                              </span>
-                              <div className="text-slate-500">
-                                {latestPass.isFrozen ? (
-                                  <span className="text-sky-700 font-bold">
-                                    FAGYASZTVA
-                                  </span>
-                                ) : latestPass.type === PassType.TIME_BASED ? (
-                                  'Korlátlan'
-                                ) : (
-                                  `${latestPass.remainingPasses} / ${latestPass.totalPasses} alkalom`
+                              <span className="rounded bg-indigo-50 dark:bg-indigo-950/60 px-2 py-0.5 font-semibold text-indigo-700 dark:text-indigo-300">
+                                Havi Köredzés Tagság:{' '}
+                                {activeMembership.monthlyFeeHuf.toLocaleString(
+                                  'hu-HU',
                                 )}{' '}
-                                • Lejár:{' '}
-                                {new Date(
-                                  latestPass.expirationDate,
-                                ).toLocaleDateString('hu-HU')}
-                              </div>
+                                Ft/hó ({activeMembership.status})
+                              </span>
                             </div>
+                          )}
+                          {activePasses.length > 0 ? (
+                            activePasses.map((p) => (
+                              <div key={p.id} className="text-slate-600">
+                                <span className="font-semibold text-slate-900">
+                                  {p.passTemplateName}
+                                </span>
+                                :{' '}
+                                {p.isFrozen
+                                  ? 'FAGYASZTVA'
+                                  : p.type === PassType.TIME_BASED
+                                    ? 'Korlátlan'
+                                    : `${p.remainingPasses} / ${p.totalPasses} alk.`}
+                              </div>
+                            ))
                           ) : (
                             <span className="text-rose-600 font-medium">
-                              Nincs bérlet
+                              Nincs aktív bérlet
                             </span>
                           )}
                         </td>
                         <td className="py-3 px-3 text-right">
-                          <div className="inline-flex items-center gap-1.5">
+                          <div className="inline-flex flex-wrap justify-end items-center gap-1.5">
                             <button
                               type="button"
                               onClick={() => setDigitalCardGuest(g)}
                               className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-100"
                             >
                               <QrCode className="h-3.5 w-3.5" />
-                              Digitális Kártya
+                              Kártya
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setDeductModalState({ isOpen: true, guest: g })
+                              }
+                              className="rounded-lg bg-teal-600 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-teal-500"
+                            >
+                              Kezelés -1
                             </button>
                             <button
                               type="button"
@@ -1029,7 +1535,7 @@ export const ReceptionPage: React.FC = () => {
                                   isOpen: true,
                                   guest: g,
                                   preselectedTemplateId:
-                                    latestPass?.passTemplateId,
+                                    activePasses[0]?.passTemplateId,
                                 })
                               }
                               className="rounded-lg bg-emerald-600 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500"
@@ -1038,12 +1544,10 @@ export const ReceptionPage: React.FC = () => {
                             </button>
                             <button
                               type="button"
-                              onClick={() =>
-                                setGuestModalState({ isOpen: true, guest: g })
-                              }
-                              className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                              onClick={() => openGuestSheet(g)}
+                              className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-bold text-white hover:bg-slate-800"
                             >
-                              Kartoték & Hosszabbítás
+                              Adatlap
                             </button>
                           </div>
                         </td>
@@ -1058,18 +1562,154 @@ export const ReceptionPage: React.FC = () => {
 
         {activeTab === 'finance' && (
           <div className="space-y-6">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-bold text-slate-900">
+                  Pénzügy, Napi Kassza és Havi Tagdíj Tartozáskezelés (3. fejezet)
+                </h2>
+                <p className="text-xs text-slate-500">
+                  Késési kategóriák (1–5 nap, 6–15 nap, 15+ nap), részbefizetések és napi kassza zárás.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() =>
+                  setPaymentModalState({
+                    isOpen: true,
+                    guest: guestsQuery.data?.[0] ?? null,
+                  })
+                }
+                className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-500"
+              >
+                <Wallet className="h-4 w-4" />
+                + Új Befizetés / Tagdíj Elszámolás
+              </button>
+            </div>
+
+            {/* Overdue Buckets Section (3.2) */}
+            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h3 className="text-base font-bold text-slate-900">
+                  Lejárt Havi Tagdíj Esedékességek Késési Kategóriák Szerint
+                </h3>
+                <div className="flex gap-2 text-xs font-bold">
+                  <span className="rounded-lg bg-amber-100 px-2.5 py-1 text-amber-800">
+                    1–5 nap késés: {overdueQuery.data?.buckets.DAYS_1_5.length ?? 0} fő
+                  </span>
+                  <span className="rounded-lg bg-orange-100 px-2.5 py-1 text-orange-800">
+                    6–15 nap késés: {overdueQuery.data?.buckets.DAYS_6_15.length ?? 0} fő
+                  </span>
+                  <span className="rounded-lg bg-rose-100 px-2.5 py-1 text-rose-800">
+                    15+ nap késés: {overdueQuery.data?.buckets.DAYS_OVER_15.length ?? 0} fő
+                  </span>
+                </div>
+              </div>
+
+              {(overdueQuery.data?.items ?? []).length === 0 ? (
+                <p className="text-sm text-slate-500">
+                  Jelenleg nincs lejárt tagdíj-tartozás!
+                </p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm">
+                    <thead>
+                      <tr className="border-b border-slate-200 text-xs uppercase text-slate-500">
+                        <th className="py-2.5 px-3">Vendég</th>
+                        <th className="py-2.5 px-3">Időszak & Esedékesség</th>
+                        <th className="py-2.5 px-3">Késési Kategória</th>
+                        <th className="py-2.5 px-3">Előírt / Fizetett</th>
+                        <th className="py-2.5 px-3">Hátralék</th>
+                        <th className="py-2.5 px-3 text-right">Művelet</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {(overdueQuery.data?.items ?? []).map((item) => {
+                        const g = (guestsQuery.data ?? []).find(
+                          (x) => x.id === item.guestId,
+                        );
+                        return (
+                          <tr key={item.dueId}>
+                            <td className="py-2.5 px-3 font-bold">
+                              {item.guestName}{' '}
+                              <span className="font-mono text-xs text-slate-400">
+                                #{item.guestBarcode}
+                              </span>
+                            </td>
+                            <td className="py-2.5 px-3 text-xs">
+                              {item.period} (Esedékes:{' '}
+                              {new Date(item.dueDate).toLocaleDateString(
+                                'hu-HU',
+                              )}
+                              )
+                            </td>
+                            <td className="py-2.5 px-3">
+                              <span
+                                className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-bold ${
+                                  item.overdueBucket ===
+                                  OverdueBucket.DAYS_OVER_15
+                                    ? 'bg-rose-100 text-rose-800'
+                                    : item.overdueBucket ===
+                                        OverdueBucket.DAYS_6_15
+                                      ? 'bg-orange-100 text-orange-800'
+                                      : 'bg-amber-100 text-amber-800'
+                                }`}
+                              >
+                                {item.overdueDays} nap késés (
+                                {item.overdueBucket ===
+                                OverdueBucket.DAYS_OVER_15
+                                  ? '15+ nap'
+                                  : item.overdueBucket ===
+                                      OverdueBucket.DAYS_6_15
+                                    ? '6–15 nap'
+                                    : '1–5 nap'}
+                                )
+                              </span>
+                            </td>
+                            <td className="py-2.5 px-3 text-xs">
+                              {item.amountHuf.toLocaleString('hu-HU')} Ft /{' '}
+                              <span className="text-emerald-600 font-semibold">
+                                {item.paidAmountHuf.toLocaleString('hu-HU')} Ft
+                              </span>
+                            </td>
+                            <td className="py-2.5 px-3 font-extrabold text-rose-600">
+                              {item.remainingHuf.toLocaleString('hu-HU')} Ft
+                            </td>
+                            <td className="py-2.5 px-3 text-right">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setPaymentModalState({
+                                    isOpen: true,
+                                    guest: g ?? null,
+                                    preselectedDueId: item.dueId,
+                                  })
+                                }
+                                className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-500"
+                              >
+                                Befizetés Rögzítése
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
-              <div className="rounded-2xl border border-slate-200 bg-slate-900 p-5 text-white">
-                <span className="text-xs uppercase text-emerald-400 font-bold">
+              <div className="rounded-2xl border border-emerald-200 dark:border-emerald-800/70 bg-emerald-50/70 dark:bg-emerald-950/30 p-5">
+                <span className="text-xs uppercase text-emerald-700 dark:text-emerald-400 font-bold">
                   Napi Összbevétel
                 </span>
-                <p className="mt-2 text-3xl font-black">
+                <p className="mt-2 text-3xl font-black text-slate-900 dark:text-white">
                   {(financeQuery.data?.totalRevenue ?? 0).toLocaleString(
                     'hu-HU',
                   )}{' '}
                   Ft
                 </p>
-                <span className="text-xs text-slate-400">
+                <span className="text-xs text-slate-500 dark:text-slate-400">
                   {financeQuery.data?.activeTransactionCount ?? 0} aktív tranzakció
                 </span>
               </div>
@@ -1129,7 +1769,9 @@ export const ReceptionPage: React.FC = () => {
                       <tr
                         key={p.id}
                         className={
-                          p.isCancelled ? 'bg-rose-50/40 line-through text-slate-400' : ''
+                          p.isCancelled
+                            ? 'bg-rose-50/40 line-through text-slate-400'
+                            : ''
                         }
                       >
                         <td className="py-3 px-3 font-mono text-xs">
@@ -1186,6 +1828,120 @@ export const ReceptionPage: React.FC = () => {
 
         {activeTab === 'admin' && (
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            {/* Services CRUD */}
+            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
+              <h3 className="text-base font-bold text-slate-900">
+                Szolgáltatások & Kezelések Törzsadatok (Service)
+              </h3>
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (!newServiceName.trim()) return;
+                  createServiceMutation.mutate({
+                    name: newServiceName,
+                    category: newServiceCat,
+                    durationMinutes: newServiceDuration,
+                    priceHuf: newServicePrice,
+                  });
+                }}
+                className="grid grid-cols-1 gap-3 sm:grid-cols-2 rounded-xl bg-slate-50 p-4 border border-slate-200"
+              >
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">
+                    Szolgáltatás megnevezése
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={newServiceName}
+                    onChange={(e) => setNewServiceName(e.target.value)}
+                    placeholder="Pl. Hypoxi Dermology / Wiener Testtekercselés"
+                    className="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">
+                    Kategória
+                  </label>
+                  <select
+                    value={newServiceCat}
+                    onChange={(e) =>
+                      setNewServiceCat(e.target.value as ServiceCategory)
+                    }
+                    className="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm"
+                  >
+                    <option value={ServiceCategory.BODY_SHAPING}>
+                      Alakformáló Kezelés (BODY_SHAPING)
+                    </option>
+                    <option value={ServiceCategory.COSMETIC}>
+                      Kozmetikai Kezelés (COSMETIC)
+                    </option>
+                    <option value={ServiceCategory.CIRCUIT}>
+                      Női Köredzés (CIRCUIT)
+                    </option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">
+                    Időtartam (perc)
+                  </label>
+                  <input
+                    type="number"
+                    min={5}
+                    value={newServiceDuration}
+                    onChange={(e) =>
+                      setNewServiceDuration(Number(e.target.value))
+                    }
+                    className="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">
+                    Listaár (Ft)
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={newServicePrice}
+                    onChange={(e) => setNewServicePrice(Number(e.target.value))}
+                    className="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm"
+                  />
+                </div>
+                <div className="flex items-end justify-end">
+                  <button
+                    type="submit"
+                    className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-500"
+                  >
+                    + Szolgáltatás Hozzáadása
+                  </button>
+                </div>
+              </form>
+
+              <div className="divide-y divide-slate-100">
+                {(servicesQuery.data ?? []).map((s) => (
+                  <div
+                    key={s.id}
+                    className="flex items-center justify-between py-2.5 text-sm"
+                  >
+                    <div>
+                      <span className="font-bold text-slate-900">{s.name}</span>
+                      <p className="text-xs text-slate-500">
+                        {s.category === ServiceCategory.CIRCUIT
+                          ? 'Női Köredzés'
+                          : s.category === ServiceCategory.COSMETIC
+                            ? 'Kozmetikai Kezelés'
+                            : 'Alakformáló Kezelés'}{' '}
+                        • {s.durationMinutes} perc
+                      </p>
+                    </div>
+                    <span className="font-bold text-emerald-700">
+                      {s.priceHuf.toLocaleString('hu-HU')} Ft
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
             {/* Pass Templates CRUD */}
             <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
               <h3 className="text-base font-bold text-slate-900">
@@ -1217,7 +1973,7 @@ export const ReceptionPage: React.FC = () => {
                     required
                     value={newTplName}
                     onChange={(e) => setNewTplName(e.target.value)}
-                    placeholder="Pl. 20 Alkalmas Reformer Bérlet"
+                    placeholder="Pl. 10 Alkalmas Hypoxi Bérlet"
                     className="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm"
                   />
                 </div>
@@ -1279,7 +2035,7 @@ export const ReceptionPage: React.FC = () => {
                 <div className="sm:col-span-2 flex justify-end">
                   <button
                     type="submit"
-                    className="rounded-xl bg-slate-900 px-4 py-2 text-xs font-bold text-white hover:bg-slate-800"
+                    className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-500"
                   >
                     + Bérletsablon Hozzáadása
                   </button>
@@ -1309,17 +2065,40 @@ export const ReceptionPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Dual-Mode Monitor & Tablet Pairing */}
-            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
-              <div className="flex items-center gap-2">
-                <Smartphone className="h-5 w-5 text-emerald-600" />
-                <h3 className="text-base font-bold text-slate-900">
-                  Vendégmonitorok & Önálló Tablet Párosítás
-                </h3>
+            {/* Dual-Mode Monitor & Greeting Duration Config */}
+            <div className="lg:col-span-2 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div className="flex items-center gap-2">
+                  <Smartphone className="h-5 w-5 text-emerald-600" />
+                  <h3 className="text-base font-bold text-slate-900">
+                    Vendégmonitor Beállítások & Önálló Tablet Párosítás (5.3)
+                  </h3>
+                </div>
+
+                <div className="flex items-center gap-2 rounded-xl bg-slate-100 dark:bg-slate-800 px-3.5 py-2 text-xs">
+                  <Clock className="h-4 w-4 text-emerald-600" />
+                  <span className="font-semibold">
+                    Üdvözlő üzenet megjelenítési ideje:
+                  </span>
+                  <input
+                    type="number"
+                    min={3}
+                    max={30}
+                    value={greetingSeconds}
+                    onChange={(e) => {
+                      const val = mockStudioEngine.setMonitorGreetingSeconds(
+                        Number(e.target.value),
+                      );
+                      setGreetingSeconds(val);
+                      notify.info(
+                        `Vendégmonitor üdvözlési idő: ${val} másodperc`,
+                      );
+                    }}
+                    className="w-16 rounded-lg border border-slate-300 px-2 py-1 text-center font-bold"
+                  />
+                  <span>mp (alapértelmezett: 5–8 mp)</span>
+                </div>
               </div>
-              <p className="text-xs text-slate-600">
-                A Vendégmonitor futhat ugyanazon a PC-n másodlagos ablakban, vagy különálló Tableten / iPaden 6 jegyű párosító kóddal.
-              </p>
 
               <form
                 onSubmit={(e) => {
@@ -1379,9 +2158,34 @@ export const ReceptionPage: React.FC = () => {
             </div>
           </div>
         )}
+        </>
+        )}
       </main>
 
       {/* Modals */}
+      <DeductTreatmentModal
+        isOpen={deductModalState.isOpen}
+        initialGuest={deductModalState.guest}
+        guests={guestsQuery.data ?? []}
+        services={servicesQuery.data ?? []}
+        isSubmitting={deductTreatmentMutation.isPending}
+        onClose={() => setDeductModalState({ isOpen: false, guest: null })}
+        onConfirmDeduct={(data) => deductTreatmentMutation.mutate(data)}
+        onOpenSellPass={(guest) =>
+          setSellModalState({ isOpen: true, guest })
+        }
+      />
+
+      <RecordPaymentModal
+        isOpen={paymentModalState.isOpen}
+        initialGuest={paymentModalState.guest}
+        guests={guestsQuery.data ?? []}
+        preselectedDueId={paymentModalState.preselectedDueId}
+        isSubmitting={recordPaymentMutation.isPending}
+        onClose={() => setPaymentModalState({ isOpen: false, guest: null })}
+        onConfirmPayment={(data) => recordPaymentMutation.mutate(data)}
+      />
+
       <SellPassModal
         isOpen={sellModalState.isOpen}
         guest={sellModalState.guest}
@@ -1390,20 +2194,6 @@ export const ReceptionPage: React.FC = () => {
         isSubmitting={sellPassMutation.isPending}
         onClose={() => setSellModalState({ isOpen: false, guest: null })}
         onConfirmSell={(data) => sellPassMutation.mutate(data)}
-      />
-
-      <GuestModal
-        isOpen={guestModalState.isOpen}
-        guest={guestModalState.guest}
-        onClose={() => setGuestModalState({ isOpen: false, guest: null })}
-        onSaveGuest={(data) => saveGuestMutation.mutate(data)}
-        onExtendPass={(passId, additionalDays, note) =>
-          extendPassMutation.mutate({ passId, additionalDays, note })
-        }
-        onToggleFreezePass={(passId, note) =>
-          toggleFreezeMutation.mutate({ passId, note })
-        }
-        onOpenDigitalCard={(g) => setDigitalCardGuest(g)}
       />
 
       <DigitalPassCardModal
