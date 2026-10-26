@@ -14,10 +14,10 @@ A **ReformStudioSync** egy egystúdiós (de `studioId` szinten többstúdiós Sa
 
 ## 2. Architektúra Döntések (ADR) és Alapterv-Javítások
 
-### ADR-01: Atomi Feltételes Alkalomlevonás és 60 mp-es Dupla Lehúzás Védelem
+### ADR-01: Atomi Feltételes Alkalomlevonás és 10 mp-es Dupla Lehúzás Védelem
 - **Kontextus:** Fizikai USB vonalkódolvasóknál gyakori a véletlen dupla csippantás, vagy párhuzamos kérések beérkezése.
 - **Megoldás:**
-  1. **Cooldown védelem (`DUPLICATE_SCAN_COOLDOWN_SECONDS = 60`):** Ha ugyanazt a kártyát 60 másodpercen belül újra beolvassák (`forceDuplicate !== true`), a rendszer nem von le újabb alkalmat, hanem `DUPLICATE_SCAN` státuszt ad vissza. A recepciós a Toast üzenetben található *"Mégis levonás (+1 fő)"* gombbal felülbírálhatja.
+  1. **Cooldown védelem (`DUPLICATE_SCAN_COOLDOWN_SECONDS = 10`):** Ha ugyanazt a kártyát 10 másodpercen belül újra beolvassák (`forceDuplicate !== true`), a rendszer nem von le újabb alkalmat, hanem `DUPLICATE_SCAN` státuszt ad vissza. A recepciós a Toast üzenetben található *"Mégis levonás (+1 fő)"* gombbal felülbírálhatja. (Korábban 60 mp volt; a fogadóélmény miatt 10 mp-re csökkentve.)
   2. **Adatbázis-szintű atomi feltétel (`updateMany`):** Alkalom alapú (`OCCASION_BASED`) bérletnél a levonás `where: { id: activePass.id, isActive: true, isFrozen: false, remainingPasses: { gt: 0 } }` feltétellel fut le, és a tranzakció ellenőrzi, hogy `atomicUpdate.count === 1`. Így a bérlet egyenlege soha nem mehet negatívba.
 
 ### ADR-02: Post-Commit WebSocket Eseményküldés

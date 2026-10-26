@@ -26,7 +26,7 @@ Ez a kézikönyv a **ReformStudioSync** napi szintű, egyszerű és gyors haszn�
   - A Vendégmonitoron 7 másodpercig megjelenik a vendég neve, a maradék alkalmak száma és a bérlet lejárati dátuma.
 - **SÁRGA (Figyelmeztetés + dupla hangjelzés):**
   - **Utolsó alkalom / Hamarosan lejár:** A vendég az utolsó (vagy utolsó előtti) alkalmát használta fel, vagy a bérlete 3 napon belül lejár. A felugró üzenetben és a kártyán azonnal megjelenik a **"Bérlet Megújítása 1 Kattintással"** gomb!
-  - **Dupla leolvasás védelem (60 másodpercen belül):** Ha véletlenül kétszer húztad le ugyanazt a kártyát 1 percen belül, a rendszer **nem von le** újabb alkalmat. Ha a vendég szándékosan egy barátját is a saját bérletére szeretné beléptetni, kattints a **"Mégis levonás (+1 vendég)"** gombra.
+  - **Dupla leolvasás védelem (10 másodpercen belül):** Ha véletlenül kétszer húztad le ugyanazt a kártyát 10 másodpercen belül, a rendszer **nem von le** újabb alkalmat. Ha a vendég szándékosan egy barátját is a saját bérletére szeretné beléptetni, kattints a **"Mégis levonás (+1 vendég)"** gombra.
 - **PIROS (Elutasított belépés + mély figyelmeztető hang):**
   - A vendég bérlete lejárt, elfogytak az alkalmai, vagy a bérlete jelenleg **fagyasztva van**.
   - Kattints a felugró üzenetben a **"Bérlet eladása most"** gombra az azonnali értékesítéshez.

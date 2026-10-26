@@ -6,7 +6,7 @@ A **ReformStudioSync** egy dedikált fitnesz- és Reformer Pilates stúdiókezel
 
 1. **Recepciós Munkafelület (`/reception`):**
    - Globális fizikai vonalkódolvasó (`useBarcodeScanner`) támogatás fókusz-vesztés nélkül.
-   - Atomi beléptetés 60 másodperces dupla-lehúzás védelemmel (Cooldown) és automatikus bérlet-priorizálással (`TIME_BASED` -> leghamarabb lejáró `OCCASION_BASED`).
+   - Atomi beléptetés 10 másodperces dupla-lehúzás védelemmel (Cooldown) és automatikus bérlet-priorizálással (`TIME_BASED` -> leghamarabb lejáró `OCCASION_BASED`).
    - Állandó, interaktív **Toast visszaigazolások** (`Sonner` + `MutationCache`) minden művelethez akciógombokkal.
    - **1-kattintásos Sztornó (Beléptetés és Fizetés visszavonás)** és **1-kattintásos Bérletmegújítás** (utolsó alkalom vagy lejárat esetén).
    - **Offline Olvasási Puffer (`Optimistic Offline Scan Queue`):** internet-mikroszakadás esetén a beolvasások mentése és automatikus, idempotens szinkronizálása.

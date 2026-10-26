@@ -8,7 +8,7 @@ Ez a dokumentum rögzíti a **ReformStudioSync** rendszer fázisonkénti megval�
 - **Megvalósított elemek:**
   - Gyökér `package.json`, `pnpm-workspace.yaml` és `tsconfig.base.json` konfigurálása.
   - `packages/shared` csomag felépítése:
-    - `enums.ts`: `Role`, `PassType`, `PaymentMethod`, `CheckInStatus`, `CheckInWarningCode` és rendszerkonstansok (`DUPLICATE_SCAN_COOLDOWN_SECONDS = 60`, `EXPIRING_SOON_THRESHOLD_DAYS = 3`).
+    - `enums.ts`: `Role`, `PassType`, `PaymentMethod`, `CheckInStatus`, `CheckInWarningCode` és rendszerkonstansok (`DUPLICATE_SCAN_COOLDOWN_SECONDS = 10`, `EXPIRING_SOON_THRESHOLD_DAYS = 3`).
     - `socket-events.ts`: `SOCKET_NAMESPACE = '/monitor'`, `SOCKET_EVENTS` és a `CheckInResultPayload`, `CheckInRevokedPayload`, `MonitorStatePayload` interfészek.
     - `contracts/index.ts`: Teljes körű DTO-k a vendégekhez, bérletekhez, pénzügyhöz, offline szinkronhoz és kijelző-párosításhoz.
 
@@ -31,7 +31,7 @@ Ez a dokumentum rögzíti a **ReformStudioSync** rendszer fázisonkénti megval�
   - `MonitorGateway` (`Socket.io`): `/monitor` névtér, `studio:default-studio` szobakezelés, csatlakoztatott kijelzők számlálása, `checkin:result` és `checkin:revoked` események küldése.
   - `CheckInsService`:
     - Idempotencia ellenőrzés (`idempotencyKey`).
-    - 60 másodperces dupla lehúzás védelem (`DUPLICATE_SCAN`) felülbírálási lehetőséggel (`forceDuplicate`).
+    - 10 másodperces dupla lehúzás védelem (`DUPLICATE_SCAN`) felülbírálási lehetőséggel (`forceDuplicate`).
     - Fagyasztott bérlet detektálás (`isFrozen`).
     - Determinisztikus bérlet-priorizálás (`TIME_BASED` -> leghamarabb lejáró `OCCASION_BASED`).
     - Atomi `updateMany` (`remainingPasses > 0`) levonás a versenyhelyzetek kizárására.
@@ -56,7 +56,7 @@ Ez a dokumentum rögzíti a **ReformStudioSync** rendszer fázisonkénti megval�
 ## Fázis 7: Kritikus Üzleti Tesztkészlet (`Vitest`) és Recepciós Sötét Mód (Dark Mode)
 - **Megvalósított elemek:**
   - **Kritikus végkimenetel tesztek (`npm test`):**
-    - `apps/api/src/modules/check-ins/check-ins.service.spec.ts` (8 üzleti teszteset: sikeres levonás, `TIME_BASED` vs `OCCASION_BASED` priorizálás, leghamarabb lejáró bérlet kiválasztása, `LAST_OCCASION` + `EXPIRING_SOON` figyelmeztetések és inaktiválás, 60 mp-es `DUPLICATE_SCAN` védelem és `forceDuplicate` felülbírálás, `DENIED` elutasítások fagyasztott/lejárt/ismeretlen kártyára, `ConflictException` versenyhelyzet-védelem negatív egyenleg ellen, 1-kattintásos `revokeCheckIn` sztornó és offline `idempotencyKey`).
+    - `apps/api/src/modules/check-ins/check-ins.service.spec.ts` (8 üzleti teszteset: sikeres levonás, `TIME_BASED` vs `OCCASION_BASED` priorizálás, leghamarabb lejáró bérlet kiválasztása, `LAST_OCCASION` + `EXPIRING_SOON` figyelmeztetések és inaktiválás, 10 mp-es `DUPLICATE_SCAN` védelem és `forceDuplicate` felülbírálás, `DENIED` elutasítások fagyasztott/lejárt/ismeretlen kártyára, `ConflictException` versenyhelyzet-védelem negatív egyenleg ellen, 1-kattintásos `revokeCheckIn` sztornó és offline `idempotencyKey`).
     - `apps/api/src/modules/passes/passes-finance.spec.ts` (3 pénzügyi és bérlet teszteset: atomi bérleteladás + kasszatétel, fagyasztás feloldásakor automatikus nap-jóváírás a lejáratra, valamint fizetés sztornózásakor bérlet-deaktiválás és napi kasszazárás korrekció).
   - **Választható Recepciós Sötét Mód (`useThemeStore` + `ThemeToggleButton`):**
     - `apps/web/src/stores/themeStore.ts` és `apps/web/src/components/ThemeToggleButton.tsx` (1-kattintásos Nap/Hold kapcsoló a Recepciós Pult és a Demo fejlécében, `localStorage` mentéssel).
