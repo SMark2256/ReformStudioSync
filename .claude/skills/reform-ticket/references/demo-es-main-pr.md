@@ -5,9 +5,16 @@ api a Renderen (`render.yaml`), az adatbázis a Supabase-en. A `main` minden pus
 élesre megy: https://reformstudiosync.smark-siklodi.workers.dev.
 
 A `demo` ág a tesztkörnyezet: ide kerül minden ticket, mielőtt a `main`-re menne.
-A teszthez a `demo` ág Cloudflare preview URL-jét add a felhasználónak (Workers
-Builds, nem éles ág). Ha a preview nincs bekapcsolva a `demo`-ra, vagy nem találod
-az URL-t, szólj, és addig a felhasználó helyben tesztel (`npm run dev:web`).
+A `demo` minden pushja a Cloudflare Workers Builds Previews-ra megy (kb. 1 perc),
+a teszthez ezt a címet add a felhasználónak:
+https://demo-reformstudiosync.smark-siklodi.workers.dev
+
+Ha a preview build elbukik vagy nem frissül, a Cloudflare MCP-vel nézd meg a
+`reformstudiosync` Worker `demo` preview buildjének naplóját. A preview beállítása:
+build `npm run build:web`, deploy `npx wrangler preview --config apps/web/wrangler.jsonc`;
+a `wrangler.jsonc`-ban kell a `previews` blokk, és az SPA fallbacket a preview-n a
+`apps/web/worker/index.ts` adja. Ha nem sikerül megjavítani, szólj, és addig a
+felhasználó helyben tesztel (`npm run dev:web`).
 
 ## Ha a `demo` ág még nem létezik
 
