@@ -1,9 +1,6 @@
+import { Injectable } from '@nestjs/common';
 import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
-import {
+  appError,
   DailyFinanceSummaryDto,
   DEFAULT_STUDIO_ID,
   EXPIRING_SOON_THRESHOLD_DAYS,
@@ -155,12 +152,10 @@ export class FinanceService {
     studioId = DEFAULT_STUDIO_ID,
   ): Promise<PaymentDto> {
     if (dto.amountHuf <= 0) {
-      throw new BadRequestException('A befizetett összegnek pozitívnak kell lennie.');
+      throw appError('PAYMENT.AMOUNT_NOT_POSITIVE');
     }
     if (dto.membershipDueId && dto.passId) {
-      throw new BadRequestException(
-        'Egy befizetés allokáció egyszerre csak egy célhoz (havi tagdíj VAGY bérlet) rendelhető.',
-      );
+      throw appError('PAYMENT.MULTIPLE_TARGETS');
     }
 
     return this.prisma.$transaction(async (tx) => {
@@ -168,7 +163,9 @@ export class FinanceService {
         where: { id: dto.guestId, studioId },
       });
       if (!guest) {
-        throw new NotFoundException('A kiválasztott vendég nem található.');
+        throw appError('GUEST.NOT_FOUND', {
+          message: 'A kiválasztott vendég nem található.',
+        });
       }
 
       let noteText = dto.note?.trim() || 'Kézi befizetés';
@@ -180,7 +177,7 @@ export class FinanceService {
           include: { membership: true },
         });
         if (!due || due.membership.guestId !== guest.id) {
-          throw new NotFoundException('A kiválasztott havi tagdíj-esedékesség nem található.');
+          throw appError('MEMBERSHIP.DUE_NOT_FOUND');
         }
 
         const newPaid = due.paidAmountHuf + Math.round(dto.amountHuf);
@@ -269,11 +266,11 @@ export class FinanceService {
       });
 
       if (!payment) {
-        throw new NotFoundException('A fizetési tétel nem található.');
+        throw appError('PAYMENT.NOT_FOUND');
       }
 
       if (payment.isCancelled) {
-        throw new BadRequestException('Ez a fizetési tétel már sztornózva lett.');
+        throw appError('PAYMENT.ALREADY_CANCELLED');
       }
 
       const updatedPayment = await tx.payment.update({
@@ -409,7 +406,7 @@ export class FinanceService {
       where: { id: membershipId, studioId },
     });
     if (!existing) {
-      throw new NotFoundException('A havi tagság nem található.');
+      throw appError('MEMBERSHIP.NOT_FOUND');
     }
 
     const now = new Date();
@@ -440,7 +437,7 @@ export class FinanceService {
       include: { guest: true },
     });
     if (!membership) {
-      throw new NotFoundException('A havi tagság nem található.');
+      throw appError('MEMBERSHIP.NOT_FOUND');
     }
 
     const due = await this.prisma.membershipDue.create({
