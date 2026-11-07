@@ -10,5 +10,8 @@
     "directory": "./dist",
     // react-router: minden ismeretlen útvonal az index.html-re esik vissza.
     "not_found_handling": "single-page-application"
-  }
+  },
+  // Workers Builds Previews: a nem éles ágak (pl. `demo`) `wrangler preview`-val
+  // saját preview URL-t kapnak. A blokk lehet üres, de lennie kell.
+  "previews": {}
 }
