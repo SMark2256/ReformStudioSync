@@ -1,19 +1,19 @@
 ---
 name: reform-ticket
 description: >
-  ReformStudioSync Jira-ticket (KAN-NN, reformstudiosync.atlassian.net) végigvitele:
-  ticket beolvasása, terv, jóváhagyás után implementáció a saját `KAN-NN` ágon,
+  ReformStudioSync Jira-ticket (TICKET-NN, reformstudiosync.atlassian.net) végigvitele:
+  ticket beolvasása, terv, jóváhagyás után implementáció a saját `TICKET-NN` ágon,
   quality gate (typecheck, teszt, FSD lint, build), review, commit, majd PR a
   `demo` ágra, ott teszt, és sikeres teszt plusz „oké” után PR a `demo`-ról a
   `main`-re. Közben a Jira-ticket státuszát is lépteti (Teendő → Folyamatban →
-  Ellenőrzés alatt → Kész). Használd mindig, ha a felhasználó KAN ticketet említ
-  vagy ad („vidd végig a KAN-12-t”, „csináld meg a KAN-5-öt és a KAN-6-ot”,
-  „hol tart a KAN-12”, „mehet a demo PR”, „tesztelve, mehet a main-re”), vagy
+  Ellenőrzés alatt → Kész). Használd mindig, ha a felhasználó TICKET-ticketet említ (TICKET-NN vagy Ticket-NN)
+  vagy ad („vidd végig a TICKET-12-t”, „csináld meg a TICKET-5-öt és a TICKET-6-ot”,
+  „hol tart a TICKET-12”, „mehet a demo PR”, „tesztelve, mehet a main-re”), vagy
   ha ReformStudioSync feladatot ticketből, ágon, PR-ral kell lezárni, akkor is,
-  ha a „ticket” vagy „Jira” szó nem hangzik el, csak egy KAN-szám.
+  ha a „ticket” vagy „Jira” szó nem hangzik el, csak egy TICKET-szám.
 ---
 
-# KAN ticket → `KAN-NN` ág → PR a `demo`-ra → teszt → PR a `main`-re
+# TICKET-NN ticket → `TICKET-NN` ág → PR a `demo`-ra → teszt → PR a `main`-re
 
 Ticketenként a folyamat: **ticket → terv → (jóváhagyás) → implementáció → gate →
 review → commit → PR a `demo`-ra → teszt a demón → („oké”) → PR `demo` → `main`**.
@@ -28,13 +28,13 @@ meglévő stílusát kövesd.
 
 ## 0. Hol tart a munka?
 
-Ha a felhasználó csak egy KAN-számot ad, vagy azt kérdezi, hol tart, először
+Ha a felhasználó csak egy TICKET-számot ad, vagy azt kérdezi, hol tart, először
 nézd meg az állapotot, és onnan folytasd, ahol abbamaradt:
 
 ```bash
-python .claude/skills/reform-ticket/scripts/reform_ticket.py show KAN-NN
-git branch -a --list '*KAN-NN*'
-gh pr list --state all --search "KAN-NN in:title"
+python .claude/skills/reform-ticket/scripts/reform_ticket.py show TICKET-NN
+git branch -a --list '*TICKET-NN*'
+gh pr list --state all --search "TICKET-NN in:title"
 ```
 
 - Nincs ág → 1. fázis.
@@ -45,7 +45,7 @@ gh pr list --state all --search "KAN-NN in:title"
 ## 1. Ticket és kontextus
 
 ```bash
-python .claude/skills/reform-ticket/scripts/reform_ticket.py show KAN-NN
+python .claude/skills/reform-ticket/scripts/reform_ticket.py show TICKET-NN
 ```
 
 A script a leírást, az elfogadási feltételeket, a kommenteket, a szülő epicet és
@@ -85,14 +85,14 @@ A jóváhagyás után:
 
 ```bash
 git fetch origin
-git switch -c KAN-NN origin/main
-python .claude/skills/reform-ticket/scripts/reform_ticket.py transition KAN-NN "Folyamatban"
+git switch -c TICKET-NN origin/main
+python .claude/skills/reform-ticket/scripts/reform_ticket.py transition TICKET-NN "Folyamatban"
 ```
 
 Ha a munkakönyvtárban van commitolatlan, a tickethez nem tartozó változás, ne
 vidd át az új ágra. Szólj, és kérdezd meg, mi legyen vele.
 
-Az ág neve pontosan `KAN-NN`. A PR-keresés és a Jira–GitHub összekötés erre épít.
+Az ág neve pontosan `TICKET-NN`. A PR-keresés és a Jira–GitHub összekötés erre épít.
 
 A projekt szabályai, amelyeket a kódnak követnie kell:
 
@@ -135,11 +135,11 @@ nézd meg a változást a valódi oldalon világos és sötét témában is.
 Csak ha kód változott: előbb `simplify`, aztán `code-review` (a `main`-hez
 képest). A talált hibákat javítsd, és futtasd újra a gate-et.
 
-Commit a `KAN-NN` ágon. A commit üzenet a repó stílusát követi (`feature: …`,
+Commit a `TICKET-NN` ágon. A commit üzenet a repó stílusát követi (`feature: …`,
 `fix: …`, `docs: …`), és tartalmazza a ticketszámot:
 
 ```
-fix: KAN-12 dupla levonás javítása offline szinkronnál
+fix: TICKET-12 dupla levonás javítása offline szinkronnál
 ```
 
 ## 6. PR a `demo` ágra (a felhasználó „mehet”-je után)
@@ -151,8 +151,8 @@ a PR. A részletek, például hogy mi a teendő, ha a `demo` ág még nem létez
 A PR után a Jira-ticket a következőket kapja:
 
 ```bash
-python .claude/skills/reform-ticket/scripts/reform_ticket.py transition KAN-NN "Ellenőrzés alatt"
-python .claude/skills/reform-ticket/scripts/reform_ticket.py comment KAN-NN "PR a demo ágra: <PR URL>"
+python .claude/skills/reform-ticket/scripts/reform_ticket.py transition TICKET-NN "Ellenőrzés alatt"
+python .claude/skills/reform-ticket/scripts/reform_ticket.py comment TICKET-NN "PR a demo ágra: <PR URL>"
 ```
 
 ## 7. Teszt a demón
@@ -162,7 +162,7 @@ Ez a felhasználó tesztje. A te feladatod, hogy könnyű legyen:
   kell látnia (a ticket elfogadási feltételeiből);
 - jelezd a hatásterületet is, vagyis azt, ami nem változott, de érinthette a
   módosítás (pl. a szkenner, az offline puffer, a monitor szinkron);
-- ha a felhasználó hibát talál, javítsd ugyanazon a `KAN-NN` ágon, futtasd a
+- ha a felhasználó hibát talál, javítsd ugyanazon a `TICKET-NN` ágon, futtasd a
   gate-et, pushold, és a `demo` PR frissül.
 
 Utána várj. A `main` felé csak kifejezett „oké” vagy „mehet a main” után lépsz.
@@ -176,7 +176,7 @@ verzióléptetés (`docs/versions/` és a `widgets/version-changelog`).
 A `main` merge után:
 
 ```bash
-python .claude/skills/reform-ticket/scripts/reform_ticket.py transition KAN-NN "Kész"
+python .claude/skills/reform-ticket/scripts/reform_ticket.py transition TICKET-NN "Kész"
 ```
 
 ## 9. Beszámoló

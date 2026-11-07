@@ -1,4 +1,4 @@
-# Jira (reformstudiosync.atlassian.net, `KAN` projekt)
+# Jira (reformstudiosync.atlassian.net, `TICKET` projekt)
 
 ## Hitelesítés
 
@@ -19,12 +19,12 @@ add át a `JIRA_API_TOKEN_FILE`-on keresztül).
 
 ```bash
 S=.claude/skills/reform-ticket/scripts/reform_ticket.py
-python $S show KAN-12                     # összefoglaló: leírás, státusz, epic, alfeladatok, kommentek
-python $S list                            # nyitott KAN ticketek (Kész nélkül)
-python $S list --jql 'project=KAN AND status="Teendő"'
-python $S transitions KAN-12              # elérhető átmenetek
-python $S transition KAN-12 "Folyamatban" # átmenet célstátusz neve alapján
-python $S comment KAN-12 "PR a demo ágra: https://github.com/..."
+python $S show TICKET-12                     # összefoglaló: leírás, státusz, epic, alfeladatok, kommentek
+python $S list                            # nyitott TICKET-ticketek (Kész nélkül)
+python $S list --jql 'project=TICKET AND status="Teendő"'
+python $S transitions TICKET-12              # elérhető átmenetek
+python $S transition TICKET-12 "Folyamatban" # átmenet célstátusz neve alapján
+python $S comment TICKET-12 "PR a demo ágra: https://github.com/..."
 ```
 
 A `show`, a `list` és a `transitions` csak olvas. A `transition` és a `comment`

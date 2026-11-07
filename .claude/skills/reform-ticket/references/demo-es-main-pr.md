@@ -32,16 +32,16 @@ git push origin origin/main:refs/heads/demo
 ## Ticket ág → `demo`
 
 ```bash
-git push -u origin KAN-NN
-gh pr create --base demo --head KAN-NN \
-  --title "KAN-NN: <ticket címe>" \
+git push -u origin TICKET-NN
+gh pr create --base demo --head TICKET-NN \
+  --title "TICKET-NN: <ticket címe>" \
   --body-file <ideiglenes fájl>
 ```
 
 A PR leírása:
 
 ```
-Jira: https://reformstudiosync.atlassian.net/browse/KAN-NN
+Jira: https://reformstudiosync.atlassian.net/browse/TICKET-NN
 
 ## Mi változott
 - …
@@ -54,7 +54,7 @@ Jira: https://reformstudiosync.atlassian.net/browse/KAN-NN
 - [ ] …
 ```
 
-Ha a `demo` közben előrébb jár, és ütközés van, a `KAN-NN` ágat rebase-eld az
+Ha a `demo` közben előrébb jár, és ütközés van, a `TICKET-NN` ágat rebase-eld az
 `origin/demo`-ra, ne merge-eld bele a `demo`-t. Így a ticket ág tiszta marad a
 `main` felé is.
 
@@ -75,7 +75,7 @@ a másik ticket tesztjét.
 
 ```bash
 gh pr create --base main --head demo \
-  --title "demo → main: KAN-NN[, KAN-MM]" \
+  --title "demo → main: TICKET-NN[, TICKET-MM]" \
   --body-file <ideiglenes fájl>
 ```
 

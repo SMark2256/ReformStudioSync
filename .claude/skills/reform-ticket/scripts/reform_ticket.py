@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""KAN Jira-ticketek kezelése a reformstudiosync.atlassian.net-en.
+"""TICKET Jira-ticketek (TICKET-NN) kezelése a reformstudiosync.atlassian.net-en.
 
 Parancsok: show, list, transitions, transition, comment.
 Hitelesítés: JIRA_EMAIL + JIRA_API_TOKEN (vagy JIRA_API_TOKEN_FILE).
@@ -15,7 +15,7 @@ import urllib.parse
 import urllib.request
 
 BASE_URL = os.environ.get("JIRA_BASE_URL", "https://reformstudiosync.atlassian.net").rstrip("/")
-PROJECT_KEY = "KAN"
+PROJECT_KEY = "TICKET"
 
 
 def auth_header():
