@@ -11,6 +11,10 @@ const NO_LOGIN_REDIRECT_PATHS = ['/login', '/monitor'];
 
 let queryClient: QueryClient | null = null;
 
+// A saját onError és a globális MutationCache is meghívja a kezelőt ugyanarra a
+// hibára; a frissítés hibánként egyszer fusson.
+const reloadedErrors = new WeakSet<AppError>();
+
 /** Az app indulásakor egyszer hívandó, a `reload` viselkedéshez. */
 export function configureErrorHandling(options: { queryClient: QueryClient }) {
   queryClient = options.queryClient;
@@ -24,7 +28,7 @@ function redirectToLogin(): boolean {
   return true;
 }
 
-export interface HandleAppErrorOptions {
+interface HandleAppErrorOptions {
   /** A toast címe; a leírás mindig a hiba szövege. */
   title?: string;
 }
@@ -43,7 +47,8 @@ export function handleAppError(
 
   if (appErr.action === 'login' && redirectToLogin()) return appErr;
 
-  if (appErr.action === 'reload') {
+  if (appErr.action === 'reload' && !reloadedErrors.has(appErr)) {
+    reloadedErrors.add(appErr);
     void queryClient?.invalidateQueries();
   }
 
@@ -56,5 +61,10 @@ export function handleAppError(
  * a lejárt munkamenetre reagálunk átirányítással.
  */
 export function handleQueryError(error: unknown): void {
-  if (toAppError(error).action === 'login') redirectToLogin();
+  if (isSessionError(error)) redirectToLogin();
+}
+
+/** Lejárt munkamenet / inaktív fiók: ezt nincs értelme újrapróbálni. */
+export function isSessionError(error: unknown): boolean {
+  return toAppError(error).action === 'login';
 }

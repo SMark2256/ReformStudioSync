@@ -2,5 +2,5 @@ export {
   configureErrorHandling,
   handleAppError,
   handleQueryError,
+  isSessionError,
 } from './handleAppError';
-export type { HandleAppErrorOptions } from './handleAppError';

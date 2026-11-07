@@ -116,7 +116,6 @@ describe('toAppError', () => {
     });
     expect(err.code).toBe('COMMON.VALIDATION_FAILED');
     expect(err.message).toBe('email must be an email, name should not be empty');
-    expect(err.details).toEqual({ errors: ['email must be an email', 'name should not be empty'] });
   });
 
   it('Express middleware hiba (statusCode) → a státuszhoz illő kód, a státusz megmarad', () => {

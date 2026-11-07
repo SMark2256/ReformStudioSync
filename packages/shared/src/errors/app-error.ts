@@ -37,9 +37,7 @@ export class AppError extends Error {
     this.status = options.status ?? definition.status;
     this.action = definition.action;
     this.details = options.details;
-    if (options.cause !== undefined) {
-      this.cause = options.cause;
-    }
+    this.cause = options.cause;
   }
 }
 
@@ -105,27 +103,39 @@ function readHttpLike(error: unknown): HttpLikeError | null {
   };
 }
 
-function readMessages(body: unknown): string[] {
-  if (typeof body === 'string') return body ? [body] : [];
-  if (typeof body !== 'object' || body === null) return [];
-  const message = (body as { message?: unknown }).message;
-  if (Array.isArray(message)) {
-    return message.filter((m): m is string => typeof m === 'string');
-  }
-  return typeof message === 'string' && message ? [message] : [];
+interface BodyMessages {
+  messages: string[];
+  /** A NestJS validációs hibái üzenetlistaként (`message: string[]`) érkeznek. */
+  isList: boolean;
 }
 
-function codeForStatus(status: number, isValidationList: boolean): AppErrorCode {
-  if (status === 400) {
-    return isValidationList ? 'COMMON.VALIDATION_FAILED' : 'COMMON.BAD_REQUEST';
+function readMessages(body: unknown): BodyMessages {
+  if (typeof body === 'string') return { messages: body ? [body] : [], isList: false };
+  if (typeof body !== 'object' || body === null) return { messages: [], isList: false };
+  const message = (body as { message?: unknown }).message;
+  if (Array.isArray(message)) {
+    return {
+      messages: message.filter((m): m is string => typeof m === 'string'),
+      isList: true,
+    };
   }
-  if (status === 401) return 'AUTH.UNAUTHENTICATED';
-  if (status === 403) return 'AUTH.FORBIDDEN';
-  if (status === 404) return 'COMMON.NOT_FOUND';
-  if (status === 409) return 'COMMON.CONFLICT';
-  if (status === 413) return 'COMMON.PAYLOAD_TOO_LARGE';
-  if (status >= 400 && status < 500) return 'COMMON.BAD_REQUEST';
-  return 'COMMON.INTERNAL';
+  return {
+    messages: typeof message === 'string' && message ? [message] : [],
+    isList: false,
+  };
+}
+
+const CODE_BY_STATUS: Partial<Record<number, AppErrorCode>> = {
+  400: 'COMMON.BAD_REQUEST',
+  401: 'AUTH.UNAUTHENTICATED',
+  403: 'AUTH.FORBIDDEN',
+  404: 'COMMON.NOT_FOUND',
+  409: 'COMMON.CONFLICT',
+  413: 'COMMON.PAYLOAD_TOO_LARGE',
+};
+
+function isClientError(status: number): boolean {
+  return status >= 400 && status < 500;
 }
 
 function fromHttpLike({ status, body }: HttpLikeError, cause: unknown): AppError {
@@ -141,17 +151,16 @@ function fromHttpLike({ status, body }: HttpLikeError, cause: unknown): AppError
     }
   }
 
-  const isValidationList =
-    typeof body === 'object' &&
-    body !== null &&
-    Array.isArray((body as { message?: unknown }).message);
-  const messages = readMessages(body);
-  const code = codeForStatus(status, isValidationList);
+  const { messages, isList } = readMessages(body);
+  const code: AppErrorCode =
+    status === 400 && isList
+      ? 'COMMON.VALIDATION_FAILED'
+      : (CODE_BY_STATUS[status] ??
+        (isClientError(status) ? 'COMMON.BAD_REQUEST' : 'COMMON.INTERNAL'));
 
   return appError(code, {
     message: messages.length > 0 ? messages.join(', ') : undefined,
-    details: isValidationList ? { errors: messages } : undefined,
-    status: status >= 400 && status < 500 ? status : undefined,
+    status: isClientError(status) ? status : undefined,
     cause,
   });
 }

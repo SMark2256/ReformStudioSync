@@ -13,6 +13,7 @@ import {
   configureErrorHandling,
   handleAppError,
   handleQueryError,
+  isSessionError,
 } from '@/shared/lib/errors';
 import { useThemeStore } from '@/shared/theme';
 
@@ -29,7 +30,8 @@ const queryClient = new QueryClient({
   }),
   defaultOptions: {
     queries: {
-      retry: 1,
+      retry: (failureCount, error) =>
+        failureCount < 1 && !isSessionError(error),
       refetchOnWindowFocus: false,
     },
   },
