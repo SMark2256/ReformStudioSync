@@ -6,8 +6,11 @@
   // A Cloudflare dashboardon létrehozott Worker nevével egyeznie kell (Workers Builds).
   "name": "reformstudiosync",
   "compatibility_date": "2026-11-01",
+  // Csak a preview-n fut le: ott a not_found_handling nem érvényesül (worker/index.ts).
+  "main": "./worker/index.ts",
   "assets": {
     "directory": "./dist",
+    "binding": "ASSETS",
     // react-router: minden ismeretlen útvonal az index.html-re esik vissza.
     "not_found_handling": "single-page-application"
   },
