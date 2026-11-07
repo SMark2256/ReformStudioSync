@@ -8,3 +8,6 @@ build/
 .DS_Store
 coverage/
 .turbo/
+
+# Cloudflare wrangler local state
+.wrangler/

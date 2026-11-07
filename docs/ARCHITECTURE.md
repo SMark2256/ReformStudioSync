@@ -8,7 +8,22 @@ A **ReformStudioSync** egy egystúdiós (de `studioId` szinten többstúdiós Sa
 
 - **`packages/shared` (`@reform/shared`):** Közös TypeScript szerződések, Enumok (`Role`, `PassType`, `PaymentMethod`, `CheckInStatus`), REST DTO interfészek és Socket.io esemény-definíciók (`SOCKET_EVENTS`, `CheckInResultPayload`, `CheckInRevokedPayload`).
 - **`apps/api` (`@reform/api`):** NestJS 10 REST API + Socket.io WebSocket Gateway (`/monitor` névtér) + Prisma ORM + Swagger/OpenAPI (`/api/docs`).
-- **`apps/web` (`@reform/web`):** React 18 + Vite + Tailwind CSS + TanStack Query v5 + Zustand + Sonner Toast értesítési réteg + Kliensoldali Mock Sandbox motor (`lib/mock-engine.ts`).
+- **`apps/web` (`@reform/web`):** React 18 + Vite + Tailwind CSS + TanStack Query v5 + Zustand + Sonner Toast értesítési réteg + Kliensoldali Mock Sandbox motor (`shared/api/mock-engine.ts`). A frontend a [Feature-Sliced Design](https://feature-sliced.design) módszertan szerint épül fel (lásd 1.2).
+
+### 1.2. Frontend Rétegek (Feature-Sliced Design)
+
+Az `apps/web/src` könyvtár rétegei felülről lefelé. Egy réteg csak az alatta lévő rétegekből importálhat, és minden slice-t csak a saját `index.ts` publikus API-ján keresztül lehet elérni (`@/features/sell-pass`, nem `@/features/sell-pass/ui/...`).
+
+| Réteg | Slice-ok | Tartalom |
+| :--- | :--- | :--- |
+| `app/` | — | Belépési pont (`index.tsx`), QueryClient + Toaster providerek, router (`App.tsx`), globális stílusok |
+| `pages/` | `login`, `reception`, `monitor`, `tablet-document`, `demo-sandbox` | Útvonalanként egy oldal |
+| `widgets/` | `guest-profile`, `version-changelog` | Önálló, összetett UI blokkok |
+| `features/` | `scanner-channel`, `sell-pass`, `deduct-treatment`, `record-payment`, `toggle-theme` | Felhasználói műveletek |
+| `entities/` | `guest`, `check-in` | Üzleti entitások UI-ja és állapota (offline puffer, szkenner csatorna store) |
+| `shared/` | `api`, `auth`, `theme`, `lib/*` | REST kliens + mock motor, session store, téma store, notify/sound/szkenner/monitor csatorna segédek |
+
+A szabályokat a [Steiger](https://github.com/feature-sliced/steiger) linter ellenőrzi: `npm run lint:fsd`. A TypeScript- és React-szabályokat az ESLint (`eslint.config.mjs`) a teljes monorepón: `npm run lint` / `npm run lint:fix`.
 
 ---
 

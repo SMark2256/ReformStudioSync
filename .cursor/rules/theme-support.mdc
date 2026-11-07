@@ -7,5 +7,5 @@ alwaysApply: true
 # Kötelező Sötét és Világos Téma Támogatás (Dark / Light Mode)
 
 - Minden új vagy módosított UI blokknak, kártyának, űrlapnak, táblázatnak és modálnak (`apps/web/src/**`) **alapértelmezetten és teljes körűen támogatnia kell a világos és sötét téma váltást** (`useThemeStore` / `.reception-theme-dark` és Tailwind `dark:` osztályok).
-- Világos hátterű (`bg-white`, `bg-slate-50`, `bg-emerald-50`, `bg-amber-50`, `bg-rose-50`), szegélyű (`border-slate-200`, stb.) vagy sötét szövegű (`text-slate-900`, `text-slate-600`, stb.) elemeknél mindig gondoskodni kell a megfelelő `dark:` párokról és/vagy az `apps/web/src/index.css`-ben definiált `.reception-theme-dark` szabályokról.
+- Világos hátterű (`bg-white`, `bg-slate-50`, `bg-emerald-50`, `bg-amber-50`, `bg-rose-50`), szegélyű (`border-slate-200`, stb.) vagy sötét szövegű (`text-slate-900`, `text-slate-600`, stb.) elemeknél mindig gondoskodni kell a megfelelő `dark:` párokról és/vagy az `apps/web/src/app/styles/index.css`-ben definiált `.reception-theme-dark` szabályokról.
 - **Kivétel:** A Vendégmonitor (`/monitor` és `.monitor-invariant` konténerek) megjelenése mindig fix, nagy kontrasztú sötét/smaragd dizájn marad.
