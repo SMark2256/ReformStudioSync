@@ -3,7 +3,7 @@ name: reform-ticket
 description: >
   ReformStudioSync Jira-ticket (KAN-NN, reformstudiosync.atlassian.net) végigvitele:
   ticket beolvasása, terv, jóváhagyás után implementáció a saját `KAN-NN` ágon,
-  quality gate (typecheck, teszt, FSD lint, build), review, commit, majd PR a
+  quality gate (typecheck, teszt, ESLint, FSD lint, build), review, commit, majd PR a
   `demo` ágra, ott teszt, és sikeres teszt plusz „oké” után PR a `demo`-ról a
   `main`-re. Közben a Jira-ticket státuszát is lépteti (Teendő → Folyamatban →
   Ellenőrzés alatt → Kész). Használd mindig, ha a felhasználó KAN ticketet említ
@@ -123,7 +123,7 @@ Sorban futtatja: shared build, Prisma generate, typecheck (web + api), api
 tesztek (vitest), `lint` (ESLint), `lint:fsd` (Steiger), web build. Az első
 hibánál megáll. Hibánál javítsd, és futtasd újra. Ne kapcsold ki a szabályt, és
 ne írd át a tesztet csak azért, hogy zöld legyen. Az ESLint warningjai nem
-állítják meg a gate-et, de új kódban ne hozz létre újat.
+állítják meg a gate-et.
 
 Ha az api üzleti logikája változik (beléptetés, bérlet, pénzügy), írj vagy
 bővíts tesztet a meglévő `*.spec.ts` mintájára.

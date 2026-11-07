@@ -42,7 +42,7 @@ export default tseslint.config(
       'no-restricted-syntax': [
         'warn',
         {
-          selector: "ThrowStatement > NewExpression[callee.name='Error']",
+          selector: "ThrowStatement > :matches(NewExpression, CallExpression)[callee.name='Error']",
           message: 'Nyers `throw new Error(...)` helyett használd az `appError(...)`-t (hibakód-rendszer).',
         },
         {
