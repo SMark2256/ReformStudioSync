@@ -27,6 +27,7 @@ step "prisma generate"       npm run db:generate
 step "typecheck (api)"       npm --workspace=@reform/api run typecheck
 step "typecheck (web)"       npm --workspace=@reform/web run typecheck
 step "api tesztek (vitest)"  npm --workspace=@reform/api run test
+step "ESLint"                npm run lint
 step "FSD lint (Steiger)"    npm run lint:fsd
 step "web build"             npm --workspace=@reform/web run build
 

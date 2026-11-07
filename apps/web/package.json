@@ -28,6 +28,7 @@
   },
   "devDependencies": {
     "@feature-sliced/steiger-plugin": "^0.8.2",
+    "@steiger/toolkit": "^0.2.4",
     "@types/qrcode": "^1.5.5",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
