@@ -1,0 +1,10 @@
+{
+  "//": "Csak az ESLint típusinformációjához: a tsconfig-okon kívüli tooling-configok és a Cloudflare Worker (eslint.config.mjs, allowDefaultProject).",
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022", "DOM"],
+    "types": ["node"]
+  }
+}

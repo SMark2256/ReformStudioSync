@@ -40,7 +40,7 @@ Jira: https://reformstudiosync.atlassian.net/browse/KAN-NN
 - …
 
 ## Ellenőrzés
-- gate: shared build, prisma generate, typecheck, api teszt, lint:fsd, web build ✅
+- gate: shared build, prisma generate, typecheck, api teszt, lint, lint:fsd, web build ✅
 - kézi: …
 
 ## Teszt a demón
