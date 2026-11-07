@@ -1,9 +1,13 @@
 # PR a `demo`-ra, majd `demo` → `main`
 
-A web a Vercelen fut (`apps/web/vercel.json`), az api a Renderen (`render.yaml`).
+A web a Cloudflare Workersen fut (`apps/web/wrangler.jsonc`, Workers Builds), az
+api a Renderen (`render.yaml`), az adatbázis a Supabase-en. A `main` minden pushja
+élesre megy: https://reformstudiosync.smark-siklodi.workers.dev.
+
 A `demo` ág a tesztkörnyezet: ide kerül minden ticket, mielőtt a `main`-re menne.
-A Vercel a `demo` ágra preview deployt készít. Ennek az URL-jét a PR-ban vagy a
-Vercel felületén találod, ezt add a felhasználónak a teszthez.
+A teszthez a `demo` ág Cloudflare preview URL-jét add a felhasználónak (Workers
+Builds, nem éles ág). Ha a preview nincs bekapcsolva a `demo`-ra, vagy nem találod
+az URL-t, szólj, és addig a felhasználó helyben tesztel (`npm run dev:web`).
 
 ## Ha a `demo` ág még nem létezik
 
