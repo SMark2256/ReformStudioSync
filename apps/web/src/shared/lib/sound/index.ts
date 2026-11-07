@@ -1,0 +1,1 @@
+export { soundFeedback } from './sound';

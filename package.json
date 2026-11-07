@@ -21,7 +21,8 @@
     "db:seed": "npm --workspace=@reform/api run prisma:seed",
     "test": "npm run build:shared && npm --workspace=@reform/api run test",
     "test:watch": "npm --workspace=@reform/api run test:watch",
-    "typecheck": "npm run build:shared && npm --workspace=@reform/api run typecheck && npm --workspace=@reform/web run typecheck"
+    "typecheck": "npm run build:shared && npm --workspace=@reform/api run typecheck && npm --workspace=@reform/web run typecheck",
+    "lint:fsd": "npm --workspace=@reform/web run lint:fsd"
   },
   "engines": {
     "node": ">=20.0.0"
