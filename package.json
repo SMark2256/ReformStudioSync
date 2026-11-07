@@ -11,7 +11,8 @@
     "build:shared": "npm --workspace=@reform/shared run build",
     "build:api": "npm --workspace=@reform/shared run build && npm --workspace=@reform/api run build",
     "build:web": "npm --workspace=@reform/shared run build && npm --workspace=@reform/web run build",
-    "build": "npm run build:shared && npm --workspace=@reform/api run build && npm --workspace=@reform/web run build",
+    "deploy:web": "npm run build:web && npm --workspace=@reform/web run deploy",
+    "build": "npm run build:shared &&npm --workspace=@reform/api run build && npm --workspace=@reform/web run build",
     "dev:api": "npm --workspace=@reform/api run start:dev",
     "dev:web": "npm --workspace=@reform/web run dev",
     "db:generate": "npm --workspace=@reform/api run prisma:generate",
@@ -24,9 +25,6 @@
   },
   "engines": {
     "node": ">=20.0.0"
-  },
-  "dependencies": {
-    "@vercel/speed-insights": "^2.0.0"
   },
   "devDependencies": {
     "vitest": "^2.1.5"

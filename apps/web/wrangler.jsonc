@@ -1,0 +1,14 @@
+{
+  // Cloudflare Workers (Static Assets) — React + Vite SPA kiszolgálás.
+  // Build: `npm run build:web` (a gyökérből) → apps/web/dist
+  // Deploy: `npm run deploy:web` (a gyökérből)
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  // A Cloudflare dashboardon létrehozott Worker nevével egyeznie kell (Workers Builds).
+  "name": "reformstudiosync",
+  "compatibility_date": "2026-11-01",
+  "assets": {
+    "directory": "./dist",
+    // react-router: minden ismeretlen útvonal az index.html-re esik vissza.
+    "not_found_handling": "single-page-application"
+  }
+}

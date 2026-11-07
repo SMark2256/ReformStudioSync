@@ -75,14 +75,23 @@ A `db:seed` parancs létrehozza az alapértelmezett fiókokat és bérletsablono
    - **Start Command:** `npm --workspace=@reform/api run start:prod`
 3. Állítsd be az Environment Variables értékeket (`DATABASE_URL`, `DIRECT_URL`, `JWT_SECRET`, `CORS_ORIGIN`).
 
-### 3.3. Vercel (React + Vite Frontend — Free Tier)
-1. Importáld a repository-t a [vercel.com](https://vercel.com) felületén.
-2. Állítsd a **Root Directory** értéket `apps/web`-re, vagy a gyökérből futtasd az alábbi beállításokkal:
-   - **Build Command:** `cd ../.. && npm run build:web`
-   - **Output Directory:** `dist`
-3. Állítsd be a környezeti változókat:
-   - `VITE_API_URL`: `https://<render-app-neve>.onrender.com/api`
-   - `VITE_WS_URL`: `https://<render-app-neve>.onrender.com`
+### 3.3. Cloudflare Workers (React + Vite Frontend — Free Tier)
+A frontend statikus SPA-ként fut Cloudflare Workers Static Assets-en (`apps/web/wrangler.jsonc`, SPA fallbackkel a react-routerhez).
+
+1. **Manuális deploy a gyökérből:**
+   ```bash
+   npx -w @reform/web wrangler login   # egyszer, böngészős jóváhagyás
+   VITE_API_URL="https://<render-app-neve>.onrender.com/api" \
+   VITE_WS_URL="https://<render-app-neve>.onrender.com" \
+   npm run deploy:web
+   ```
+   A `VITE_*` változók **build időben** kerülnek a bundle-be, ezért a build előtt kell megadni őket (vagy `apps/web/.env.production` fájlban).
+2. **Vagy Git-alapú automatikus deploy** (Cloudflare Dashboard → Workers & Pages → Create → Import a repository):
+   - **Root directory:** `/` (repo gyökér)
+   - **Build command:** `npm run build:web`
+   - **Deploy command:** `npm --workspace=@reform/web run deploy`
+   - **Build variables:** `VITE_API_URL`, `VITE_WS_URL` (lásd fent)
+3. A kapott `https://reformstudiosync.<fiók>.workers.dev` címet add meg a Renderen a `CORS_ORIGIN` értékeként.
 
 ### 3.4. UptimeRobot (Render Spin-Down & Supabase Pause Megelőzése)
 1. Regisztrálj egy ingyenes fiókot az [uptimerobot.com](https://uptimerobot.com) oldalon.
