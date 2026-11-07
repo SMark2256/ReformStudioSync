@@ -3,6 +3,8 @@ import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
+import { AppExceptionFilter } from './common/filters/app-exception.filter';
+import { validationExceptionFactory } from './common/filters/validation-exception.factory';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -21,8 +23,10 @@ async function bootstrap() {
       whitelist: true,
       transform: true,
       forbidNonWhitelisted: false,
+      exceptionFactory: validationExceptionFactory,
     }),
   );
+  app.useGlobalFilters(new AppExceptionFilter());
 
   const swaggerConfig = new DocumentBuilder()
     .setTitle('ReformStudioSync API')
