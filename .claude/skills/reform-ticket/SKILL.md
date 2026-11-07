@@ -120,9 +120,10 @@ bash .claude/skills/reform-ticket/scripts/gate.sh
 ```
 
 Sorban futtatja: shared build, Prisma generate, typecheck (web + api), api
-tesztek (vitest), `lint:fsd` (Steiger), web build. Az első hibánál megáll.
-Hibánál javítsd, és futtasd újra. Ne kapcsold ki a szabályt, és ne írd át a
-tesztet csak azért, hogy zöld legyen.
+tesztek (vitest), `lint` (ESLint), `lint:fsd` (Steiger), web build. Az első
+hibánál megáll. Hibánál javítsd, és futtasd újra. Ne kapcsold ki a szabályt, és
+ne írd át a tesztet csak azért, hogy zöld legyen. Az ESLint warningjai nem
+állítják meg a gate-et.
 
 Ha az api üzleti logikája változik (beléptetés, bérlet, pénzügy), írj vagy
 bővíts tesztet a meglévő `*.spec.ts` mintájára.

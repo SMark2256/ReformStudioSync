@@ -25,6 +25,7 @@ import {
   FlaskConical,
   KeyRound,
   LogOut,
+  Megaphone,
   Monitor,
   Plus,
   QrCode,
@@ -67,8 +68,11 @@ import { GuestModal } from '@/widgets/guest-profile';
 import { DeductTreatmentModal } from '@/features/deduct-treatment';
 import { RecordPaymentModal } from '@/features/record-payment';
 import { SellPassModal } from '@/features/sell-pass';
+import { countUnseenReleaseNotes, type ReceptionMainTab } from '../model/releaseNotes';
+import { useReleaseNotesStore } from '../model/releaseNotesStore';
+import { WhatsNewPanel } from './WhatsNewPanel';
 
-type ActiveTab = 'desk' | 'guests' | 'finance' | 'admin';
+type ActiveTab = ReceptionMainTab | 'news';
 
 export const ReceptionPage: React.FC = () => {
   const navigate = useNavigate();
@@ -85,6 +89,7 @@ export const ReceptionPage: React.FC = () => {
   } = useOfflineQueueStore();
 
   const [activeTab, setActiveTab] = useState<ActiveTab>('desk');
+  const unseenReleaseNotes = useReleaseNotesStore((s) => countUnseenReleaseNotes(s.seenIds));
   const [manualBarcode, setManualBarcode] = useState('');
   const [guestSearch, setGuestSearch] = useState('');
   const {
@@ -656,6 +661,7 @@ export const ReceptionPage: React.FC = () => {
               { id: 'guests', label: 'Vendégkartoték', icon: Users },
               { id: 'finance', label: 'Pénzügy & Tartozások', icon: Wallet },
               { id: 'admin', label: 'Szolgáltatások & Monitor', icon: Settings },
+              { id: 'news', label: 'Újdonságok', icon: Megaphone },
             ].map((tab) => {
               const Icon = tab.icon;
               const active = !guestModalState.isOpen && activeTab === tab.id;
@@ -672,6 +678,14 @@ export const ReceptionPage: React.FC = () => {
                 >
                   <Icon className="h-3.5 w-3.5" />
                   {tab.label}
+                  {tab.id === 'news' && unseenReleaseNotes > 0 && (
+                    <span
+                      className="ml-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-600 px-1 text-[10px] font-bold text-white"
+                      title={`${unseenReleaseNotes} még nem látott újdonság`}
+                    >
+                      {unseenReleaseNotes}
+                    </span>
+                  )}
                 </button>
               );
             })}
@@ -2624,6 +2638,10 @@ export const ReceptionPage: React.FC = () => {
               </div>
             </div>
           </div>
+        )}
+
+        {activeTab === 'news' && (
+          <WhatsNewPanel onOpenReceptionTab={handleSelectMainTab} />
         )}
         </>
         )}

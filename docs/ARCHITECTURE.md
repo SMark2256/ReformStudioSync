@@ -23,7 +23,7 @@ Az `apps/web/src` könyvtár rétegei felülről lefelé. Egy réteg csak az ala
 | `entities/` | `guest`, `check-in` | Üzleti entitások UI-ja és állapota (offline puffer, szkenner csatorna store) |
 | `shared/` | `api`, `auth`, `theme`, `lib/*` | REST kliens + mock motor, session store, téma store, notify/sound/szkenner/monitor csatorna segédek |
 
-A szabályokat a [Steiger](https://github.com/feature-sliced/steiger) linter ellenőrzi: `npm run lint:fsd`.
+A szabályokat a [Steiger](https://github.com/feature-sliced/steiger) linter ellenőrzi: `npm run lint:fsd`. A TypeScript- és React-szabályokat az ESLint (`eslint.config.mjs`) a teljes monorepón: `npm run lint` / `npm run lint:fix`.
 
 ---
 

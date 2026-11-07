@@ -26,3 +26,4 @@ A **ReformStudioSync** egy dedikált fitnesz- és Reformer Pilates stúdiókezel
 - [Fejlesztési Napló (`docs/DEVELOPMENT_LOG.md`)](docs/DEVELOPMENT_LOG.md)
 - [Telepítési és Üzemeltetési Útmutató (`docs/INSTALLATION_GUIDE.md`)](docs/INSTALLATION_GUIDE.md)
 - [Felhasználói Kézikönyv (`docs/USER_GUIDE.md`)](docs/USER_GUIDE.md)
+- [Fejlesztési Munkafolyamat — Koordinátor + Worker szálak (`docs/WORKFLOW.md`)](docs/WORKFLOW.md)

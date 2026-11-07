@@ -84,5 +84,7 @@ Ha véletlenül rossz kártyát csippantottál le:
   - A rendszer automatikusan **Offline Puffer** módba vált (sárga jelzés a felső sávban). Nyugodtan csippantsd le a kártyákat: a rendszer elmenti őket, és amint visszatér az internet, automatikusan szinkronizálja az összes belépést.
 - **Hol tudom kockázat nélkül gyakorolni a rendszer használatát?**
   - Kattints a jobb felső sarokban a **"Demo Oldal" (`/demo`)** gombra! Itt tesztvendégekkel és virtuális vonalkódolvasóval bármit kipróbálhatsz anélkül, hogy az éles adatokat módosítanád.
+- **Hol látom, mi változott a legutóbbi frissítésben?**
+  - Kattints a felső sávban az **"Újdonságok"** fülre (piros szám jelzi a még nem látott újdonságokat). Ha egy új funkció vagy oldal megtekinthető, a kártyán lévő gomb egyből oda visz; a kisebb fejlesztéseknél csak rövid leírás van.
 - **Hogyan válthatok Sötét Módra (Dark Mode) a recepciós pultnál?**
   - Kattints a felső navigációs sávban található **"Sötét mód / Világos mód"** (Hold / Nap ikon) gombra. A beállítást a böngésző megjegyzi, miközben a **Vendégmonitor (`/monitor`)** képernyője változatlan marad.
