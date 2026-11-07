@@ -5,9 +5,16 @@ api a Renderen (`render.yaml`), az adatbázis a Supabase-en. A `main` minden pus
 élesre megy: https://reformstudiosync.smark-siklodi.workers.dev.
 
 A `demo` ág a tesztkörnyezet: ide kerül minden ticket, mielőtt a `main`-re menne.
-A teszthez a `demo` ág Cloudflare preview URL-jét add a felhasználónak (Workers
-Builds, nem éles ág). Ha a preview nincs bekapcsolva a `demo`-ra, vagy nem találod
-az URL-t, szólj, és addig a felhasználó helyben tesztel (`npm run dev:web`).
+A `demo` minden pushja a Cloudflare Workers Builds Previews-ra megy (kb. 1 perc),
+a teszthez ezt a címet add a felhasználónak:
+https://demo-reformstudiosync.smark-siklodi.workers.dev
+
+Ha a preview build elbukik vagy nem frissül, a Cloudflare MCP-vel nézd meg a
+`reformstudiosync` Worker `demo` preview buildjének naplóját. A preview beállítása:
+build `npm run build:web`, deploy `npx wrangler preview --config apps/web/wrangler.jsonc`;
+a `wrangler.jsonc`-ban kell a `previews` blokk, és az SPA fallbacket a preview-n a
+`apps/web/worker/index.ts` adja. Ha nem sikerül megjavítani, szólj, és addig a
+felhasználó helyben tesztel (`npm run dev:web`).
 
 ## Ha a `demo` ág még nem létezik
 
@@ -25,16 +32,16 @@ git push origin origin/main:refs/heads/demo
 ## Ticket ág → `demo`
 
 ```bash
-git push -u origin KAN-NN
-gh pr create --base demo --head KAN-NN \
-  --title "KAN-NN: <ticket címe>" \
+git push -u origin TICKET-NN
+gh pr create --base demo --head TICKET-NN \
+  --title "TICKET-NN: <ticket címe>" \
   --body-file <ideiglenes fájl>
 ```
 
 A PR leírása:
 
 ```
-Jira: https://reformstudiosync.atlassian.net/browse/KAN-NN
+Jira: https://reformstudiosync.atlassian.net/browse/TICKET-NN
 
 ## Mi változott
 - …
@@ -47,7 +54,7 @@ Jira: https://reformstudiosync.atlassian.net/browse/KAN-NN
 - [ ] …
 ```
 
-Ha a `demo` közben előrébb jár, és ütközés van, a `KAN-NN` ágat rebase-eld az
+Ha a `demo` közben előrébb jár, és ütközés van, a `TICKET-NN` ágat rebase-eld az
 `origin/demo`-ra, ne merge-eld bele a `demo`-t. Így a ticket ág tiszta marad a
 `main` felé is.
 
@@ -68,7 +75,7 @@ a másik ticket tesztjét.
 
 ```bash
 gh pr create --base main --head demo \
-  --title "demo → main: KAN-NN[, KAN-MM]" \
+  --title "demo → main: TICKET-NN[, TICKET-MM]" \
   --body-file <ideiglenes fájl>
 ```
 
