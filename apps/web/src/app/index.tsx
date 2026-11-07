@@ -1,5 +1,6 @@
 import {
   MutationCache,
+  QueryCache,
   QueryClient,
   QueryClientProvider,
 } from '@tanstack/react-query';
@@ -8,16 +9,22 @@ import ReactDOM from 'react-dom/client';
 import { Toaster } from 'sonner';
 import { App } from './App';
 import './styles/index.css';
-import { notify } from '@/shared/lib/notify';
+import {
+  configureErrorHandling,
+  handleAppError,
+  handleQueryError,
+} from '@/shared/lib/errors';
 import { useThemeStore } from '@/shared/theme';
 
 const queryClient = new QueryClient({
   mutationCache: new MutationCache({
     onError: (error) => {
-      notify.error(
-        'Hiba történt a művelet végrehajtása közben',
-        (error as Error).message || 'Ismeretlen hiba lépett fel.',
-      );
+      handleAppError(error);
+    },
+  }),
+  queryCache: new QueryCache({
+    onError: (error) => {
+      handleQueryError(error);
     },
   }),
   defaultOptions: {
@@ -27,6 +34,8 @@ const queryClient = new QueryClient({
     },
   },
 });
+
+configureErrorHandling({ queryClient });
 
 const ThemedToaster: React.FC = () => {
   const { theme } = useThemeStore();
