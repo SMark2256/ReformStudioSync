@@ -53,7 +53,7 @@ sequenceDiagram
 
 - **Időpont:** minden munkanap 07:00 (Europe/Budapest).
 - **Futtatója:** a Koordinátor szál (ütemezett feladatként, pl. T3 Code `schedule_task` / Claude Code `/schedule`).
-- **Előfeltétel:** Jira hozzáférés az agent számára (`JIRA_EMAIL` + `JIRA_API_TOKEN` / `JIRA_API_TOKEN_FILE`, lásd `.claude/skills/reform-ticket/references/jira.md`). *Állapot: a hozzáférés beállítása folyamatban — amíg nincs meg, az ütemezést nem kapcsoljuk be.*
+- **Előfeltétel:** Jira hozzáférés az agent számára (`JIRA_EMAIL` + `JIRA_API_TOKEN` / `JIRA_API_TOKEN_FILE`, lásd `.claude/skills/reform-ticket/references/jira.md`). A változók Windows felhasználói szinten vannak beállítva; ha egy agent munkamenet ezek felvétele előtt indult, onnan kell betöltenie. *Állapot: aktív — T3 ütemezett feladat, hétfőtől péntekig 07:00, a Koordinátor szálba jelent.*
 - **Lekérdezés:** `python .claude/skills/reform-ticket/scripts/reform_ticket.py list --jql 'project=KAN AND statusCategory != Done AND updated >= -1d ORDER BY priority DESC'`
 - **Kimenet:** napi terv a `docs/plans/` mappában (lásd 2.2), és rövid üzenet a Koordinátor szálban.
 
