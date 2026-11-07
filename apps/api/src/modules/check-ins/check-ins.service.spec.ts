@@ -1,4 +1,3 @@
-import { BadRequestException, ConflictException } from '@nestjs/common';
 import {
   CheckInStatus,
   DUPLICATE_SCAN_COOLDOWN_SECONDS,
@@ -337,10 +336,10 @@ describe('CheckInsService — Kritikus Beléptetési és Köredzés vs. Kezelés
     txMock.guest.findUnique.mockResolvedValue(null);
     await expect(
       service.processBarcodeCheckIn({ barcode: 'UNKNOWN999' }, 'staff-1'),
-    ).rejects.toThrow(BadRequestException);
+    ).rejects.toMatchObject({ code: 'CHECKIN.GUEST_NOT_FOUND', status: 400 });
   });
 
-  it('7. Versenyhelyzet (Race Condition) védelem: ha az atomi updateMany count=0 értéket ad vissza, ConflictException-t dob és nem megy negatívba', async () => {
+  it('7. Versenyhelyzet (Race Condition) védelem: ha az atomi updateMany count=0 értéket ad vissza, CHECKIN.BALANCE_CHANGED hibát dob és nem megy negatívba', async () => {
     txMock.guest.findUnique.mockResolvedValue({
       id: 'guest-1',
       firstName: 'Anna',
@@ -368,7 +367,7 @@ describe('CheckInsService — Kritikus Beléptetési és Köredzés vs. Kezelés
 
     await expect(
       service.processBarcodeCheckIn({ barcode: 'RS100001' }, 'staff-1'),
-    ).rejects.toThrow(ConflictException);
+    ).rejects.toMatchObject({ code: 'CHECKIN.BALANCE_CHANGED', status: 409 });
     expect(monitorGatewayMock.emitCheckInResult).not.toHaveBeenCalled();
   });
 
