@@ -1,7 +1,7 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PassportStrategy } from '@nestjs/passport';
-import { AuthUserDto, Role } from '@reform/shared';
+import { appError, AuthUserDto, Role } from '@reform/shared';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { PrismaService } from '../../prisma/prisma.service';
 
@@ -34,7 +34,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
 
     if (!user || !user.isActive) {
-      throw new UnauthorizedException('A felhasználói fiók nem aktív.');
+      throw appError('AUTH.ACCOUNT_INACTIVE');
     }
 
     return {

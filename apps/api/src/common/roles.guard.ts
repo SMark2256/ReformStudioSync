@@ -1,11 +1,10 @@
 import {
   CanActivate,
   ExecutionContext,
-  ForbiddenException,
   Injectable,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { AuthUserDto, Role } from '@reform/shared';
+import { appError, AuthUserDto, Role } from '@reform/shared';
 import { ROLES_KEY } from './roles.decorator';
 
 @Injectable()
@@ -26,9 +25,7 @@ export class RolesGuard implements CanActivate {
     const user: AuthUserDto | undefined = request.user;
 
     if (!user || !requiredRoles.includes(user.role)) {
-      throw new ForbiddenException(
-        'Nincs jogosultságod a művelet végrehajtásához.',
-      );
+      throw appError('AUTH.FORBIDDEN');
     }
 
     return true;
