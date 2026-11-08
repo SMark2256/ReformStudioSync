@@ -37,6 +37,7 @@ import { VersionBadge } from '@/widgets/version-changelog';
 import { normalizeScannedCode } from '@/shared/lib/barcode-scanner';
 import { broadcastToScannerChannel } from '@/shared/lib/monitor-channel';
 import { mockStudioEngine } from '@/shared/api';
+import { handleAppError } from '@/shared/lib/errors';
 import { notify } from '@/shared/lib/notify';
 import { useOfflineQueueStore } from '@/entities/check-in';
 import { useScannerChannelStore } from '@/entities/check-in';
@@ -149,7 +150,7 @@ export const DemoSandboxPage: React.FC = () => {
         );
         forceRender();
       } catch (err) {
-        notify.error('Sztornó hiba', (err as Error).message);
+        handleAppError(err, { title: 'Sztornó hiba' });
       }
     },
     [recordRevokedResult, showRevokedOnEmbeddedMonitor, forceRender],
@@ -205,7 +206,7 @@ export const DemoSandboxPage: React.FC = () => {
         });
         forceRender();
       } catch (err) {
-        notify.error('Beléptetési hiba', (err as Error).message);
+        handleAppError(err, { title: 'Beléptetési hiba' });
       }
     },
     [
@@ -400,7 +401,7 @@ export const DemoSandboxPage: React.FC = () => {
                 }
                 forceRender();
               } catch (err) {
-                notify.error('Mentési hiba', (err as Error).message);
+                handleAppError(err, { title: 'Mentési hiba' });
               }
             }}
             onExtendPass={(passId, additionalDays, note) => {

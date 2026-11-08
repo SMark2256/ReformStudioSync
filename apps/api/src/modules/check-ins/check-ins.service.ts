@@ -1,10 +1,6 @@
+import { Injectable } from '@nestjs/common';
 import {
-  BadRequestException,
-  ConflictException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
-import {
+  appError,
   CheckInResultPayload,
   CheckInRevokedPayload,
   CheckInStatus,
@@ -104,9 +100,9 @@ export class CheckInsService {
       });
 
       if (!guest || !guest.isActive) {
-        throw new BadRequestException(
-          `Nem található aktív vendég a(z) "${barcode}" vonalkóddal.`,
-        );
+        throw appError('CHECKIN.GUEST_NOT_FOUND', {
+          message: `Nem található aktív vendég a(z) "${barcode}" vonalkóddal.`,
+        });
       }
 
       const guestFullName = `${guest.lastName} ${guest.firstName}`;
@@ -345,9 +341,7 @@ export class CheckInsService {
         });
 
         if (atomicUpdate.count !== 1) {
-          throw new ConflictException(
-            'A bérlet egyenlege időközben módosult. Kérjük, próbáld újra!',
-          );
+          throw appError('CHECKIN.BALANCE_CHANGED');
         }
 
         const calculatedRemaining = (activePass.remainingPasses ?? 1) - 1;
@@ -457,13 +451,11 @@ export class CheckInsService {
       });
 
       if (!checkIn) {
-        throw new NotFoundException('A beléptetési naplóbejegyzés nem található.');
+        throw appError('CHECKIN.NOT_FOUND');
       }
 
       if (checkIn.status !== 'SUCCESS') {
-        throw new BadRequestException(
-          'Csak sikeres (SUCCESS) státuszú beléptetés sztornózható.',
-        );
+        throw appError('CHECKIN.NOT_REVOCABLE');
       }
 
       let restoredRemaining: number | 'Korlátlan' = 'Korlátlan';

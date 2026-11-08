@@ -1,10 +1,6 @@
+import { Injectable } from '@nestjs/common';
 import {
-  BadRequestException,
-  ConflictException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
-import {
+  appError,
   DEFAULT_STUDIO_ID,
   DocumentStatus,
   DocumentType,
@@ -147,7 +143,9 @@ export class GuestsService {
     });
 
     if (!guest) {
-      throw new NotFoundException('A keresett vendég nem található.');
+      throw appError('GUEST.NOT_FOUND', {
+        message: 'A keresett vendég nem található.',
+      });
     }
 
     return this.mapGuest(guest);
@@ -175,9 +173,9 @@ export class GuestsService {
     });
 
     if (existing) {
-      throw new ConflictException(
-        `A(z) "${barcode}" vonalkód már egy másik vendéghez (${existing.lastName} ${existing.firstName}) tartozik.`,
-      );
+      throw appError('GUEST.BARCODE_TAKEN', {
+        message: `A(z) "${barcode}" vonalkód már egy másik vendéghez (${existing.lastName} ${existing.firstName}) tartozik.`,
+      });
     }
 
     const created = await this.prisma.guest.create({
@@ -209,7 +207,7 @@ export class GuestsService {
     });
 
     if (!existing) {
-      throw new NotFoundException('A vendég nem található.');
+      throw appError('GUEST.NOT_FOUND');
     }
 
     if (dto.barcode && dto.barcode.trim() !== existing.barcode) {
@@ -219,9 +217,9 @@ export class GuestsService {
         },
       });
       if (collision) {
-        throw new ConflictException(
-          `A(z) "${dto.barcode.trim()}" vonalkód már foglalt (${collision.lastName} ${collision.firstName}).`,
-        );
+        throw appError('GUEST.BARCODE_TAKEN', {
+          message: `A(z) "${dto.barcode.trim()}" vonalkód már foglalt (${collision.lastName} ${collision.firstName}).`,
+        });
       }
     }
 
@@ -304,9 +302,7 @@ export class GuestsService {
       dto.compressedSizeBytes &&
       dto.compressedSizeBytes > maxCompressedBytes
     ) {
-      throw new BadRequestException(
-        'A feltöltött kép mérete meghaladja a megengedett optimalizált határt (750 KB). Kérjük, használd az automatikus WebP tömörítést!',
-      );
+      throw appError('GUEST.PHOTO_TOO_LARGE');
     }
 
     const created = await this.prisma.guestPhoto.create({
@@ -387,7 +383,7 @@ export class GuestsService {
       include: { guest: true },
     });
     if (!existing) {
-      throw new NotFoundException('A dokumentum nem található.');
+      throw appError('GUEST.DOCUMENT_NOT_FOUND');
     }
 
     const updated = await this.prisma.guestDocument.update({
@@ -472,7 +468,7 @@ export class GuestsService {
       where: { id: guestId },
     });
     if (!guest) {
-      throw new NotFoundException('A vendég nem található.');
+      throw appError('GUEST.NOT_FOUND');
     }
 
     const created = await this.prisma.messageLog.create({

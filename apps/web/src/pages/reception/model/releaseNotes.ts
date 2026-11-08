@@ -63,6 +63,21 @@ export const getJiraIssueUrl = (jiraKey: string): string =>
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    id: 'v0.3-unified-error-messages',
+    version: '0.3',
+    date: '2026-11-08',
+    kind: 'IMPROVEMENT',
+    title: 'Egységes hibaüzenetek',
+    summary:
+      'A rendszer minden hibát egyformán jelez, és ha lejárt a bejelentkezés, automatikusan a belépő oldalra visz.',
+    details: [
+      'A hibaüzenetek szövege nem változott, de mostantól minden oldalon ugyanúgy jelennek meg.',
+      'Lejárt bejelentkezésnél nem kell kézzel kilépni: a rendszer kiléptet, és a belépő oldalra irányít.',
+      'Offline módban a beléptetés továbbra is a helyi pufferbe kerül.',
+    ],
+    jiraKey: 'TICKET-9',
+  },
+  {
     id: 'v0.2-global-scanner-channel',
     version: '0.2',
     date: '2026-10-22',

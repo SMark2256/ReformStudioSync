@@ -27,6 +27,7 @@ import React, { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { api } from '@/shared/api';
 import { formatBytes, optimizeImageFile } from '@/shared/lib/image';
+import { handleAppError } from '@/shared/lib/errors';
 import { notify } from '@/shared/lib/notify';
 
 type GuestSheetTab =
@@ -298,7 +299,7 @@ export const GuestModal: React.FC<GuestModalProps> = ({
       );
       onRefreshAll?.();
     } catch (err) {
-      notify.error('Képfeltöltés sikertelen', (err as Error).message);
+      handleAppError(err, { title: 'Képfeltöltés sikertelen' });
     } finally {
       setIsOptimizingPhoto(false);
       e.target.value = '';

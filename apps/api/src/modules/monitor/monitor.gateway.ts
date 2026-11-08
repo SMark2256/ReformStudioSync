@@ -16,6 +16,7 @@ import {
   MonitorTestPingPayload,
   SOCKET_EVENTS,
   SOCKET_NAMESPACE,
+  toAppError,
 } from '@reform/shared';
 import { Server, Socket } from 'socket.io';
 import { AuthService } from '../auth/auth.service';
@@ -83,8 +84,9 @@ export class MonitorGateway
       }
       this.broadcastMonitorState(studioId);
     } catch (err) {
+      const error = toAppError(err);
       this.logger.warn(
-        `Monitor socket connection rejected (${client.id}): ${(err as Error).message}`,
+        `Monitor socket connection rejected (${client.id}): ${error.code} ${error.message}`,
       );
       client.disconnect(true);
     }
