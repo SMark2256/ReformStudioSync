@@ -34,6 +34,9 @@ step "shared build"          npm run build:shared
 step "prisma generate"       npm run db:generate
 step "typecheck (api)"       npm --workspace=@reform/api run typecheck
 step "typecheck (web)"       npm --workspace=@reform/web run typecheck
+if [ -f e2e/tsconfig.json ]; then
+  step "typecheck (e2e)"     npx tsc -p e2e
+fi
 step "api tesztek (vitest)"  npm --workspace=@reform/api run test
 step "ESLint"                npm run lint
 step "FSD lint (Steiger)"    npm run lint:fsd
