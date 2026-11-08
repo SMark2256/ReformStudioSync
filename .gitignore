@@ -11,3 +11,9 @@ coverage/
 
 # Cloudflare wrangler local state
 .wrangler/
+
+# Playwright E2E
+.e2e-dist/
+test-results/
+playwright-report/
+blob-report/

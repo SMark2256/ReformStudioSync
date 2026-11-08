@@ -128,6 +128,18 @@ ne írd át a tesztet csak azért, hogy zöld legyen. Az ESLint warningjai nem
 Ha az api üzleti logikája változik (beléptetés, bérlet, pénzügy), írj vagy
 bővíts tesztet a meglévő `*.spec.ts` mintájára.
 
+**Opcionális: E2E tesztek** (nem része a gate-nek). Ha a ticket a recepció, a
+monitor, a `/demo` vagy a mock-motor viselkedését érinti, futtasd:
+
+```bash
+npm run test:e2e   # első alkalommal előtte: npx playwright install chromium
+```
+
+Mock-módban, API nélkül fut (`e2e/README.md`). Hibajavító ticketnél nézd meg,
+van-e rá `test.fixme` regressziós teszt (a tesztnévben a ticketkulcs, pl.
+`npm run test:e2e -- -g "TICKET-2"`): a javítás után a
+`fixme`-t cseréld `test`-re, és legyen zöld.
+
 Felületi változásnál indítsd el az appot (`run` skill, vagy `npm run dev:web`), és
 nézd meg a változást a valódi oldalon világos és sötét témában is.
 
