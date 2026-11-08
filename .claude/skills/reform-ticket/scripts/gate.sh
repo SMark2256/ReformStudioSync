@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # ReformStudioSync quality gate. Az első hibánál megáll.
 # Használat: bash .claude/skills/reform-ticket/scripts/gate.sh   (a repó gyökeréből)
+# A CI (.github/workflows/ci.yml, `gate` job) ugyanezeket a lépéseket futtatja külön
+# step-ekként: a kettőt együtt kell karbantartani.
 set -euo pipefail
 
 cd "$(git rev-parse --show-toplevel)"
