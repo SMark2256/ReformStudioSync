@@ -1,11 +1,13 @@
-import type { BrowserContext, Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
 import { deductTreatment, expect, expectMonitorIdle, loginToReception, scanBarcode, test } from './fixtures';
 
-/** Belépés a recepcióra, és ugyanebben a böngészőben a monitor megnyitása külön oldalon. */
-async function openReceptionWithMonitor(page: Page, context: BrowserContext) {
+/** Belépés a recepcióra, és a „Vendégmonitor” gombbal a monitor megnyitása külön ablakban. */
+async function openReceptionWithMonitor(page: Page) {
   await loginToReception(page);
-  const monitor = await context.newPage();
-  await monitor.goto('/monitor');
+  const popupPromise = page.waitForEvent('popup');
+  await page.getByRole('button', { name: 'Vendégmonitor' }).click();
+  const monitor = await popupPromise;
+  await expect(monitor).toHaveURL(/\/monitor$/);
   await expectMonitorIdle(monitor);
   await page.bringToFront();
   return monitor;
@@ -13,13 +15,7 @@ async function openReceptionWithMonitor(page: Page, context: BrowserContext) {
 
 test.describe('Vendégmonitor azonos böngészőben', () => {
   test('a „Vendégmonitor” gomb külön ablakban nyitja a jogosult monitort', async ({ page }) => {
-    await loginToReception(page);
-    const popupPromise = page.waitForEvent('popup');
-    await page.getByRole('button', { name: 'Vendégmonitor' }).click();
-    const monitor = await popupPromise;
-
-    await expect(monitor).toHaveURL(/\/monitor$/);
-    await expectMonitorIdle(monitor);
+    await openReceptionWithMonitor(page);
   });
 
   test('a /demo beágyazott monitor-előnézete üdvözli a beléptetett vendéget', async ({ page }) => {
@@ -37,8 +33,8 @@ test.describe('Regresszió: TICKET-2', () => {
   // monitorablakba, és a monitor jogosult („Helyi Broadcast Szinkron Aktív”), a kijelző mégsem vált.
   test.fixme(
     'TICKET-2: azonos gépen nyitott monitor mock-módban üdvözli a köredzésre belépő vendéget (<1 mp)',
-    async ({ page, context }) => {
-      const monitor = await openReceptionWithMonitor(page, context);
+    async ({ page }) => {
+      const monitor = await openReceptionWithMonitor(page);
       await scanBarcode(page, '100001');
 
       await expect(monitor.getByText('Jó edzést kívánunk!', { exact: true })).toBeVisible({ timeout: 1_000 });
@@ -48,8 +44,8 @@ test.describe('Regresszió: TICKET-2', () => {
 
   test.fixme(
     'TICKET-2: azonos gépen nyitott monitor kezeléslevonás után a hátralévő alkalmakat mutatja',
-    async ({ page, context }) => {
-      const monitor = await openReceptionWithMonitor(page, context);
+    async ({ page }) => {
+      const monitor = await openReceptionWithMonitor(page);
       await deductTreatment(page, '100001');
 
       await expect(monitor.getByText('Hátralévő alkalmak', { exact: true })).toBeVisible({ timeout: 1_000 });

@@ -20,6 +20,8 @@ npx playwright show-trace test-results/<teszt>/trace.zip   # hiba utáni trace
   (`shared/api/mock-engine.ts`) vált. A mock-állapot a `localStorage`-ben van
   (`reform-studio-mock-sandbox-v2`), ezért minden teszt friss böngészőkontextusban,
   a kiinduló demóadatokkal indul.
+- Az óra rögzített (`2026-03-10 12:00`, `e2e/fixtures.ts`): a mock-adatok a „most”-hoz
+  képest készülnek, így a mai kassza és napló értékei futásonként azonosak.
 - Biztonsági háló: az `e2e/fixtures.ts` minden `/api/...` kérést megszakít, így
   valódi API-címmel buildelt szerver mellett is a mock-motor fut.
 - Dev szerver helyett azért preview, mert a Vite dev futás közbeni

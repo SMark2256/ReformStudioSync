@@ -2,12 +2,15 @@ import type { Page } from '@playwright/test';
 import {
   expect,
   loginToReception,
+  quickSearchRow,
   scanBarcode,
   SELL_MODAL_TITLE,
   sellToIdentifiedGuest,
   test,
   toasts,
 } from './fixtures';
+
+const DAY_TICKET_ROW_TEXT = '1 Alkalmas Napijegy';
 
 /** A recepció „Mai Kassza Gyorsösszesítő” kártyája. */
 function cashSummary(page: Page) {
@@ -36,6 +39,7 @@ test.describe('Bérlet / napijegy eladása', () => {
 
     await expect(cashSummary(page)).toContainText('95 500 Ft');
     await expect(cashSummary(page)).toContainText('16 500 Ft');
+    await expect(quickSearchRow(page, '100003')).toContainText(DAY_TICKET_ROW_TEXT);
   });
 
   test('alkalmas bérlet eladása kártyával a kimerült bérletű vendégnek', async ({ page }) => {
@@ -72,6 +76,8 @@ test.describe('Regresszió: TICKET-4', () => {
       await page.getByRole('button', { name: 'Bérlet Eladása & Fizetés' }).click();
 
       await expect(toasts(page)).toContainText('Szabó Eszter');
+      await expect(quickSearchRow(page, '100003')).toContainText(DAY_TICKET_ROW_TEXT);
+      await expect(quickSearchRow(page, '100001')).not.toContainText(DAY_TICKET_ROW_TEXT);
     },
   );
 });
