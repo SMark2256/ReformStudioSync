@@ -14,6 +14,11 @@ export default tseslint.config(
       '**/build/**',
       '**/coverage/**',
       '**/.wrangler/**',
+      // Playwright E2E: a mock-módú build és a riportok.
+      '.e2e-dist/**',
+      'test-results/**',
+      'playwright-report/**',
+      'blob-report/**',
       'apps/api/prisma/migrations/**',
     ],
   },
@@ -27,7 +32,7 @@ export default tseslint.config(
           // A tsconfig-okon kívüli TS-fájlok (build- és tooling-configok, a Cloudflare Worker)
           // a `tsconfig.eslint.json`-nal kapnak típusinformációt.
           defaultProject: 'tsconfig.eslint.json',
-          allowDefaultProject: ['apps/*/*.config.ts', 'apps/web/worker/*.ts'],
+          allowDefaultProject: ['playwright.config.ts', 'apps/*/*.config.ts', 'apps/web/worker/*.ts'],
         },
         tsconfigRootDir: import.meta.dirname,
       },
@@ -60,12 +65,12 @@ export default tseslint.config(
     languageOptions: { globals: globals.node },
   },
 
-  // API (NestJS), a seed és a tooling-configok: Node környezet.
+  // API (NestJS), a seed, a tooling-configok és az E2E tesztek (Playwright): Node környezet.
   // A `@typescript-eslint/consistent-type-imports` szándékosan nincs bekapcsolva: a Nest DI az
   // `emitDecoratorMetadata`-ra épül, és a csak típusként importált provider-osztály futáskor
   // eltűnne a konstruktor-metaadatból (`undefined` injektálás).
   {
-    files: ['apps/api/**/*.ts', 'apps/web/*.config.ts'],
+    files: ['apps/api/**/*.ts', 'apps/web/*.config.ts', 'e2e/**/*.ts', 'playwright.config.ts'],
     languageOptions: { globals: globals.node },
   },
 
