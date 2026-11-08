@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 # ReformStudioSync quality gate. Az első hibánál megáll.
 # Használat: bash .claude/skills/reform-ticket/scripts/gate.sh   (a repó gyökeréből)
-# A CI (.github/workflows/ci.yml, `gate` job) ugyanezeket a lépéseket futtatja külön
-# step-ekként: a kettőt együtt kell karbantartani.
 set -euo pipefail
 
 cd "$(git rev-parse --show-toplevel)"
@@ -12,11 +10,19 @@ if [ ! -d node_modules ]; then
   npm ci --no-audit --no-fund
 fi
 
+# A CI is ezt a scriptet futtatja (.github/workflows/ci.yml). GitHub Actionsben a
+# lépések összecsukható log-csoportok, a hibás lépés neve pedig annotációként jelenik meg.
 step() {
   local name="$1"; shift
   echo
-  echo "▶ $name"
-  if ! "$@"; then
+  if [ -n "${GITHUB_ACTIONS:-}" ]; then echo "::group::$name"; else echo "▶ $name"; fi
+  local rc=0
+  "$@" || rc=$?
+  if [ -n "${GITHUB_ACTIONS:-}" ]; then
+    echo "::endgroup::"
+    if [ "$rc" -ne 0 ]; then echo "::error title=Gate hiba::$name"; fi
+  fi
+  if [ "$rc" -ne 0 ]; then
     echo
     echo "✘ GATE HIBA: $name"
     exit 1

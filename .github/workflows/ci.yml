@@ -1,8 +1,7 @@
 # CI (TICKET-12): minőségellenőrzés minden PR-on és pushon a demo / main ágra.
 #
-# A `gate` job lépései a `.claude/skills/reform-ticket/scripts/gate.sh` lépéseivel
-# egyeznek, de külön step-ekként, hogy a GitHub felületén látszódjon, melyik bukott el.
-# A kettőt EGYÜTT kell karbantartani: ha a gate.sh-ba új lépés kerül, ide is vedd fel.
+# A `gate` job ugyanazt a `gate.sh`-t futtatja, mint a helyi ellenőrzés, így a lépéslista
+# egy helyen él. A hibás lépés neve annotációként látszik a futás összefoglalóján.
 #
 # A job-nevek ("Gate (typecheck, lint, teszt, build)", "E2E (Playwright)") a branch
 # protection kötelező checkjei; átnevezésük után a branch protectiont is frissíteni kell.
@@ -12,11 +11,11 @@ on:
   pull_request:
     branches: [demo, main]
   push:
-    branches: [demo, main, TICKET-12] # IDEIGLENES: TICKET-12 ellenőrzéshez
+    branches: [demo, main, TICKET-12, TICKET-12-e2e-probe] # IDEIGLENES
   workflow_dispatch:
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -25,7 +24,6 @@ permissions:
 env:
   # Node 24: ugyanaz, mint a Cloudflare buildben. Az ESLint >=22.13-at kér, a helyi 22.9 nem elég.
   NODE_VERSION: '24'
-  CI: true
 
 jobs:
   gate:
@@ -43,78 +41,62 @@ jobs:
       - name: npm ci
         run: npm ci --no-audit --no-fund
 
-      - name: shared build
-        run: npm run build:shared
+      - name: Quality gate
+        run: bash .claude/skills/reform-ticket/scripts/gate.sh
 
-      - name: prisma generate
-        run: npm run db:generate
+  # Amíg nincs `test:e2e` szkript (TICKET-11 előtt), az E2E job kimarad. A kihagyott job
+  # sikeresnek számít, így kötelező checkként is beállítható, és a szkripttel magától bekapcsol.
+  e2e-detect:
+    name: E2E előfeltétel
+    runs-on: ubuntu-latest
+    outputs:
+      enabled: ${{ steps.detect.outputs.enabled }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: package.json
+          sparse-checkout-cone-mode: false
 
-      - name: typecheck (api)
-        run: npm --workspace=@reform/api run typecheck
-
-      - name: typecheck (web)
-        run: npm --workspace=@reform/web run typecheck
-
-      - name: api tesztek (vitest)
-        run: npm --workspace=@reform/api run test
-
-      - name: ESLint
-        run: npm run lint
-
-      - name: FSD lint (Steiger)
-        run: npm run lint:fsd
-
-      - name: web build
-        run: npm --workspace=@reform/web run build
+      - id: detect
+        run: |
+          if node -e "process.exit(require('./package.json').scripts?.['test:e2e'] ? 0 : 1)"; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::Nincs test:e2e szkript, az E2E job kimarad."
+          fi
 
   e2e:
     name: E2E (Playwright)
+    needs: e2e-detect
+    if: needs.e2e-detect.outputs.enabled == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
-      # Amíg nincs `test:e2e` szkript (TICKET-11 előtt), a job zölden átugorja a lépéseket,
-      # így kötelező checkként is beállítható; a szkript megjelenésével magától bekapcsol.
-      - name: Van E2E?
-        id: detect
-        run: |
-          if node -e "process.exit(require('./package.json').scripts?.['test:e2e'] ? 0 : 1)"; then
-            echo "enabled=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "enabled=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::Nincs test:e2e szkript, az E2E lépések kimaradnak."
-          fi
-
       - uses: actions/setup-node@v4
-        if: steps.detect.outputs.enabled == 'true'
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
 
       - name: npm ci
-        if: steps.detect.outputs.enabled == 'true'
         run: npm ci --no-audit --no-fund
 
       - name: shared build
-        if: steps.detect.outputs.enabled == 'true'
         run: npm run build:shared
 
-      # Az e2e/ tsconfig-ot a gate job workspace-typecheckjei nem fedik le.
+      # Az e2e/ tsconfig-ot a gate workspace-typecheckjei nem fedik le.
       - name: typecheck (e2e)
-        if: steps.detect.outputs.enabled == 'true' && hashFiles('e2e/tsconfig.json') != ''
         run: npx tsc -p e2e
 
       - name: Playwright Chromium telepítése
-        if: steps.detect.outputs.enabled == 'true'
         run: npx playwright install --with-deps chromium
 
       - name: E2E tesztek
-        if: steps.detect.outputs.enabled == 'true'
         run: npm run test:e2e
 
       - name: Playwright riport feltöltése
-        if: failure() && steps.detect.outputs.enabled == 'true'
+        if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report
