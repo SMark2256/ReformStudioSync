@@ -11,7 +11,7 @@ on:
   pull_request:
     branches: [demo, main]
   push:
-    branches: [demo, main, TICKET-12, TICKET-12-e2e-probe] # IDEIGLENES
+    branches: [demo, main]
   workflow_dispatch:
 
 concurrency:
