@@ -20,6 +20,19 @@ A **ReformStudioSync** egy dedikált fitnesz- és Reformer Pilates stúdiókezel
 4. **Interaktív Demo & Sandbox Oldal (`/demo`):**
    - Különálló, élő adatbázistól független tesztkörnyezet virtuális vonalkódolvasó szimulátorral, beágyazott élő Vendégmonitor előnézettel és minden funkció kipróbálásával.
 
+## E2E tesztek (Playwright, mock-módban)
+
+A fő recepciós folyamatokat böngészős tesztek fedik le. API és adatbázis nélkül
+futnak: a web a kliensoldali mock-motorra esik vissza.
+
+```bash
+npx playwright install chromium   # egyszer, a böngésző letöltése
+npm run test:e2e                  # build + vite preview + tesztek
+npm run test:e2e:ui               # interaktív Playwright UI
+```
+
+Részletek (mock-mód, belépés, hibakeresés, `test.fixme` regressziók): [`e2e/README.md`](e2e/README.md).
+
 ## Dokumentációk
 
 - [Technikai Architektúra (`docs/ARCHITECTURE.md`)](docs/ARCHITECTURE.md)

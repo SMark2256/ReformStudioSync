@@ -119,14 +119,31 @@ A projekt szabályai, amelyeket a kódnak követnie kell:
 bash .claude/skills/reform-ticket/scripts/gate.sh
 ```
 
-Sorban futtatja: shared build, Prisma generate, typecheck (web + api), api
-tesztek (vitest), `lint` (ESLint), `lint:fsd` (Steiger), web build. Az első
-hibánál megáll. Hibánál javítsd, és futtasd újra. Ne kapcsold ki a szabályt, és
-ne írd át a tesztet csak azért, hogy zöld legyen. Az ESLint warningjai nem
-állítják meg a gate-et.
+Sorban futtatja: shared build, Prisma generate, typecheck (web + api, és az
+`e2e/`, ha van), api tesztek (vitest), `lint` (ESLint), `lint:fsd` (Steiger), web
+build. Az első hibánál megáll. Hibánál javítsd, és futtasd újra. Ne kapcsold ki a
+szabályt, és ne írd át a tesztet csak azért, hogy zöld legyen. Az ESLint
+warningjai nem állítják meg a gate-et.
+
+A CI (`.github/workflows/ci.yml`) ugyanezt a scriptet futtatja minden `demo`/`main`
+felé nyitott PR-on és az ezekre érkező pushokon, mellette külön jobban az E2E
+teszteket. A branch protection után a PR csak zöld CI-jal merge-elhető. Új gate-lépést a `gate.sh`-ba vegyél
+fel, a workflow-t nem kell hozzá módosítani.
 
 Ha az api üzleti logikája változik (beléptetés, bérlet, pénzügy), írj vagy
 bővíts tesztet a meglévő `*.spec.ts` mintájára.
+
+**Opcionális: E2E tesztek** (nem része a gate-nek). Ha a ticket a recepció, a
+monitor, a `/demo` vagy a mock-motor viselkedését érinti, futtasd:
+
+```bash
+npm run test:e2e   # első alkalommal előtte: npx playwright install chromium
+```
+
+Mock-módban, API nélkül fut (`e2e/README.md`). Hibajavító ticketnél nézd meg,
+van-e rá `test.fixme` regressziós teszt (a tesztnévben a ticketkulcs, pl.
+`npm run test:e2e -- -g "TICKET-2"`): a javítás után a
+`fixme`-t cseréld `test`-re, és legyen zöld.
 
 Felületi változásnál indítsd el az appot (`run` skill, vagy `npm run dev:web`), és
 nézd meg a változást a valódi oldalon világos és sötét témában is.
@@ -146,7 +163,7 @@ fix: TICKET-12 dupla levonás javítása offline szinkronnál
 ## 6. PR a `demo` ágra (a felhasználó „mehet”-je után)
 
 Mutasd meg az összefoglalót (mi változott, gate eredménye), és kérdezd meg, mehet-e
-a PR. A részletek, például hogy mi a teendő, ha a `demo` ág még nem létezik:
+a PR. A PR megnyitása után várd meg, hogy a CI zöld legyen (`gh pr checks <PR>`). A részletek, például hogy mi a teendő, ha a `demo` ág még nem létezik:
 `references/demo-es-main-pr.md`.
 
 A PR után a Jira-ticket a következőket kapja:

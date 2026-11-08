@@ -9,6 +9,7 @@ A **ReformStudioSync** egy egystúdiós (de `studioId` szinten többstúdiós Sa
 - **`packages/shared` (`@reform/shared`):** Közös TypeScript szerződések, Enumok (`Role`, `PassType`, `PaymentMethod`, `CheckInStatus`), REST DTO interfészek és Socket.io esemény-definíciók (`SOCKET_EVENTS`, `CheckInResultPayload`, `CheckInRevokedPayload`).
 - **`apps/api` (`@reform/api`):** NestJS 10 REST API + Socket.io WebSocket Gateway (`/monitor` névtér) + Prisma ORM + Swagger/OpenAPI (`/api/docs`).
 - **`apps/web` (`@reform/web`):** React 18 + Vite + Tailwind CSS + TanStack Query v5 + Zustand + Sonner Toast értesítési réteg + Kliensoldali Mock Sandbox motor (`shared/api/mock-engine.ts`). A frontend a [Feature-Sliced Design](https://feature-sliced.design) módszertan szerint épül fel (lásd 1.2).
+- **`e2e/` + `playwright.config.ts`:** Playwright böngészős tesztek mock-módban: a web nem elérhető API-címmel buildelve (`.e2e-dist/`, `vite preview`) a mock motorra esik vissza, így API és adatbázis nélkül futnak (`npm run test:e2e`, részletek: `e2e/README.md`). A gate-nek nem része.
 
 ### 1.2. Frontend Rétegek (Feature-Sliced Design)
 

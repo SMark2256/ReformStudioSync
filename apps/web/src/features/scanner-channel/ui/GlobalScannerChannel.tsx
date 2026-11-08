@@ -17,6 +17,7 @@ import {
   useMonitorChannel,
 } from '@/shared/lib/monitor-channel';
 import { api } from '@/shared/api';
+import { handleAppError } from '@/shared/lib/errors';
 import { notify } from '@/shared/lib/notify';
 import { useOfflineQueueStore } from '@/entities/check-in';
 import { useScannerChannelStore } from '@/entities/check-in';
@@ -67,7 +68,7 @@ export const GlobalScannerChannel: React.FC = () => {
         invalidateCheckInQueries();
       } catch (err) {
         if (!isMonitorPage) {
-          notify.error('Sztornó hiba', (err as Error).message);
+          handleAppError(err, { title: 'Sztornó hiba' });
         }
       }
     },
@@ -144,10 +145,9 @@ export const GlobalScannerChannel: React.FC = () => {
         return result;
       } catch (err) {
         if (!isMonitorPage) {
-          notify.error(
-            `Ismeretlen vagy hibás QR/vonalkód (#${code})`,
-            (err as Error).message,
-          );
+          handleAppError(err, {
+            title: `Ismeretlen vagy hibás QR/vonalkód (#${code})`,
+          });
         }
         return null;
       } finally {

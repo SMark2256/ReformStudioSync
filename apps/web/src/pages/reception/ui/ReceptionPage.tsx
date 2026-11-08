@@ -57,6 +57,7 @@ import {
 } from '@/shared/lib/monitor-channel';
 import { api } from '@/shared/api';
 import { mockStudioEngine } from '@/shared/api';
+import { handleAppError } from '@/shared/lib/errors';
 import { notify } from '@/shared/lib/notify';
 import { soundFeedback } from '@/shared/lib/sound';
 import { useAuthStore } from '@/shared/auth';
@@ -353,7 +354,7 @@ export const ReceptionPage: React.FC = () => {
       );
       refreshAll();
     } catch (err) {
-      notify.error('Offline szinkronizáció sikertelen', (err as Error).message);
+      handleAppError(err, { title: 'Offline szinkronizáció sikertelen' });
     }
   }, [offlineQueue, clearQueue, refreshAll]);
 
@@ -480,7 +481,7 @@ export const ReceptionPage: React.FC = () => {
       refreshAll();
     },
     onError: (err) => {
-      notify.error('Nem sikerült kódot generálni', (err as Error).message);
+      handleAppError(err, { title: 'Nem sikerült kódot generálni' });
     },
   });
 
@@ -494,7 +495,7 @@ export const ReceptionPage: React.FC = () => {
       refreshAll();
     },
     onError: (err) => {
-      notify.error('Kód újragenerálása sikertelen', (err as Error).message);
+      handleAppError(err, { title: 'Kód újragenerálása sikertelen' });
     },
   });
 
@@ -511,7 +512,7 @@ export const ReceptionPage: React.FC = () => {
       refreshAll();
     },
     onError: (err) => {
-      notify.error('Átnevezés sikertelen', (err as Error).message);
+      handleAppError(err, { title: 'Átnevezés sikertelen' });
     },
   });
 
@@ -525,7 +526,7 @@ export const ReceptionPage: React.FC = () => {
       refreshAll();
     },
     onError: (err) => {
-      notify.error('Törlés sikertelen', (err as Error).message);
+      handleAppError(err, { title: 'Törlés sikertelen' });
     },
   });
 
@@ -536,7 +537,7 @@ export const ReceptionPage: React.FC = () => {
       refreshAll();
     },
     onError: (err) => {
-      notify.error('Teszt jel küldése sikertelen', (err as Error).message);
+      handleAppError(err, { title: 'Teszt jel küldése sikertelen' });
     },
   });
 

@@ -1,4 +1,5 @@
 import {
+  appError,
   CheckInResultPayload,
   CheckInRevokedPayload,
   DailyFinanceSummaryDto,
@@ -32,6 +33,7 @@ import {
   ServiceCategory,
   ServiceDto,
   TodayDashboardDto,
+  toAppError,
   VisitType,
 } from '@reform/shared';
 import { broadcastToLocalMonitors } from '@/shared/lib/monitor-channel';
@@ -40,6 +42,10 @@ import { mockStudioEngine } from './mock-engine';
 
 const API_BASE_URL =
   import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+
+function isNetworkError(err: unknown): err is TypeError {
+  return err instanceof TypeError && err.message.toLowerCase().includes('fetch');
+}
 
 async function request<T>(
   path: string,
@@ -59,21 +65,18 @@ async function request<T>(
     });
 
     if (!response.ok) {
-      const errBody = await response.json().catch(() => ({}));
-      const msg = Array.isArray(errBody.message)
-        ? errBody.message.join(', ')
-        : errBody.message || `Szerver hiba (${response.status})`;
-      throw new Error(msg);
+      const body: unknown = await response
+        .json()
+        .catch(() => ({ message: `Szerver hiba (${response.status})` }));
+      throw toAppError({ status: response.status, response: body });
     }
 
     return (await response.json()) as T;
   } catch (err) {
-    if (
-      fallbackFn &&
-      err instanceof TypeError &&
-      err.message.toLowerCase().includes('fetch')
-    ) {
-      return await fallbackFn();
+    // Elérhetetlen szerver: mock fallback (demó és offline mód), ha van.
+    if (isNetworkError(err)) {
+      if (fallbackFn) return await fallbackFn();
+      throw appError('COMMON.NETWORK', { cause: err });
     }
     throw err;
   }

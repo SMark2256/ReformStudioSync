@@ -1,4 +1,5 @@
 import {
+  appError,
   AuditLogDto,
   CheckInResultPayload,
   CheckInRevokedPayload,
@@ -1146,7 +1147,7 @@ class MockStudioEngine {
   getGuestById(id: string): GuestDto {
     const state = this.load();
     const guest = state.guests.find((g) => g.id === id);
-    if (!guest) throw new Error('A vendég nem található.');
+    if (!guest) throw appError('GUEST.NOT_FOUND');
     return guest;
   }
 
@@ -1174,9 +1175,9 @@ class MockStudioEngine {
 
     const collision = state.guests.find((g) => g.barcode === barcode);
     if (collision) {
-      throw new Error(
-        `A(z) "${barcode}" vonalkód már foglalt (${collision.lastName} ${collision.firstName}).`,
-      );
+      throw appError('GUEST.BARCODE_TAKEN', {
+        message: `A(z) "${barcode}" vonalkód már foglalt (${collision.lastName} ${collision.firstName}).`,
+      });
     }
 
     const now = new Date().toISOString();
@@ -1227,7 +1228,7 @@ class MockStudioEngine {
   ): GuestDto {
     const state = this.load();
     const idx = state.guests.findIndex((g) => g.id === id);
-    if (idx === -1) throw new Error('A vendég nem található.');
+    if (idx === -1) throw appError('GUEST.NOT_FOUND');
 
     const current = state.guests[idx];
     if (input.barcode && input.barcode.trim() !== current.barcode) {
@@ -1235,9 +1236,9 @@ class MockStudioEngine {
         (g) => g.barcode === input.barcode!.trim() && g.id !== id,
       );
       if (collision) {
-        throw new Error(
-          `A(z) "${input.barcode.trim()}" vonalkód már foglalt (${collision.lastName} ${collision.firstName}).`,
-        );
+        throw appError('GUEST.BARCODE_TAKEN', {
+          message: `A(z) "${input.barcode.trim()}" vonalkód már foglalt (${collision.lastName} ${collision.firstName}).`,
+        });
       }
     }
 
@@ -1316,7 +1317,7 @@ class MockStudioEngine {
   ): PassTemplateDto {
     const state = this.load();
     const idx = state.templates.findIndex((t) => t.id === id);
-    if (idx === -1) throw new Error('A bérletsablon nem található.');
+    if (idx === -1) throw appError('PASS.TEMPLATE_NOT_FOUND');
     state.templates[idx] = {
       ...state.templates[idx],
       ...input,
@@ -1334,10 +1335,18 @@ class MockStudioEngine {
   }) {
     const state = this.load();
     const guest = state.guests.find((g) => g.id === input.guestId);
-    if (!guest) throw new Error('A kiválasztott vendég nem található.');
+    if (!guest) {
+      throw appError('GUEST.NOT_FOUND', {
+        message: 'A kiválasztott vendég nem található.',
+      });
+    }
 
     const template = state.templates.find((t) => t.id === input.passTemplateId);
-    if (!template) throw new Error('A kiválasztott bérletsablon nem található.');
+    if (!template) {
+      throw appError('PASS.TEMPLATE_NOT_FOUND', {
+        message: 'A kiválasztott bérletsablon nem található.',
+      });
+    }
 
     const now = new Date();
     const exp = new Date(
@@ -1430,32 +1439,34 @@ class MockStudioEngine {
     const state = this.load();
     const now = new Date();
     const guest = state.guests.find((g) => g.id === input.guestId);
-    if (!guest) throw new Error('A vendég nem található.');
+    if (!guest) throw appError('GUEST.NOT_FOUND');
 
     const pass = (guest.passes ?? []).find((p) => p.id === input.passId);
-    if (!pass) throw new Error('A kiválasztott bérlet nem található.');
+    if (!pass) {
+      throw appError('PASS.NOT_FOUND', {
+        message: 'A kiválasztott bérlet nem található.',
+      });
+    }
 
     const service = state.services.find((s) => s.id === input.serviceId);
     const serviceName =
       service?.name ?? pass.serviceName ?? pass.passTemplateName ?? 'Kezelés';
 
     if (pass.isFrozen) {
-      throw new Error(
-        'Ez a bérlet jelenleg fagyasztva van, nem vonható le belőle alkalom.',
-      );
+      throw appError('PASS.FROZEN', {
+        message: 'Ez a bérlet jelenleg fagyasztva van, nem vonható le belőle alkalom.',
+      });
     }
 
     if (!pass.isActive || new Date(pass.expirationDate) < now) {
-      throw new Error('A kiválasztott bérlet lejárt vagy inaktív!');
+      throw appError('PASS.EXPIRED');
     }
 
     let newRemaining: number | 'Korlátlan' = 'Korlátlan';
     if (pass.type === PassType.OCCASION_BASED) {
       const currentRem = pass.remainingPasses ?? 0;
       if (currentRem <= 0) {
-        throw new Error(
-          'A bérleten elfogytak a felhasználható alkalmak (0 maradt)!',
-        );
+        throw appError('PASS.NO_REMAINING');
       }
       const nextRem = currentRem - 1;
       pass.remainingPasses = nextRem;
@@ -1582,7 +1593,9 @@ class MockStudioEngine {
         const usage = (pass.usageLogs ?? []).find((u) => u.id === usageId);
         if (usage) {
           if (usage.reversedAt) {
-            throw new Error('Ez a levonás már vissza lett vonva.');
+            throw appError('PASS.USAGE_ALREADY_REVERSED', {
+              message: 'Ez a levonás már vissza lett vonva.',
+            });
           }
           usage.reversedAt = now.toISOString();
           usage.reversalReason = reversalReason.trim();
@@ -1629,7 +1642,7 @@ class MockStudioEngine {
       }
     }
 
-    throw new Error('A kezelési levonás nem található.');
+    throw appError('PASS.USAGE_NOT_FOUND');
   }
 
   extendPass(passId: string, additionalDays: number, note: string): GuestPassDto {
@@ -1663,7 +1676,7 @@ class MockStudioEngine {
         return pass;
       }
     }
-    throw new Error('A bérlet nem található.');
+    throw appError('PASS.NOT_FOUND');
   }
 
   toggleFreezePass(passId: string, note?: string): GuestPassDto {
@@ -1718,7 +1731,7 @@ class MockStudioEngine {
         return pass;
       }
     }
-    throw new Error('A bérlet nem található.');
+    throw appError('PASS.NOT_FOUND');
   }
 
   /**
@@ -1739,9 +1752,9 @@ class MockStudioEngine {
     );
 
     if (!guest) {
-      throw new Error(
-        `Nem található aktív vendég a(z) "${barcode}" vonalkóddal.`,
-      );
+      throw appError('CHECKIN.GUEST_NOT_FOUND', {
+        message: `Nem található aktív vendég a(z) "${barcode}" vonalkóddal.`,
+      });
     }
 
     const guestFullName = `${guest.lastName} ${guest.firstName}`;
@@ -1979,9 +1992,11 @@ class MockStudioEngine {
   revokeCheckIn(checkInId: string): CheckInRevokedPayload {
     const state = this.load();
     const checkIn = state.checkIns.find((c) => c.id === checkInId);
-    if (!checkIn) throw new Error('A beléptetési naplóbejegyzés nem található.');
+    if (!checkIn) throw appError('CHECKIN.NOT_FOUND');
     if (checkIn.status !== CheckInStatus.SUCCESS) {
-      throw new Error('Csak sikeres beléptetés sztornózható.');
+      throw appError('CHECKIN.NOT_REVOCABLE', {
+        message: 'Csak sikeres beléptetés sztornózható.',
+      });
     }
 
     let restoredRemaining: number | 'Korlátlan' = 'Korlátlan';
@@ -2047,9 +2062,11 @@ class MockStudioEngine {
   recordPayment(input: RecordPaymentRequestDto): PaymentDto {
     const state = this.load();
     const guest = state.guests.find((g) => g.id === input.guestId);
-    if (!guest) throw new Error('A vendég nem található.');
+    if (!guest) throw appError('GUEST.NOT_FOUND');
     if (input.amountHuf <= 0)
-      throw new Error('Az összegnek pozitívnak kell lennie.');
+      throw appError('PAYMENT.AMOUNT_NOT_POSITIVE', {
+        message: 'Az összegnek pozitívnak kell lennie.',
+      });
 
     const now = new Date();
     let membershipPeriod: string | null = null;
@@ -2129,7 +2146,7 @@ class MockStudioEngine {
   }): MembershipDto {
     const state = this.load();
     const guest = state.guests.find((g) => g.id === input.guestId);
-    if (!guest) throw new Error('A vendég nem található.');
+    if (!guest) throw appError('GUEST.NOT_FOUND');
 
     const start = input.startDate ? new Date(input.startDate) : new Date();
     const dueDay = input.dueDay ?? 10;
@@ -2193,7 +2210,7 @@ class MockStudioEngine {
         return m;
       }
     }
-    throw new Error('A havi tagság nem található.');
+    throw appError('MEMBERSHIP.NOT_FOUND');
   }
 
   addMembershipDue(
@@ -2232,7 +2249,7 @@ class MockStudioEngine {
         return due;
       }
     }
-    throw new Error('A havi tagság nem található.');
+    throw appError('MEMBERSHIP.NOT_FOUND');
   }
 
   getOverdueMemberships(): OverdueReportDto {
@@ -2436,9 +2453,9 @@ class MockStudioEngine {
   cancelPayment(paymentId: string, reason?: string): PaymentDto {
     const state = this.load();
     const payment = state.payments.find((p) => p.id === paymentId);
-    if (!payment) throw new Error('A fizetési tétel nem található.');
+    if (!payment) throw appError('PAYMENT.NOT_FOUND');
     if (payment.isCancelled)
-      throw new Error('Ez a fizetési tétel már sztornózva lett.');
+      throw appError('PAYMENT.ALREADY_CANCELLED');
 
     payment.isCancelled = true;
     payment.note =
@@ -2505,7 +2522,7 @@ class MockStudioEngine {
   ): MeasurementDto {
     const state = this.load();
     const guest = state.guests.find((g) => g.id === guestId);
-    if (!guest) throw new Error('A vendég nem található.');
+    if (!guest) throw appError('GUEST.NOT_FOUND');
 
     const created: MeasurementDto = {
       id: `ms-${Date.now()}`,
@@ -2545,7 +2562,7 @@ class MockStudioEngine {
   ): GuestPhotoDto {
     const state = this.load();
     const guest = state.guests.find((g) => g.id === guestId);
-    if (!guest) throw new Error('A vendég nem található.');
+    if (!guest) throw appError('GUEST.NOT_FOUND');
 
     const srv = state.services.find((s) => s.id === input.serviceId);
     const created: GuestPhotoDto = {
@@ -2581,7 +2598,7 @@ class MockStudioEngine {
   ): GuestDocumentDto {
     const state = this.load();
     const guest = state.guests.find((g) => g.id === guestId);
-    if (!guest) throw new Error('A vendég nem található.');
+    if (!guest) throw appError('GUEST.NOT_FOUND');
 
     const isSigned = Boolean(input.signatureDataUrl);
     const created: GuestDocumentDto = {
@@ -2636,13 +2653,13 @@ class MockStudioEngine {
         return doc;
       }
     }
-    throw new Error('A dokumentum nem található.');
+    throw appError('GUEST.DOCUMENT_NOT_FOUND');
   }
 
   addInternalNote(guestId: string, content: string): GuestNoteDto {
     const state = this.load();
     const guest = state.guests.find((g) => g.id === guestId);
-    if (!guest) throw new Error('A vendég nem található.');
+    if (!guest) throw appError('GUEST.NOT_FOUND');
 
     const created: GuestNoteDto = {
       id: `note-${Date.now()}`,
@@ -2664,7 +2681,7 @@ class MockStudioEngine {
   ): MessageLogDto {
     const state = this.load();
     const guest = state.guests.find((g) => g.id === guestId);
-    if (!guest) throw new Error('A vendég nem található.');
+    if (!guest) throw appError('GUEST.NOT_FOUND');
 
     const created: MessageLogDto = {
       id: `msg-${Date.now()}`,
@@ -2718,7 +2735,7 @@ class MockStudioEngine {
   ): string {
     const trimmed = name.trim();
     if (!trimmed) {
-      throw new Error('Az eszköz nevének megadása kötelező.');
+      throw appError('AUTH.DEVICE_NAME_REQUIRED');
     }
     const collision = devices.find(
       (d) =>
@@ -2726,9 +2743,9 @@ class MockStudioEngine {
         d.name.trim().toLowerCase() === trimmed.toLowerCase(),
     );
     if (collision) {
-      throw new Error(
-        `Már létezik "${trimmed}" nevű kijelző! Ugyanolyan nevű monitort nem lehet kétszer létrehozni.`,
-      );
+      throw appError('AUTH.DEVICE_NAME_TAKEN', {
+        message: `Már létezik "${trimmed}" nevű kijelző! Ugyanolyan nevű monitort nem lehet kétszer létrehozni.`,
+      });
     }
     return trimmed;
   }
@@ -2765,15 +2782,13 @@ class MockStudioEngine {
       (d) => d.pairingCode === code && d.isActive,
     );
     if (!device) {
-      throw new Error('Érvénytelen vagy már felhasznált 6 jegyű párosító kód.');
+      throw appError('AUTH.DEVICE_PAIRING_CODE_INVALID');
     }
     if (
       device.pairingExpiresAt &&
       new Date(device.pairingExpiresAt).getTime() <= Date.now()
     ) {
-      throw new Error(
-        'A párosító kód lejárt (10 perc után érvénytelenné válik). Kérj új kódot a recepción!',
-      );
+      throw appError('AUTH.DEVICE_PAIRING_CODE_EXPIRED');
     }
 
     const nowIso = new Date().toISOString();
@@ -2796,7 +2811,7 @@ class MockStudioEngine {
     const state = this.load();
     const device = state.devices.find((d) => d.id === deviceId);
     if (!device) {
-      throw new Error('A keresett kijelző eszköz nem található.');
+      throw appError('AUTH.DEVICE_NOT_FOUND');
     }
 
     const now = new Date();
@@ -2829,7 +2844,7 @@ class MockStudioEngine {
     const state = this.load();
     const device = state.devices.find((d) => d.id === deviceId);
     if (!device) {
-      throw new Error('A keresett kijelző eszköz nem található.');
+      throw appError('AUTH.DEVICE_NOT_FOUND');
     }
     const cleanName = this.ensureUniqueDeviceName(
       state.devices,
@@ -2845,7 +2860,7 @@ class MockStudioEngine {
     const state = this.load();
     const idx = state.devices.findIndex((d) => d.id === deviceId);
     if (idx === -1) {
-      throw new Error('A keresett kijelző eszköz nem található.');
+      throw appError('AUTH.DEVICE_NOT_FOUND');
     }
     const [removed] = state.devices.splice(idx, 1);
     this.save(state);
@@ -2893,7 +2908,9 @@ class MockStudioEngine {
     if (deviceId) {
       const dev = state.devices.find((d) => d.id === deviceId);
       if (!dev) {
-        throw new Error('A megadott kijelző nem található.');
+        throw appError('AUTH.DEVICE_NOT_FOUND', {
+          message: 'A megadott kijelző nem található.',
+        });
       }
       targetName = dev.name;
       if (!dev.pairingCode) {

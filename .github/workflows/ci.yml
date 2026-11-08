@@ -1,0 +1,104 @@
+# CI (TICKET-12): minőségellenőrzés minden PR-on és pushon a demo / main ágra.
+#
+# A `gate` job ugyanazt a `gate.sh`-t futtatja, mint a helyi ellenőrzés, így a lépéslista
+# egy helyen él. A hibás lépés neve annotációként látszik a futás összefoglalóján.
+#
+# A job-nevek ("Gate (typecheck, lint, teszt, build)", "E2E (Playwright)") a branch
+# protection kötelező checkjei; átnevezésük után a branch protectiont is frissíteni kell.
+name: CI
+
+on:
+  pull_request:
+    branches: [demo, main]
+  push:
+    branches: [demo, main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  # PR-on az új push megszakítja a régi futást; a demo/main pushok mind lefutnak.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+env:
+  # Node 24: ugyanaz, mint a Cloudflare buildben. Az ESLint >=22.13-at kér, a helyi 22.9 nem elég.
+  NODE_VERSION: '24'
+
+jobs:
+  gate:
+    name: Gate (typecheck, lint, teszt, build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: npm ci
+        run: npm ci --no-audit --no-fund
+
+      - name: Quality gate
+        run: bash .claude/skills/reform-ticket/scripts/gate.sh
+
+  # Amíg nincs `test:e2e` szkript (TICKET-11 előtt), az E2E job kimarad. A kihagyott job
+  # sikeresnek számít, így kötelező checkként is beállítható, és a szkripttel magától bekapcsol.
+  e2e-detect:
+    name: E2E előfeltétel
+    runs-on: ubuntu-latest
+    outputs:
+      enabled: ${{ steps.detect.outputs.enabled }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: package.json
+          sparse-checkout-cone-mode: false
+
+      - id: detect
+        run: |
+          if node -e "process.exit(require('./package.json').scripts?.['test:e2e'] ? 0 : 1)"; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::Nincs test:e2e szkript, az E2E job kimarad."
+          fi
+
+  e2e:
+    name: E2E (Playwright)
+    needs: e2e-detect
+    if: needs.e2e-detect.outputs.enabled == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: npm ci
+        run: npm ci --no-audit --no-fund
+
+      - name: shared build
+        run: npm run build:shared
+
+      - name: Playwright Chromium telepítése
+        run: npx playwright install --with-deps chromium
+
+      - name: E2E tesztek
+        run: npm run test:e2e
+
+      - name: Playwright riport feltöltése
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 14
+          if-no-files-found: ignore

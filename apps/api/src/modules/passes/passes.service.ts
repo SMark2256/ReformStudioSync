@@ -1,11 +1,6 @@
+import { Injectable, Optional } from '@nestjs/common';
 import {
-  BadRequestException,
-  ConflictException,
-  Injectable,
-  NotFoundException,
-  Optional,
-} from '@nestjs/common';
-import {
+  appError,
   CheckInResultPayload,
   CheckInRevokedPayload,
   CheckInStatus,
@@ -122,9 +117,7 @@ export class PassesService {
     studioId = DEFAULT_STUDIO_ID,
   ): Promise<PassTemplateDto> {
     if (dto.type === PassType.OCCASION_BASED && !dto.totalPasses) {
-      throw new BadRequestException(
-        'Alkalom alapú bérletnél kötelező megadni az alkalmak számát.',
-      );
+      throw appError('PASS.TEMPLATE_TOTAL_REQUIRED');
     }
 
     const created = await this.prisma.passTemplate.create({
@@ -165,7 +158,7 @@ export class PassesService {
       where: { id, studioId },
     });
     if (!existing) {
-      throw new NotFoundException('A bérletsablon nem található.');
+      throw appError('PASS.TEMPLATE_NOT_FOUND');
     }
 
     const updated = await this.prisma.passTemplate.update({
@@ -206,7 +199,9 @@ export class PassesService {
         where: { id: dto.guestId, studioId },
       });
       if (!guest) {
-        throw new NotFoundException('A kiválasztott vendég nem található.');
+        throw appError('GUEST.NOT_FOUND', {
+          message: 'A kiválasztott vendég nem található.',
+        });
       }
 
       const template = await tx.passTemplate.findFirst({
@@ -214,9 +209,9 @@ export class PassesService {
         include: { service: true },
       });
       if (!template) {
-        throw new NotFoundException(
-          'A kiválasztott bérletsablon nem található vagy inaktív.',
-        );
+        throw appError('PASS.TEMPLATE_NOT_FOUND', {
+          message: 'A kiválasztott bérletsablon nem található vagy inaktív.',
+        });
       }
 
       const startDate = dto.startDate ? new Date(dto.startDate) : new Date();
@@ -342,7 +337,9 @@ export class PassesService {
         where: { id: dto.guestId, studioId },
       });
       if (!guest || !guest.isActive) {
-        throw new NotFoundException('A kiválasztott vendég nem található vagy inaktív.');
+        throw appError('GUEST.NOT_FOUND', {
+          message: 'A kiválasztott vendég nem található vagy inaktív.',
+        });
       }
 
       const pass = await tx.guestPass.findFirst({
@@ -350,7 +347,9 @@ export class PassesService {
         include: { passTemplate: true, usageLogs: true },
       });
       if (!pass) {
-        throw new NotFoundException('A kiválasztott bérlet nem található.');
+        throw appError('PASS.NOT_FOUND', {
+          message: 'A kiválasztott bérlet nem található.',
+        });
       }
 
       const service = await tx.service.findFirst({
@@ -359,15 +358,11 @@ export class PassesService {
       const serviceName = service?.name ?? pass.passTemplate.name;
 
       if (pass.isFrozen) {
-        throw new BadRequestException(
-          'Ez a bérlet jelenleg fagyasztva van (szünetel), nem vonható le belőle alkalom.',
-        );
+        throw appError('PASS.FROZEN');
       }
 
       if (!pass.isActive || pass.expirationDate < now) {
-        throw new BadRequestException(
-          'A kiválasztott bérlet lejárt vagy inaktív!',
-        );
+        throw appError('PASS.EXPIRED');
       }
 
       // Fennmaradó alkalmak ellenőrzése a nem visszavont felhasználásokból is
@@ -383,9 +378,7 @@ export class PassesService {
 
       if (pass.type === 'OCCASION_BASED') {
         if ((pass.remainingPasses ?? computedRemaining) <= 0) {
-          throw new BadRequestException(
-            'A bérleten elfogytak a felhasználható alkalmak (0 maradt)!',
-          );
+          throw appError('PASS.NO_REMAINING');
         }
 
         const atomicUpdate = await tx.guestPass.updateMany({
@@ -401,9 +394,7 @@ export class PassesService {
         });
 
         if (atomicUpdate.count !== 1) {
-          throw new ConflictException(
-            'Versenyhelyzet észlelve: a bérlet egyenlege időközben módosult, nem történt túlfogyasztás.',
-          );
+          throw appError('PASS.BALANCE_CHANGED');
         }
 
         const calcRem = (pass.remainingPasses ?? computedRemaining) - 1;
@@ -515,15 +506,15 @@ export class PassesService {
       });
 
       if (!usage || usage.guestPass.studioId !== studioId) {
-        throw new NotFoundException('A kezelési levonás nem található.');
+        throw appError('PASS.USAGE_NOT_FOUND');
       }
 
       if (usage.reversedAt) {
-        throw new BadRequestException('Ez a levonás már korábban vissza lett vonva.');
+        throw appError('PASS.USAGE_ALREADY_REVERSED');
       }
 
       if (usage.delta >= 0) {
-        throw new BadRequestException('Csak alkalomlevonási tétel vonható vissza.');
+        throw appError('PASS.USAGE_NOT_REVERSIBLE');
       }
 
       const now = new Date();
@@ -586,7 +577,7 @@ export class PassesService {
       });
 
       if (!pass) {
-        throw new NotFoundException('A bérlet nem található.');
+        throw appError('PASS.NOT_FOUND');
       }
 
       const baseDate =
@@ -634,7 +625,7 @@ export class PassesService {
       });
 
       if (!pass) {
-        throw new NotFoundException('A bérlet nem található.');
+        throw appError('PASS.NOT_FOUND');
       }
 
       const now = new Date();

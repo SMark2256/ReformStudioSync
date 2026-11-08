@@ -1,15 +1,12 @@
 import {
-  BadRequestException,
-  ConflictException,
   forwardRef,
   Inject,
   Injectable,
-  NotFoundException,
   Optional,
-  UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import {
+  appError,
   AuthUserDto,
   DEFAULT_STUDIO_ID,
   DisplayDeviceDto,
@@ -94,7 +91,7 @@ export class AuthService {
   ): Promise<void> {
     const trimmed = name.trim();
     if (!trimmed) {
-      throw new BadRequestException('Az eszköz nevének megadása kötelező.');
+      throw appError('AUTH.DEVICE_NAME_REQUIRED');
     }
 
     const devices = await this.prisma.displayDevice.findMany({
@@ -108,9 +105,9 @@ export class AuthService {
     );
 
     if (duplicate) {
-      throw new ConflictException(
-        `Már létezik "${trimmed}" nevű kijelző! Válassz másik nevet, vagy kezeld a meglévő eszközt a listában.`,
-      );
+      throw appError('AUTH.DEVICE_NAME_TAKEN', {
+        message: `Már létezik "${trimmed}" nevű kijelző! Válassz másik nevet, vagy kezeld a meglévő eszközt a listában.`,
+      });
     }
   }
 
@@ -120,12 +117,12 @@ export class AuthService {
     });
 
     if (!user || !user.isActive) {
-      throw new UnauthorizedException('Hibás e-mail cím vagy jelszó.');
+      throw appError('AUTH.INVALID_CREDENTIALS');
     }
 
     const valid = await bcrypt.compare(dto.password, user.passwordHash);
     if (!valid) {
-      throw new UnauthorizedException('Hibás e-mail cím vagy jelszó.');
+      throw appError('AUTH.INVALID_CREDENTIALS');
     }
 
     const authUser: AuthUserDto = {
@@ -173,9 +170,7 @@ export class AuthService {
     const email = dto.email.trim().toLowerCase();
     const existing = await this.prisma.user.findUnique({ where: { email } });
     if (existing) {
-      throw new ConflictException(
-        'Ezzel az e-mail címmel már létezik munkatárs.',
-      );
+      throw appError('AUTH.STAFF_EMAIL_TAKEN');
     }
 
     const passwordHash = await bcrypt.hash(dto.password, 10);
@@ -234,18 +229,14 @@ export class AuthService {
     });
 
     if (!device || !device.isActive) {
-      throw new BadRequestException(
-        'Érvénytelen vagy már felhasznált 6 jegyű párosító kód.',
-      );
+      throw appError('AUTH.DEVICE_PAIRING_CODE_INVALID');
     }
 
     if (
       device.pairingExpiresAt &&
       device.pairingExpiresAt.getTime() <= Date.now()
     ) {
-      throw new BadRequestException(
-        'A párosító kód lejárt (10 perc után érvénytelenné válik). Kérj új kódot a recepción!',
-      );
+      throw appError('AUTH.DEVICE_PAIRING_CODE_EXPIRED');
     }
 
     const now = new Date();
@@ -286,7 +277,7 @@ export class AuthService {
     });
 
     if (!existing) {
-      throw new NotFoundException('A keresett kijelző eszköz nem található.');
+      throw appError('AUTH.DEVICE_NOT_FOUND');
     }
 
     const pairingCode = String(randomInt(100000, 999999));
@@ -328,7 +319,7 @@ export class AuthService {
     });
 
     if (!existing) {
-      throw new NotFoundException('A keresett kijelző eszköz nem található.');
+      throw appError('AUTH.DEVICE_NOT_FOUND');
     }
 
     await this.ensureUniqueDeviceName(dto.name, studioId, deviceId);
@@ -352,7 +343,7 @@ export class AuthService {
     });
 
     if (!existing) {
-      throw new NotFoundException('A keresett kijelző eszköz nem található.');
+      throw appError('AUTH.DEVICE_NOT_FOUND');
     }
 
     await this.prisma.displayDevice.delete({
@@ -411,7 +402,9 @@ export class AuthService {
         where: { id: dto.deviceId, studioId },
       });
       if (!device) {
-        throw new NotFoundException('A megadott kijelző nem található.');
+        throw appError('AUTH.DEVICE_NOT_FOUND', {
+          message: 'A megadott kijelző nem található.',
+        });
       }
       targetDeviceName = device.name;
       if (!device.pairingCode) {
@@ -479,7 +472,7 @@ export class AuthService {
       });
 
       if (!device || !device.isActive || device.pairingCode !== null) {
-        throw new UnauthorizedException('Érvénytelen vagy nem párosított kijelző token.');
+        throw appError('AUTH.DEVICE_TOKEN_INVALID');
       }
 
       await this.prisma.displayDevice.update({
