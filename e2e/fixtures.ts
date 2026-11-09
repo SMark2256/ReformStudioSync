@@ -2,7 +2,7 @@ import { expect, test as base, type Page } from '@playwright/test';
 
 /**
  * Közös fixture: minden teszt friss böngészőkontextusban fut, így a mock-motor
- * (localStorage: `reform-studio-mock-sandbox-v2`) mindig a kiinduló demóadatokkal indul.
+ * (localStorage: `reform-studio-mock-sandbox-v3`) mindig a kiinduló demóadatokkal indul.
  *
  * Biztonsági háló: ha valódi API-címmel buildelt szerver fut (pl. `reuseExistingServer`),
  * az `/api/...` kéréseket megszakítjuk, így a kliens akkor is a mock-motorra esik vissza.

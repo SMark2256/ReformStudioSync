@@ -63,6 +63,21 @@ export const getJiraIssueUrl = (jiraKey: string): string =>
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    id: 'v0.3-monthly-dues-generation',
+    version: '0.3',
+    date: '2026-11-08',
+    kind: 'FIX',
+    title: 'Havi tagdíjak automatikus esedékessége',
+    summary:
+      'A havi tagdíjak minden hónapban automatikusan esedékessé válnak, így a tartozások és a késési kategóriák (1–5, 6–15, 15+ nap) pontosak.',
+    details: [
+      'A hónap tagdíja a hónap elejétől látszik a vendég adatlapján, és előre is befizethető.',
+      'Ha a tagság a havi esedékességi nap után indul, az első tagdíj a következő hónapban esedékes, így új tag nem indul tartozással.',
+      'Szüneteltetett vagy megszűnt tagságra nem keletkezik új tagdíj; újraaktiváláskor a következő esedékes hónaptól folytatódik.',
+    ],
+    jiraKey: 'TICKET-13',
+  },
+  {
     id: 'v0.3-monitor-privacy-filter',
     version: '0.3',
     date: '2026-11-08',

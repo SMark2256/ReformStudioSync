@@ -342,6 +342,8 @@ describe('PassesService & FinanceService — Kritikus Bérlet, Kezeléslevonás,
 
   it('5. Havi tagdíj késési kategóriák (1–5, 6–15, 15+ nap) és részbefizetés allokáció (recordPayment)', async () => {
     const now = Date.now();
+    // Az esedékesség-pótlás (ensureDuesUpTo) itt nem talál hiányzó hónapot
+    txMock.membership = { findMany: vi.fn().mockResolvedValue([]) };
     prismaMock.membership = {
       findMany: vi.fn().mockResolvedValue([
         {

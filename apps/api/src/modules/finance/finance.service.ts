@@ -1,9 +1,16 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import {
   appError,
   DailyFinanceSummaryDto,
   DEFAULT_STUDIO_ID,
   EXPIRING_SOON_THRESHOLD_DAYS,
+  getMembershipDueSchedule,
+  getMembershipStatusTimestamps,
+  getMissingDues,
+  getOverdueBucket,
+  getOverdueDays,
+  isDueRemovableOnStop,
   MembershipDto,
   MembershipDueDto,
   MembershipDueStatus,
@@ -14,16 +21,10 @@ import {
   PaymentDto,
   PaymentMethod,
   RecordPaymentRequestDto,
+  stopsBilling,
   TodayDashboardDto,
 } from '@reform/shared';
 import { PrismaService } from '../../prisma/prisma.service';
-
-export function calculateOverdueBucket(overdueDays: number): OverdueBucket {
-  if (overdueDays <= 0) return OverdueBucket.NONE;
-  if (overdueDays <= 5) return OverdueBucket.DAYS_1_5;
-  if (overdueDays <= 15) return OverdueBucket.DAYS_6_15;
-  return OverdueBucket.DAYS_OVER_15;
-}
 
 @Injectable()
 export class FinanceService {
@@ -370,9 +371,12 @@ export class FinanceService {
   ): Promise<MembershipDto> {
     const start = dto.startDate ? new Date(dto.startDate) : new Date();
     const dueDay = dto.dueDay ?? 10;
-    const period = start.toISOString().slice(0, 7);
-    const dueDate = new Date(start.getFullYear(), start.getMonth(), dueDay);
+    const schedule = getMembershipDueSchedule(
+      { startDate: start, dueDay, status: MembershipStatus.ACTIVE },
+      new Date(),
+    );
 
+    // Egyetlen nested create: a tagság és az esedékes hónapok atomikusan jönnek létre.
     const created = await this.prisma.membership.create({
       data: {
         studioId,
@@ -382,13 +386,13 @@ export class FinanceService {
         dueDay,
         status: 'ACTIVE',
         dues: {
-          create: {
+          create: schedule.map(({ period, dueDate }) => ({
             period,
             dueDate,
             amountHuf: dto.monthlyFeeHuf,
             paidAmountHuf: 0,
-            status: 'PENDING',
-          },
+            status: MembershipDueStatus.PENDING,
+          })),
         },
       },
       include: { dues: true, guest: true },
@@ -402,29 +406,125 @@ export class FinanceService {
     dto: { status: MembershipStatus; monthlyFeeHuf?: number; dueDay?: number },
     studioId = DEFAULT_STUDIO_ID,
   ): Promise<MembershipDto> {
-    const existing = await this.prisma.membership.findFirst({
-      where: { id: membershipId, studioId },
-    });
-    if (!existing) {
-      throw appError('MEMBERSHIP.NOT_FOUND');
-    }
-
     const now = new Date();
-    const updated = await this.prisma.membership.update({
-      where: { id: membershipId },
-      data: {
-        status: dto.status,
-        ...(dto.monthlyFeeHuf !== undefined
-          ? { monthlyFeeHuf: dto.monthlyFeeHuf }
-          : {}),
-        ...(dto.dueDay !== undefined ? { dueDay: dto.dueDay } : {}),
-        pausedAt: dto.status === MembershipStatus.PAUSED ? now : null,
-        terminatedAt: dto.status === MembershipStatus.TERMINATED ? now : null,
-      },
-      include: { dues: true, guest: true },
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const existing = await tx.membership.findFirst({
+        where: { id: membershipId, studioId },
+      });
+      if (!existing) {
+        throw appError('MEMBERSHIP.NOT_FOUND');
+      }
+
+      // A váltás előtti állapot szerint esedékes hónapok rögzítése, mert
+      // újraaktiválás után a számlázás már csak a `resumedAt`-tól folytatódik.
+      await this.fillMissingDues(tx, { id: existing.id }, now);
+
+      const previousStatus = existing.status as MembershipStatus;
+      await tx.membership.update({
+        where: { id: membershipId },
+        data: {
+          status: dto.status,
+          ...(dto.monthlyFeeHuf !== undefined
+            ? { monthlyFeeHuf: dto.monthlyFeeHuf }
+            : {}),
+          ...(dto.dueDay !== undefined ? { dueDay: dto.dueDay } : {}),
+          ...getMembershipStatusTimestamps(
+            { ...existing, status: previousStatus },
+            dto.status,
+            now,
+          ),
+        },
+      });
+
+      // Szünet / megszűnés: a hónap elején előre létrehozott, de a leállás
+      // napja után esedékes, érintetlen tagdíj törlése.
+      if (stopsBilling(previousStatus, dto.status)) {
+        const candidates = await tx.membershipDue.findMany({
+          where: { membershipId, allocations: { none: {} } },
+          select: { id: true, status: true, paidAmountHuf: true, dueDate: true },
+        });
+        const ids = candidates
+          .filter((d) => isDueRemovableOnStop(d, now))
+          .map((d) => d.id);
+        if (ids.length > 0) {
+          await tx.membershipDue.deleteMany({ where: { id: { in: ids } } });
+        }
+      }
+
+      return tx.membership.findUniqueOrThrow({
+        where: { id: membershipId },
+        include: { dues: true, guest: true },
+      });
     });
 
     return this.mapMembership(updated);
+  }
+
+  /**
+   * Hiányzó havi esedékességek idempotens pótlása a stúdió összes tagságára.
+   * Ismételt futásra sem duplikál (`@@unique([membershipId, period])`).
+   * @returns a létrehozott esedékességek száma
+   */
+  async ensureDuesUpTo(
+    now: Date = new Date(),
+    studioId = DEFAULT_STUDIO_ID,
+  ): Promise<number> {
+    return this.prisma.$transaction((tx) =>
+      this.fillMissingDues(tx, { studioId }, now),
+    );
+  }
+
+  /**
+   * Egy vendég tagságainak esedékesség-pótlása (pl. beléptetés előtt).
+   * Ha `tx` meg van adva, a hívó tranzakciójában fut.
+   * @returns a létrehozott esedékességek száma
+   */
+  async ensureDuesForGuest(
+    guestId: string,
+    now: Date = new Date(),
+    tx?: Prisma.TransactionClient,
+  ): Promise<number> {
+    if (tx) return this.fillMissingDues(tx, { guestId }, now);
+    return this.prisma.$transaction((t) =>
+      this.fillMissingDues(t, { guestId }, now),
+    );
+  }
+
+  private async fillMissingDues(
+    tx: Prisma.TransactionClient,
+    where: Prisma.MembershipWhereInput,
+    now: Date,
+  ): Promise<number> {
+    const memberships = await tx.membership.findMany({
+      where,
+      include: { dues: { select: { period: true } } },
+    });
+
+    const data: Prisma.MembershipDueCreateManyInput[] = [];
+    for (const m of memberships) {
+      const missing = getMissingDues(
+        { ...m, status: m.status as MembershipStatus },
+        m.dues.map((d) => d.period),
+        now,
+      );
+      for (const { period, dueDate } of missing) {
+        data.push({
+          membershipId: m.id,
+          period,
+          dueDate,
+          amountHuf: m.monthlyFeeHuf,
+          paidAmountHuf: 0,
+          status: MembershipDueStatus.PENDING,
+        });
+      }
+    }
+    if (data.length === 0) return 0;
+
+    const { count } = await tx.membershipDue.createMany({
+      data,
+      skipDuplicates: true,
+    });
+    return count;
   }
 
   async addMembershipDue(
@@ -462,6 +562,7 @@ export class FinanceService {
     studioId = DEFAULT_STUDIO_ID,
   ): Promise<OverdueReportDto> {
     const now = new Date();
+    await this.ensureDuesUpTo(now, studioId);
     const memberships = await this.prisma.membership.findMany({
       where: { studioId },
       include: {
@@ -488,12 +589,10 @@ export class FinanceService {
         const remainingHuf = Math.max(0, d.amountHuf - d.paidAmountHuf);
         if (remainingHuf <= 0) continue;
 
-        const diffDays = Math.ceil(
-          (now.getTime() - d.dueDate.getTime()) / (24 * 60 * 60 * 1000),
-        );
+        const diffDays = getOverdueDays(d.dueDate, now);
         if (diffDays <= 0) continue;
 
-        const bucket = calculateOverdueBucket(diffDays);
+        const bucket = getOverdueBucket(diffDays);
         const item: OverdueSummaryItemDto = {
           dueId: d.id,
           membershipId: m.id,
@@ -694,12 +793,7 @@ export class FinanceService {
   private mapMembershipDue(d: any, guestId: string): MembershipDueDto {
     const now = new Date();
     const remainingHuf = Math.max(0, d.amountHuf - d.paidAmountHuf);
-    const overdueDays =
-      remainingHuf > 0 && d.dueDate < now
-        ? Math.ceil(
-            (now.getTime() - d.dueDate.getTime()) / (24 * 60 * 60 * 1000),
-          )
-        : 0;
+    const overdueDays = remainingHuf > 0 ? getOverdueDays(d.dueDate, now) : 0;
     return {
       id: d.id,
       membershipId: d.membershipId,
@@ -711,7 +805,7 @@ export class FinanceService {
       remainingHuf,
       status: d.status as MembershipDueStatus,
       overdueDays,
-      overdueBucket: calculateOverdueBucket(overdueDays),
+      overdueBucket: getOverdueBucket(overdueDays),
       createdAt: d.createdAt.toISOString(),
     };
   }
@@ -729,6 +823,7 @@ export class FinanceService {
       status: m.status as MembershipStatus,
       pausedAt: m.pausedAt ? m.pausedAt.toISOString() : null,
       terminatedAt: m.terminatedAt ? m.terminatedAt.toISOString() : null,
+      resumedAt: m.resumedAt ? m.resumedAt.toISOString() : null,
       createdAt: m.createdAt.toISOString(),
       dues: (m.dues ?? []).map(
         // eslint-disable-next-line @typescript-eslint/no-explicit-any

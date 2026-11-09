@@ -15,12 +15,20 @@ import {
   DocumentType,
   DUPLICATE_SCAN_COOLDOWN_SECONDS,
   EXPIRING_SOON_THRESHOLD_DAYS,
+  formatPeriod,
+  getDueDate,
+  getMembershipStatusTimestamps,
+  getMissingDues,
+  getOverdueBucket,
+  getOverdueDays,
+  getStudioDate,
   GuestDocumentDto,
   GuestDto,
   GuestNoteDto,
   GuestPassDto,
   GuestPhotoDto,
   GuestStatus,
+  isDueRemovableOnStop,
   LoggedCheckInDto,
   MeasurementDto,
   MembershipDto,
@@ -46,13 +54,14 @@ import {
   Role,
   ServiceCategory,
   ServiceDto,
+  stopsBilling,
   TodayDashboardDto,
   VisitDto,
   VisitType,
 } from '@reform/shared';
 import { broadcastToLocalMonitors } from '@/shared/lib/monitor-channel';
 
-const STORAGE_KEY = 'reform-studio-mock-sandbox-v2';
+const STORAGE_KEY = 'reform-studio-mock-sandbox-v3';
 const MONITOR_CONFIG_KEY = 'reform-studio-monitor-greeting-seconds';
 
 export interface MockDatabaseState {
@@ -70,13 +79,6 @@ function addDays(base: Date, days: number): string {
   return new Date(base.getTime() + days * 24 * 60 * 60 * 1000).toISOString();
 }
 
-export function getOverdueBucketForDays(days: number): OverdueBucket {
-  if (days <= 0) return OverdueBucket.NONE;
-  if (days <= 5) return OverdueBucket.DAYS_1_5;
-  if (days <= 15) return OverdueBucket.DAYS_6_15;
-  return OverdueBucket.DAYS_OVER_15;
-}
-
 // Kisméretű SVG alapú optimalizált WebP/SVG előtte-utána mintaillusztráció
 function createSampleSvgDataUrl(label: string, colorHex: string): string {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="480" height="320" viewBox="0 0 480 320"><rect width="480" height="320" rx="20" fill="${colorHex}"/><circle cx="240" cy="125" r="46" fill="rgba(255,255,255,0.22)"/><rect x="170" y="185" width="140" height="65" rx="18" fill="rgba(255,255,255,0.22)"/><text x="240" y="285" font-family="sans-serif" font-size="16" font-weight="bold" fill="#ffffff" text-anchor="middle">${label}</text></svg>`;
@@ -86,7 +88,17 @@ function createSampleSvgDataUrl(label: string, colorHex: string): string {
 export function createInitialMockDatabase(): MockDatabaseState {
   const now = new Date();
   const todayMmDd = `${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-  const currentPeriod = now.toISOString().slice(0, 7);
+  // Tagsági demóadat: a kezdés napja az esedékesség napja, így a havi pótlás
+  // (getMembershipDueSchedule) nem gyárt hozzájuk korábbi, fiktív tartozást.
+  const seedBilling = (daysAgo: number) => {
+    const day = getStudioDate(addDays(now, -daysAgo));
+    const dueDate = getDueDate(day.year, day.month, day.day).toISOString();
+    return { dueDay: day.day, period: formatPeriod(day.year, day.month), dueDate };
+  };
+  const billing1 = seedBilling(5);
+  const billing2 = seedBilling(3);
+  const billing3 = seedBilling(9);
+  const billing4 = seedBilling(21);
 
   const services: ServiceDto[] = [
     {
@@ -245,8 +257,8 @@ export function createInitialMockDatabase(): MockDatabaseState {
           guestId: 'guest-1',
           guestName: 'Kovács Anna',
           monthlyFeeHuf: 22000,
-          startDate: addDays(now, -60),
-          dueDay: 10,
+          startDate: billing1.dueDate,
+          dueDay: billing1.dueDay,
           status: MembershipStatus.ACTIVE,
           pausedAt: null,
           terminatedAt: null,
@@ -257,8 +269,8 @@ export function createInitialMockDatabase(): MockDatabaseState {
               membershipId: 'mem-1',
               guestId: 'guest-1',
               guestName: 'Kovács Anna',
-              period: currentPeriod,
-              dueDate: addDays(now, -5),
+              period: billing1.period,
+              dueDate: billing1.dueDate,
               amountHuf: 22000,
               paidAmountHuf: 22000,
               remainingHuf: 0,
@@ -532,8 +544,8 @@ export function createInitialMockDatabase(): MockDatabaseState {
           guestId: 'guest-2',
           guestName: 'Nagy Péter',
           monthlyFeeHuf: 22000,
-          startDate: addDays(now, -35),
-          dueDay: 15,
+          startDate: billing2.dueDate,
+          dueDay: billing2.dueDay,
           status: MembershipStatus.ACTIVE,
           pausedAt: null,
           terminatedAt: null,
@@ -544,8 +556,8 @@ export function createInitialMockDatabase(): MockDatabaseState {
               membershipId: 'mem-2',
               guestId: 'guest-2',
               guestName: 'Nagy Péter',
-              period: currentPeriod,
-              dueDate: addDays(now, -3), // 3 napja lejárt -> 1–5 napos késési kategória
+              period: billing2.period,
+              dueDate: billing2.dueDate, // 3 napja lejárt -> 1–5 napos késési kategória
               amountHuf: 22000,
               paidAmountHuf: 0,
               remainingHuf: 22000,
@@ -626,8 +638,8 @@ export function createInitialMockDatabase(): MockDatabaseState {
           guestId: 'guest-3',
           guestName: 'Szabó Eszter',
           monthlyFeeHuf: 20000,
-          startDate: addDays(now, -60),
-          dueDay: 10,
+          startDate: billing3.dueDate,
+          dueDay: billing3.dueDay,
           status: MembershipStatus.ACTIVE,
           pausedAt: null,
           terminatedAt: null,
@@ -638,8 +650,8 @@ export function createInitialMockDatabase(): MockDatabaseState {
               membershipId: 'mem-3',
               guestId: 'guest-3',
               guestName: 'Szabó Eszter',
-              period: currentPeriod,
-              dueDate: addDays(now, -9), // 9 napja esedékes -> 6–15 napos kategória (részbefizetéssel)
+              period: billing3.period,
+              dueDate: billing3.dueDate, // 9 napja esedékes -> 6–15 napos kategória (részbefizetéssel)
               amountHuf: 20000,
               paidAmountHuf: 10000,
               remainingHuf: 10000,
@@ -702,8 +714,8 @@ export function createInitialMockDatabase(): MockDatabaseState {
           guestId: 'guest-4',
           guestName: 'Tóth Gábor',
           monthlyFeeHuf: 24000,
-          startDate: addDays(now, -70),
-          dueDay: 1,
+          startDate: billing4.dueDate,
+          dueDay: billing4.dueDay,
           status: MembershipStatus.ACTIVE,
           pausedAt: null,
           terminatedAt: null,
@@ -714,8 +726,8 @@ export function createInitialMockDatabase(): MockDatabaseState {
               membershipId: 'mem-4',
               guestId: 'guest-4',
               guestName: 'Tóth Gábor',
-              period: currentPeriod,
-              dueDate: addDays(now, -21), // 21 napja lejárt -> 15 nap feletti késés
+              period: billing4.period,
+              dueDate: billing4.dueDate, // 21 napja lejárt -> 15 nap feletti késés
               amountHuf: 24000,
               paidAmountHuf: 0,
               remainingHuf: 24000,
@@ -823,13 +835,29 @@ export function createInitialMockDatabase(): MockDatabaseState {
           guestId: 'guest-6',
           guestName: 'Horváth Dóra',
           monthlyFeeHuf: 22000,
-          startDate: addDays(now, -40),
-          dueDay: 10,
+          startDate: billing1.dueDate,
+          dueDay: billing1.dueDay,
           status: MembershipStatus.PAUSED,
           pausedAt: addDays(now, -4),
           terminatedAt: null,
           createdAt: addDays(now, -40),
-          dues: [],
+          dues: [
+            {
+              id: 'due-6',
+              membershipId: 'mem-6',
+              guestId: 'guest-6',
+              guestName: 'Horváth Dóra',
+              period: billing1.period,
+              dueDate: billing1.dueDate,
+              amountHuf: 22000,
+              paidAmountHuf: 22000,
+              remainingHuf: 0,
+              status: MembershipDueStatus.PAID,
+              overdueDays: 0,
+              overdueBucket: OverdueBucket.NONE,
+              createdAt: billing1.dueDate,
+            },
+          ],
         },
       ],
       passes: [
@@ -921,20 +949,20 @@ export function createInitialMockDatabase(): MockDatabaseState {
       guestPassId: null,
       passName: null,
       membershipDueId: 'due-3',
-      membershipPeriod: currentPeriod,
+      membershipPeriod: billing3.period,
       recordedByUserId: 'staff-default-1',
       recordedByName: 'Recepciós Munkatárs',
       amount: 10000,
       paymentMethod: PaymentMethod.CASH,
       isCancelled: false,
-      note: `Havi tagdíj részbefizetés (${currentPeriod})`,
+      note: `Havi tagdíj részbefizetés (${billing3.period})`,
       createdAt: new Date(now.getTime() - 90 * 60 * 1000).toISOString(),
       allocations: [
         {
           id: 'alloc-2',
           paymentId: 'pay-2',
           membershipDueId: 'due-3',
-          membershipPeriod: currentPeriod,
+          membershipPeriod: billing3.period,
           passId: null,
           amountHuf: 10000,
         },
@@ -1148,6 +1176,7 @@ class MockStudioEngine {
     const state = this.load();
     const guest = state.guests.find((g) => g.id === id);
     if (!guest) throw appError('GUEST.NOT_FOUND');
+    if (this.syncMembershipDues(guest, new Date())) this.save(state);
     return guest;
   }
 
@@ -2148,44 +2177,27 @@ class MockStudioEngine {
     const guest = state.guests.find((g) => g.id === input.guestId);
     if (!guest) throw appError('GUEST.NOT_FOUND');
 
-    const start = input.startDate ? new Date(input.startDate) : new Date();
-    const dueDay = input.dueDay ?? 10;
-    const period = start.toISOString().slice(0, 7);
-    const dueDate = new Date(start.getFullYear(), start.getMonth(), dueDay);
-    const memId = `mem-${Date.now()}`;
+    const now = new Date();
+    const start = input.startDate ? new Date(input.startDate) : now;
 
     const membership: MembershipDto = {
-      id: memId,
+      id: `mem-${Date.now()}`,
       studioId: DEFAULT_STUDIO_ID,
       guestId: guest.id,
       guestName: `${guest.lastName} ${guest.firstName}`,
       monthlyFeeHuf: input.monthlyFeeHuf,
       startDate: start.toISOString(),
-      dueDay,
+      dueDay: input.dueDay ?? 10,
       status: MembershipStatus.ACTIVE,
       pausedAt: null,
       terminatedAt: null,
-      createdAt: new Date().toISOString(),
-      dues: [
-        {
-          id: `due-${Date.now()}`,
-          membershipId: memId,
-          guestId: guest.id,
-          guestName: `${guest.lastName} ${guest.firstName}`,
-          period,
-          dueDate: dueDate.toISOString(),
-          amountHuf: input.monthlyFeeHuf,
-          paidAmountHuf: 0,
-          remainingHuf: input.monthlyFeeHuf,
-          status: MembershipDueStatus.PENDING,
-          overdueDays: 0,
-          overdueBucket: OverdueBucket.NONE,
-          createdAt: new Date().toISOString(),
-        },
-      ],
+      resumedAt: null,
+      createdAt: now.toISOString(),
+      dues: [],
     };
 
     guest.memberships = [membership, ...(guest.memberships ?? [])];
+    this.syncMembershipDues(guest, now);
     this.save(state);
     return membership;
   }
@@ -2195,22 +2207,85 @@ class MockStudioEngine {
     input: { status: MembershipStatus; monthlyFeeHuf?: number; dueDay?: number },
   ): MembershipDto {
     const state = this.load();
-    const now = new Date().toISOString();
+    const now = new Date();
     for (const g of state.guests) {
       const m = (g.memberships ?? []).find((x) => x.id === membershipId);
       if (m) {
+        // Mint az API-ban: előbb a váltás előtti állapot szerinti pótlás.
+        this.syncMembershipDues(g, now);
+
+        const billingStops = stopsBilling(m.status, input.status);
+        const stamps = getMembershipStatusTimestamps(m, input.status, now);
         m.status = input.status;
         if (input.monthlyFeeHuf !== undefined)
           m.monthlyFeeHuf = input.monthlyFeeHuf;
         if (input.dueDay !== undefined) m.dueDay = input.dueDay;
-        m.pausedAt = input.status === MembershipStatus.PAUSED ? now : null;
-        m.terminatedAt =
-          input.status === MembershipStatus.TERMINATED ? now : null;
+        m.pausedAt = stamps.pausedAt?.toISOString() ?? null;
+        m.terminatedAt = stamps.terminatedAt?.toISOString() ?? null;
+        if (stamps.resumedAt) m.resumedAt = stamps.resumedAt.toISOString();
+
+        if (billingStops) {
+          const allocatedDueIds = new Set(
+            state.payments.flatMap((p) => [
+              ...(p.membershipDueId ? [p.membershipDueId] : []),
+              ...(p.allocations ?? []).flatMap((a) =>
+                a.membershipDueId ? [a.membershipDueId] : [],
+              ),
+            ]),
+          );
+          m.dues = (m.dues ?? []).filter(
+            (d) => allocatedDueIds.has(d.id) || !isDueRemovableOnStop(d, now),
+          );
+        }
         this.save(state);
         return m;
       }
     }
     throw appError('MEMBERSHIP.NOT_FOUND');
+  }
+
+  /**
+   * Hiányzó havi esedékességek pótlása és a késés frissítése egy vendég
+   * tagságain (az API `ensureDuesForGuest` párja).
+   * @returns igaz, ha új esedékesség jött létre (mentés kell)
+   */
+  private syncMembershipDues(guest: GuestDto, now: Date): boolean {
+    const guestName = `${guest.lastName} ${guest.firstName}`;
+    let added = false;
+    for (const m of guest.memberships ?? []) {
+      const dues = m.dues ?? [];
+      const missing = getMissingDues(
+        m,
+        dues.map((d) => d.period),
+        now,
+      );
+      for (const { period, dueDate } of missing) {
+        added = true;
+        dues.push({
+          id: `due-${m.id}-${period}`,
+          membershipId: m.id,
+          guestId: guest.id,
+          guestName,
+          period,
+          dueDate: dueDate.toISOString(),
+          amountHuf: m.monthlyFeeHuf,
+          paidAmountHuf: 0,
+          remainingHuf: m.monthlyFeeHuf,
+          status: MembershipDueStatus.PENDING,
+          overdueDays: 0,
+          overdueBucket: OverdueBucket.NONE,
+          createdAt: now.toISOString(),
+        });
+      }
+      for (const d of dues) {
+        d.remainingHuf = Math.max(0, d.amountHuf - d.paidAmountHuf);
+        d.overdueDays =
+          d.remainingHuf > 0 ? getOverdueDays(d.dueDate, now) : 0;
+        d.overdueBucket = getOverdueBucket(d.overdueDays);
+      }
+      m.dues = dues.sort((a, b) => b.dueDate.localeCompare(a.dueDate));
+    }
+    return added;
   }
 
   addMembershipDue(
@@ -2223,12 +2298,7 @@ class MockStudioEngine {
       const m = (g.memberships ?? []).find((x) => x.id === membershipId);
       if (m) {
         const dueDateObj = new Date(input.dueDate);
-        const overdueDays =
-          dueDateObj < now
-            ? Math.ceil(
-                (now.getTime() - dueDateObj.getTime()) / (24 * 60 * 60 * 1000),
-              )
-            : 0;
+        const overdueDays = getOverdueDays(dueDateObj, now);
         const due: MembershipDueDto = {
           id: `due-${Date.now()}`,
           membershipId: m.id,
@@ -2241,7 +2311,7 @@ class MockStudioEngine {
           remainingHuf: input.amountHuf,
           status: MembershipDueStatus.PENDING,
           overdueDays,
-          overdueBucket: getOverdueBucketForDays(overdueDays),
+          overdueBucket: getOverdueBucket(overdueDays),
           createdAt: now.toISOString(),
         };
         m.dues = [due, ...(m.dues ?? [])];
@@ -2255,6 +2325,9 @@ class MockStudioEngine {
   getOverdueMemberships(): OverdueReportDto {
     const state = this.load();
     const now = new Date();
+    let added = false;
+    for (const g of state.guests) added = this.syncMembershipDues(g, now) || added;
+    if (added) this.save(state);
     const items: OverdueSummaryItemDto[] = [];
     const buckets: OverdueReportDto['buckets'] = {
       DAYS_1_5: [],
@@ -2275,13 +2348,10 @@ class MockStudioEngine {
           const remainingHuf = Math.max(0, d.amountHuf - d.paidAmountHuf);
           if (remainingHuf <= 0) continue;
 
-          const diffDays = Math.ceil(
-            (now.getTime() - new Date(d.dueDate).getTime()) /
-              (24 * 60 * 60 * 1000),
-          );
+          const diffDays = getOverdueDays(d.dueDate, now);
           if (diffDays <= 0) continue;
 
-          const bucket = getOverdueBucketForDays(diffDays);
+          const bucket = getOverdueBucket(diffDays);
           const item: OverdueSummaryItemDto = {
             dueId: d.id,
             membershipId: m.id,
@@ -2318,10 +2388,10 @@ class MockStudioEngine {
   }
 
   getTodayDashboard(): TodayDashboardDto {
+    const overdue = this.getOverdueMemberships();
     const state = this.load();
     const now = new Date();
     const todayMmDd = `${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-    const overdue = this.getOverdueMemberships();
     const finance = this.getDailyFinanceSummary();
 
     const expiringPasses: TodayDashboardDto['expiringPasses'] = [];

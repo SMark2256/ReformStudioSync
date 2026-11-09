@@ -120,6 +120,8 @@ export interface MembershipDto {
   status: MembershipStatus;
   pausedAt: string | null;
   terminatedAt: string | null;
+  /** Utolsó újraaktiválás ideje (szünet / megszűnés után); a tagdíj innen folytatódik. */
+  resumedAt?: string | null;
   createdAt: string;
   dues: MembershipDueDto[];
 }

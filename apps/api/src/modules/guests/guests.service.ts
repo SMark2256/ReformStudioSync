@@ -10,18 +10,20 @@ import {
   GuestPassDto,
   GuestPhotoDto,
   GuestStatus,
+  getOverdueBucket,
+  getOverdueDays,
   MeasurementDto,
   MembershipDueStatus,
   MembershipStatus,
   MessageLogDto,
   MessageStatus,
-  OverdueBucket,
   PassType,
   PaymentMethod,
   Role,
 } from '@reform/shared';
 import { randomInt } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
+import { FinanceService } from '../finance/finance.service';
 import {
   CreateGuestDocumentDto,
   CreateGuestDto,
@@ -33,16 +35,12 @@ import {
   UpdateGuestDto,
 } from './guests.dto';
 
-function computeOverdueBucket(days: number): OverdueBucket {
-  if (days <= 0) return OverdueBucket.NONE;
-  if (days <= 5) return OverdueBucket.DAYS_1_5;
-  if (days <= 15) return OverdueBucket.DAYS_6_15;
-  return OverdueBucket.DAYS_OVER_15;
-}
-
 @Injectable()
 export class GuestsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly finance: FinanceService,
+  ) {}
 
   private async generateUniqueBarcode(studioId: string): Promise<string> {
     for (let i = 0; i < 10; i++) {
@@ -137,6 +135,7 @@ export class GuestsService {
   }
 
   async findOne(id: string, studioId = DEFAULT_STUDIO_ID): Promise<GuestDto> {
+    await this.finance.ensureDuesForGuest(id);
     const guest = await this.prisma.guest.findFirst({
       where: { id, studioId },
       include: this.getFullGuestIncludes(),
@@ -601,18 +600,14 @@ export class GuestsService {
           status: m.status as MembershipStatus,
           pausedAt: m.pausedAt ? m.pausedAt.toISOString() : null,
           terminatedAt: m.terminatedAt ? m.terminatedAt.toISOString() : null,
+          resumedAt: m.resumedAt ? m.resumedAt.toISOString() : null,
           createdAt: m.createdAt.toISOString(),
           dues: (m.dues ?? []).map(
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             (d: any) => {
               const remainingHuf = Math.max(0, d.amountHuf - d.paidAmountHuf);
               const overdueDays =
-                remainingHuf > 0 && d.dueDate < now
-                  ? Math.ceil(
-                      (now.getTime() - d.dueDate.getTime()) /
-                        (24 * 60 * 60 * 1000),
-                    )
-                  : 0;
+                remainingHuf > 0 ? getOverdueDays(d.dueDate, now) : 0;
               return {
                 id: d.id,
                 membershipId: d.membershipId,
@@ -625,7 +620,7 @@ export class GuestsService {
                 remainingHuf,
                 status: d.status as MembershipDueStatus,
                 overdueDays,
-                overdueBucket: computeOverdueBucket(overdueDays),
+                overdueBucket: getOverdueBucket(overdueDays),
                 createdAt: d.createdAt.toISOString(),
               };
             },
