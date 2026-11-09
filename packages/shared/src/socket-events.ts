@@ -10,6 +10,10 @@ export const SOCKET_NAMESPACE = '/monitor';
 export const SOCKET_EVENTS = {
   CHECKIN_RESULT: 'checkin:result',
   CHECKIN_REVOKED: 'checkin:revoked',
+  /** Szűkített (`MonitorCheckInPayload`) esemény a Vendégmonitoroknak. */
+  MONITOR_CHECKIN_RESULT: 'monitor:checkin-result',
+  /** Szűkített (`MonitorCheckInRevokedPayload`) esemény a Vendégmonitoroknak. */
+  MONITOR_CHECKIN_REVOKED: 'monitor:checkin-revoked',
   MONITOR_STATE: 'monitor:state',
   MONITOR_PING: 'monitor:ping',
   MONITOR_CONFIG: 'monitor:config',
@@ -20,11 +24,10 @@ export const SOCKET_EVENTS = {
 } as const;
 
 /**
- * Vendégmonitorra és recepcióra küldött esemény.
- * ADATVÉDELMI SZABÁLY: A Vendégmonitoron (MonitorDisplayCard) kizárólag:
- * - Köredzésnél (mode === 'CIRCUIT_GREETING'): "Üdvözlünk, [Név]! Jó edzést kívánunk!" (nincs bérletszám, nincs tartozás)
- * - Alkalmas kezelésnél (mode === 'TREATMENT_GREETING'): "Üdvözlünk, [Név]! [Kezelés neve]. Hátralévő alkalmak: [X]. Kellemes kezelést kívánunk!"
- * jelenhet meg.
+ * Teljes beléptetési eredmény, CSAK a recepciónak (munkatársi socket-szoba,
+ * recepciós BroadcastChannel). Tartozást, vonalkódot és elutasítási okot is
+ * tartalmaz, ezért a Vendégmonitorra soha nem kerülhet: oda a `toMonitorPayload`
+ * szűkített változata megy (`MonitorCheckInPayload`).
  */
 export interface CheckInResultPayload {
   checkInId?: string;

@@ -63,6 +63,21 @@ export const getJiraIssueUrl = (jiraKey: string): string =>
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    id: 'v0.3-monitor-privacy-filter',
+    version: '0.3',
+    date: '2026-11-08',
+    kind: 'FIX',
+    title: 'Adatvédett vendégmonitor',
+    summary:
+      'A vendégmonitor soha nem mutat tartozást vagy elutasítási okot.',
+    details: [
+      'Elutasításnál a monitoron csak a „Kérjük, fáradj a recepcióhoz!” üzenet jelenik meg, név nélkül.',
+      'A tartozás, a vonalkód és az elutasítás oka már a szerverről sem jut el a kijelzőkhöz.',
+      'Ha a szerver nem érhető el, a rendszer hibaüzenetet ad, és nem dolgozik kitalált adatokkal (a /demo oldal továbbra is működik).',
+    ],
+    jiraKey: 'TICKET-17',
+  },
+  {
     id: 'v0.3-unified-error-messages',
     version: '0.3',
     date: '2026-11-08',

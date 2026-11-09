@@ -1,7 +1,6 @@
 import {
-  CheckInResultPayload,
-  CheckInRevokedPayload,
-  CheckInStatus,
+  MonitorCheckInPayload,
+  MonitorCheckInRevokedPayload,
 } from '@reform/shared';
 import {
   AlertTriangle,
@@ -14,8 +13,8 @@ import {
 import React, { useEffect, useState } from 'react';
 
 interface MonitorDisplayCardProps {
-  activeResult: CheckInResultPayload | null;
-  revokedBanner?: CheckInRevokedPayload | null;
+  activeResult: MonitorCheckInPayload | null;
+  revokedBanner?: MonitorCheckInRevokedPayload | null;
   compact?: boolean;
 }
 
@@ -44,13 +43,6 @@ export const MonitorDisplayCard: React.FC<MonitorDisplayCardProps> = ({
         <span className="rounded-full bg-white/20 px-4 py-1 text-xs font-bold uppercase tracking-widest">
           Rögzítés Visszavonva
         </span>
-        <h2
-          className={`mt-3 font-extrabold text-center ${
-            compact ? 'text-2xl' : 'text-5xl'
-          }`}
-        >
-          {revokedBanner.guestName}
-        </h2>
         <p
           className={`mt-2 text-amber-100 text-center ${
             compact ? 'text-sm' : 'text-2xl'
@@ -121,15 +113,12 @@ export const MonitorDisplayCard: React.FC<MonitorDisplayCardProps> = ({
     );
   }
 
-  const isSuccess = activeResult.status === CheckInStatus.SUCCESS;
-  const isDuplicate = activeResult.status === CheckInStatus.DUPLICATE_SCAN;
-  const isCircuit = activeResult.mode === 'CIRCUIT_GREETING';
-
-  // Filter warnings strictly for privacy: never show OVERDUE_DUES on guest monitor
-  const safeWarnings = (activeResult.warnings ?? []).filter(
-    (w) => w === 'LAST_OCCASION' || w === 'LOW_OCCASIONS' || w === 'EXPIRING_SOON',
-  );
-  const hasSafeWarnings = !isCircuit && safeWarnings.length > 0;
+  // A payload már szerveroldalon / a broadcast előtt szűkítve van (toMonitorPayload):
+  // elutasításnál nincs benne név, ok vagy tartozás.
+  const isSuccess = activeResult.status === 'SUCCESS';
+  const isDuplicate = activeResult.status === 'DUPLICATE';
+  const isTreatment = activeResult.mode === 'TREATMENT_GREETING';
+  const hasSafeWarnings = activeResult.warnings.length > 0;
 
   const bgClass = !isSuccess
     ? isDuplicate
@@ -149,9 +138,9 @@ export const MonitorDisplayCard: React.FC<MonitorDisplayCardProps> = ({
       <div className="flex w-full items-center justify-between">
         <span className="rounded-full bg-black/20 px-4 py-1 text-xs font-bold uppercase tracking-widest">
           {isSuccess
-            ? isCircuit
-              ? 'Női Köredzés • Érkezés'
-              : 'Kezelés • Üdvözlés'
+            ? isTreatment
+              ? 'Kezelés • Üdvözlés'
+              : 'Női Köredzés • Érkezés'
             : isDuplicate
               ? 'Érkezés Már Rögzítve'
               : 'Recepciós Egyeztetés'}
@@ -172,23 +161,27 @@ export const MonitorDisplayCard: React.FC<MonitorDisplayCardProps> = ({
           />
         )}
 
-        <p
-          className={`font-medium text-white/90 ${
-            compact ? 'text-sm' : 'text-2xl'
-          }`}
-        >
-          Üdvözlünk,
-        </p>
-        <h1
-          className={`mt-1 font-black tracking-tight ${
-            compact ? 'text-3xl' : 'text-6xl'
-          }`}
-        >
-          {activeResult.guestName}!
-        </h1>
+        {activeResult.displayName && (
+          <>
+            <p
+              className={`font-medium text-white/90 ${
+                compact ? 'text-sm' : 'text-2xl'
+              }`}
+            >
+              Üdvözlünk,
+            </p>
+            <h1
+              className={`mt-1 font-black tracking-tight ${
+                compact ? 'text-3xl' : 'text-6xl'
+              }`}
+            >
+              {activeResult.displayName}!
+            </h1>
+          </>
+        )}
 
         {isSuccess || isDuplicate ? (
-          isCircuit ? (
+          !isTreatment ? (
             /* 5.3 Köredzéses érkezés után: „Üdvözlünk, [Keresztnév]! Jó edzést kívánunk!” */
             <div
               className={`mt-6 rounded-2xl bg-black/25 backdrop-blur-md border border-white/20 ${
@@ -215,7 +208,7 @@ export const MonitorDisplayCard: React.FC<MonitorDisplayCardProps> = ({
                   compact ? 'text-lg' : 'text-3xl'
                 }`}
               >
-                {activeResult.serviceName ?? activeResult.passName ?? 'Kezelés'}
+                {activeResult.serviceName ?? 'Kezelés'}
               </span>
 
               <div className="my-1">
@@ -243,27 +236,24 @@ export const MonitorDisplayCard: React.FC<MonitorDisplayCardProps> = ({
             </div>
           )
         ) : (
-          /* Diszkrét elutasító üzenet pénzügyi részletek nélkül */
-          <div className="mt-5 rounded-2xl bg-black/30 px-6 py-4 border border-white/20 max-w-md">
+          /* Semleges elutasító üzenet: név, ok és pénzügyi részletek nélkül */
+          <div className="rounded-2xl bg-black/30 px-6 py-4 border border-white/20 max-w-md">
             <p
-              className={compact ? 'text-base font-bold' : 'text-2xl font-bold'}
+              className={compact ? 'text-xl font-bold' : 'text-4xl font-bold'}
             >
-              Kérjük, fordulj a recepciós munkatársunkhoz egyeztetésért!
+              Kérjük, fáradj a recepcióhoz!
             </p>
           </div>
         )}
 
         {hasSafeWarnings && (
           <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
-            {(safeWarnings.includes('LAST_OCCASION') ||
-              safeWarnings.includes('LOW_OCCASIONS')) && (
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-400 px-3.5 py-1 text-xs font-extrabold text-slate-950 shadow">
-                <AlertTriangle className="h-3.5 w-3.5" />
-                {activeResult.remainingPasses === 0
-                  ? 'Ez volt az utolsó alkalmad a bérleten!'
-                  : `Már csak ${activeResult.remainingPasses} alkalom maradt a bérleteden!`}
-              </span>
-            )}
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-400 px-3.5 py-1 text-xs font-extrabold text-slate-950 shadow">
+              <AlertTriangle className="h-3.5 w-3.5" />
+              {activeResult.remainingPasses === 0
+                ? 'Ez volt az utolsó alkalmad a bérleten!'
+                : `Már csak ${activeResult.remainingPasses} alkalom maradt a bérleteden!`}
+            </span>
           </div>
         )}
       </div>

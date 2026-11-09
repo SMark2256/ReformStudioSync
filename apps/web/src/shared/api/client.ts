@@ -38,6 +38,7 @@ import {
 } from '@reform/shared';
 import { broadcastToLocalMonitors } from '@/shared/lib/monitor-channel';
 import { useAuthStore } from '@/shared/auth';
+import { isDemoMode } from './demo-mode';
 import { mockStudioEngine } from './mock-engine';
 
 const API_BASE_URL =
@@ -73,9 +74,9 @@ async function request<T>(
 
     return (await response.json()) as T;
   } catch (err) {
-    // Elérhetetlen szerver: mock fallback (demó és offline mód), ha van.
+    // Elérhetetlen szerver: mock fallback csak demó módban; élesben hibaüzenet.
     if (isNetworkError(err)) {
-      if (fallbackFn) return await fallbackFn();
+      if (fallbackFn && isDemoMode()) return await fallbackFn();
       throw appError('COMMON.NETWORK', { cause: err });
     }
     throw err;
@@ -84,10 +85,25 @@ async function request<T>(
 
 export const api = {
   login(email: string, password: string): Promise<LoginResponseDto> {
-    return request('/auth/login', {
-      method: 'POST',
-      body: JSON.stringify({ email, password }),
-    });
+    const isAdmin = email.includes('admin');
+    return request(
+      '/auth/login',
+      {
+        method: 'POST',
+        body: JSON.stringify({ email, password }),
+      },
+      // Demó módban, API nélkül helyi munkamenet (a többi hívás a mock-motorra fut).
+      () => ({
+        accessToken: 'local-session-token',
+        user: {
+          id: 'staff-default-1',
+          studioId: 'default-studio',
+          email,
+          name: isAdmin ? 'ReformStudio Adminisztrátor' : 'Recepciós Munkatárs',
+          role: isAdmin ? Role.ADMIN : Role.RECEPTIONIST,
+        },
+      }),
+    );
   },
 
   getServices(includeInactive = false): Promise<ServiceDto[]> {

@@ -53,3 +53,36 @@ test.describe('Regresszió: TICKET-2', () => {
     },
   );
 });
+
+test.describe('Vendégmonitor adatszűrés: TICKET-17', () => {
+  test('TICKET-17: elutasításnál a /demo monitor név és ok nélkül a recepcióhoz küld', async ({ page }) => {
+    await page.goto('/demo');
+    // Horváth Dóra (#100006): szüneteltetett tagság, fagyasztott bérlet → elutasítás.
+    await page.getByRole('button', { name: /^Horváth Dóra #100006/ }).click();
+
+    await expect(page.getByText('Kérjük, fáradj a recepcióhoz!', { exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Horváth Dóra!' })).toHaveCount(0);
+  });
+
+  test('TICKET-17: a monitor BroadcastChannelre nem kerül tartozás, vonalkód, azonosító vagy ok', async ({ page }) => {
+    const monitor = await openReceptionWithMonitor(page);
+    await monitor.evaluate(() => {
+      const w = window as unknown as { __monitorMessages: unknown[] };
+      w.__monitorMessages = [];
+      new BroadcastChannel('reform_monitor_channel').onmessage = (e) => w.__monitorMessages.push(e.data);
+    });
+
+    await scanBarcode(page, '100005'); // Varga Judit: kimerült bérlet → elutasítás
+    await deductTreatment(page, '100001'); // Kovács Anna: kezelés-levonás
+
+    const messagesJson = () =>
+      monitor.evaluate(() => JSON.stringify((window as unknown as { __monitorMessages: unknown[] }).__monitorMessages));
+    await expect.poll(messagesJson).toContain('"status":"DENIED"');
+    await expect.poll(messagesJson).toContain('"mode":"TREATMENT_GREETING"');
+
+    const json = await messagesJson();
+    for (const needle of ['overdue', 'barcode', 'guestId', 'checkInId', 'usageId', 'reason', 'OVERDUE_DUES', '100005', 'Varga Judit']) {
+      expect(json, `"${needle}" nem juthat el a monitorra`).not.toContain(needle);
+    }
+  });
+});

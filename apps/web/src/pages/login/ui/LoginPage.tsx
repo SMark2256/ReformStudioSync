@@ -1,10 +1,10 @@
-import { Role } from '@reform/shared';
 import { Lock, Sparkles, PlayCircle } from 'lucide-react';
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ThemeToggleButton } from '@/features/toggle-theme';
 import { VersionBadge } from '@/widgets/version-changelog';
 import { api } from '@/shared/api';
+import { handleAppError } from '@/shared/lib/errors';
 import { notify } from '@/shared/lib/notify';
 import { useAuthStore } from '@/shared/auth';
 import { useThemeStore } from '@/shared/theme';
@@ -28,23 +28,8 @@ export const LoginPage: React.FC = () => {
         'Sikeres bejelentkezés a recepciós rendszerbe.',
       );
       navigate('/reception');
-    } catch {
-      // Ha nincs elindítva a helyi PostgreSQL adatbázis, demó munkamenettel beléptetünk
-      setAuth('local-session-token', {
-        id: 'staff-default-1',
-        studioId: 'default-studio',
-        email,
-        name:
-          email.includes('admin')
-            ? 'ReformStudio Adminisztrátor'
-            : 'Recepciós Munkatárs',
-        role: email.includes('admin') ? Role.ADMIN : Role.RECEPTIONIST,
-      });
-      notify.info(
-        'Bejelentkezve helyi / offline munkamenettel',
-        'A recepciós felület minden funkciója használható.',
-      );
-      navigate('/reception');
+    } catch (err) {
+      handleAppError(err, { title: 'Sikertelen bejelentkezés' });
     } finally {
       setLoading(false);
     }

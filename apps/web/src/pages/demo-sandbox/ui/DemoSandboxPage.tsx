@@ -4,8 +4,12 @@ import {
   CheckInStatus,
   DUPLICATE_SCAN_COOLDOWN_SECONDS,
   GuestDto,
+  MonitorCheckInPayload,
+  MonitorCheckInRevokedPayload,
   PassType,
   PaymentMethod,
+  toMonitorPayload,
+  toMonitorRevokedPayload,
   VisitType,
 } from '@reform/shared';
 import {
@@ -57,9 +61,9 @@ export const DemoSandboxPage: React.FC = () => {
   const forceRender = useCallback(() => setTick((t) => t + 1), []);
 
   const [monitorResult, setMonitorResult] =
-    useState<CheckInResultPayload | null>(null);
+    useState<MonitorCheckInPayload | null>(null);
   const [revokedBanner, setRevokedBanner] =
-    useState<CheckInRevokedPayload | null>(null);
+    useState<MonitorCheckInRevokedPayload | null>(null);
   const monitorTimerRef = useRef<number | null>(null);
 
   const [sellModalState, setSellModalState] = useState<{
@@ -117,7 +121,7 @@ export const DemoSandboxPage: React.FC = () => {
   const showOnEmbeddedMonitor = useCallback((payload: CheckInResultPayload) => {
     if (monitorTimerRef.current) window.clearTimeout(monitorTimerRef.current);
     setRevokedBanner(null);
-    setMonitorResult(payload);
+    setMonitorResult(toMonitorPayload(payload));
     const seconds =
       payload.greetingSeconds ?? mockStudioEngine.getMonitorGreetingSeconds();
     monitorTimerRef.current = window.setTimeout(() => {
@@ -129,7 +133,7 @@ export const DemoSandboxPage: React.FC = () => {
     (payload: CheckInRevokedPayload) => {
       if (monitorTimerRef.current) window.clearTimeout(monitorTimerRef.current);
       setMonitorResult(null);
-      setRevokedBanner(payload);
+      setRevokedBanner(toMonitorRevokedPayload(payload));
       monitorTimerRef.current = window.setTimeout(() => {
         setRevokedBanner(null);
       }, 6000);

@@ -1,6 +1,6 @@
 import {
-  CheckInResultPayload,
-  CheckInRevokedPayload,
+  MonitorCheckInPayload,
+  MonitorCheckInRevokedPayload,
   MonitorDeviceRevokedPayload,
   MonitorTestPingPayload,
 } from '@reform/shared';
@@ -47,11 +47,10 @@ export const MonitorPage: React.FC = () => {
   const isDevicePaired = Boolean(deviceToken);
   const isAuthorized = isStaffAuthenticated || isDevicePaired;
 
-  const [activeResult, setActiveResult] = useState<CheckInResultPayload | null>(
-    null,
-  );
+  const [activeResult, setActiveResult] =
+    useState<MonitorCheckInPayload | null>(null);
   const [revokedBanner, setRevokedBanner] =
-    useState<CheckInRevokedPayload | null>(null);
+    useState<MonitorCheckInRevokedPayload | null>(null);
   const [testPingBanner, setTestPingBanner] =
     useState<MonitorTestPingPayload | null>(null);
 
@@ -73,7 +72,7 @@ export const MonitorPage: React.FC = () => {
     }
   }, []);
 
-  const handleCheckInResult = useCallback((payload: CheckInResultPayload) => {
+  const handleCheckInResult = useCallback((payload: MonitorCheckInPayload) => {
     if (resetTimerRef.current) window.clearTimeout(resetTimerRef.current);
     setRevokedBanner(null);
     setTestPingBanner(null);
@@ -81,7 +80,7 @@ export const MonitorPage: React.FC = () => {
 
     if (payload.status === 'SUCCESS') {
       soundFeedback.playSuccess();
-    } else if (payload.status === 'DUPLICATE_SCAN') {
+    } else if (payload.status === 'DUPLICATE') {
       soundFeedback.playWarning();
     } else {
       soundFeedback.playError();
@@ -95,17 +94,20 @@ export const MonitorPage: React.FC = () => {
     }, durationSeconds * 1000);
   }, []);
 
-  const handleCheckInRevoked = useCallback((payload: CheckInRevokedPayload) => {
-    if (resetTimerRef.current) window.clearTimeout(resetTimerRef.current);
-    setActiveResult(null);
-    setTestPingBanner(null);
-    setRevokedBanner(payload);
-    soundFeedback.playWarning();
+  const handleCheckInRevoked = useCallback(
+    (payload: MonitorCheckInRevokedPayload) => {
+      if (resetTimerRef.current) window.clearTimeout(resetTimerRef.current);
+      setActiveResult(null);
+      setTestPingBanner(null);
+      setRevokedBanner(payload);
+      soundFeedback.playWarning();
 
-    resetTimerRef.current = window.setTimeout(() => {
-      setRevokedBanner(null);
-    }, 6000);
-  }, []);
+      resetTimerRef.current = window.setTimeout(() => {
+        setRevokedBanner(null);
+      }, 6000);
+    },
+    [],
+  );
 
   const handleTestPing = useCallback((payload: MonitorTestPingPayload) => {
     if (resetTimerRef.current) window.clearTimeout(resetTimerRef.current);
@@ -156,12 +158,13 @@ export const MonitorPage: React.FC = () => {
   }, []);
 
   const { isConnected, wakeLockActive } = useMonitorChannel({
-    onCheckInResult: handleCheckInResult,
-    onCheckInRevoked: handleCheckInRevoked,
+    onMonitorCheckIn: handleCheckInResult,
+    onMonitorCheckInRevoked: handleCheckInRevoked,
     onTestPing: handleTestPing,
     onDeviceRevoked: handleDeviceRevoked,
     enableWakeLock: isAuthorized,
     enabled: isAuthorized,
+    displayOnly: true,
   });
 
   const handlePairSubmit = async (e: React.FormEvent) => {

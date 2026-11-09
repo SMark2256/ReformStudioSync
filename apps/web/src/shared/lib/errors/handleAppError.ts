@@ -4,10 +4,17 @@ import { useAuthStore } from '@/shared/auth';
 import { notify } from '../notify';
 
 const DEFAULT_TITLE = 'Hiba történt a művelet végrehajtása közben';
+const NETWORK_ERROR_TOAST_ID = 'common-network-error';
+// Leállás alatt a lekérdezések újra és újra elhasalnak: a hibaüzenet és a hang
+// legfeljebb ennyi időnként ismétlődjön.
+const NETWORK_ERROR_THROTTLE_MS = 30_000;
+let lastNetworkErrorAt = 0;
 
-// A bejelentkezés és a Vendégmonitor (kioszk, eszköztokennel fut) oldaláról
-// nem irányítunk át a bejelentkezésre.
-const NO_LOGIN_REDIRECT_PATHS = ['/login', '/monitor'];
+/** Vendégmonitor (kioszk, eszköztokennel fut): nincs átirányítás, nincs hálózati toast. */
+const MONITOR_PATH = '/monitor';
+
+// A bejelentkezés és a Vendégmonitor oldaláról nem irányítunk át a bejelentkezésre.
+const NO_LOGIN_REDIRECT_PATHS = ['/login', MONITOR_PATH];
 
 let queryClient: QueryClient | null = null;
 
@@ -57,11 +64,27 @@ export function handleAppError(
 }
 
 /**
- * Lekérdezési (useQuery) hibák: ezeknél eddig sem jelent meg toast, ezért csak
- * a lejárt munkamenetre reagálunk átirányítással.
+ * Lekérdezési (useQuery) hibák: a lejárt munkamenetre átirányítással reagálunk.
+ * Elérhetetlen szervernél egyetlen (nem halmozódó) hibaüzenet jelenik meg, hogy
+ * élesben egyértelmű legyen: az adatok nem frissek. A Vendégmonitoron nem.
  */
 export function handleQueryError(error: unknown): void {
-  if (isSessionError(error)) redirectToLogin();
+  if (isSessionError(error)) {
+    redirectToLogin();
+    return;
+  }
+  const appErr = toAppError(error);
+  if (
+    appErr.code !== 'COMMON.NETWORK' ||
+    window.location.pathname === MONITOR_PATH ||
+    Date.now() - lastNetworkErrorAt < NETWORK_ERROR_THROTTLE_MS
+  ) {
+    return;
+  }
+  lastNetworkErrorAt = Date.now();
+  notify.error('A szerver nem érhető el', appErr.message, {
+    id: NETWORK_ERROR_TOAST_ID,
+  });
 }
 
 /** Lejárt munkamenet / inaktív fiók: ezt nincs értelme újrapróbálni. */

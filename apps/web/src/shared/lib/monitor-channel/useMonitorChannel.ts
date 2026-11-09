@@ -2,6 +2,8 @@ import {
   CheckInResultPayload,
   CheckInRevokedPayload,
   MONITOR_BROADCAST_CHANNEL,
+  MonitorCheckInPayload,
+  MonitorCheckInRevokedPayload,
   MonitorDeviceRevokedPayload,
   MonitorStatePayload,
   MonitorTestPingPayload,
@@ -9,11 +11,14 @@ import {
   ScannerEventPayload,
   SOCKET_EVENTS,
   SOCKET_NAMESPACE,
+  toMonitorPayload,
+  toMonitorRevokedPayload,
 } from '@reform/shared';
 import { useCallback, useEffect, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useAuthStore } from '@/shared/auth';
 
+/** Recepciós ablakok közötti üzenet (SCANNER_BROADCAST_CHANNEL), teljes adattal. */
 export type MonitorBroadcastMessage =
   | { type: 'CHECKIN_RESULT'; payload: CheckInResultPayload }
   | { type: 'CHECKIN_REVOKED'; payload: CheckInRevokedPayload }
@@ -21,11 +26,43 @@ export type MonitorBroadcastMessage =
   | { type: 'TEST_PING'; payload: MonitorTestPingPayload }
   | { type: 'DEVICE_REVOKED'; payload: MonitorDeviceRevokedPayload };
 
+/** A Vendégmonitor csatornán (MONITOR_BROADCAST_CHANNEL) csak szűkített adat utazik. */
+type LocalMonitorMessage =
+  | { type: 'CHECKIN_RESULT'; payload: MonitorCheckInPayload }
+  | { type: 'CHECKIN_REVOKED'; payload: MonitorCheckInRevokedPayload }
+  | Extract<MonitorBroadcastMessage, { type: 'TEST_PING' | 'DEVICE_REVOKED' }>;
+
+function toLocalMonitorMessage(
+  message: MonitorBroadcastMessage,
+): LocalMonitorMessage | null {
+  switch (message.type) {
+    case 'CHECKIN_RESULT':
+      return { type: message.type, payload: toMonitorPayload(message.payload) };
+    case 'CHECKIN_REVOKED':
+      return {
+        type: message.type,
+        payload: toMonitorRevokedPayload(message.payload),
+      };
+    case 'SCAN_TRIGGERED':
+      // A vonalkód nem kerülhet a monitorra.
+      return null;
+    default:
+      return message;
+  }
+}
+
+/**
+ * Az azonos böngészőben nyitott Vendégmonitor ablakok értesítése. A beléptetési
+ * eredményt itt szűkítjük (`toMonitorPayload`), így tartozás, vonalkód,
+ * azonosító vagy elutasítási ok nem kerülhet a monitor csatornára.
+ */
 export function broadcastToLocalMonitors(message: MonitorBroadcastMessage) {
   if (typeof window === 'undefined' || !('BroadcastChannel' in window)) return;
+  const monitorMessage = toLocalMonitorMessage(message);
+  if (!monitorMessage) return;
   try {
     const channel = new BroadcastChannel(MONITOR_BROADCAST_CHANNEL);
-    channel.postMessage(message);
+    channel.postMessage(monitorMessage);
     channel.close();
   } catch {
     // BroadcastChannel not supported
@@ -44,12 +81,23 @@ export function broadcastToScannerChannel(message: MonitorBroadcastMessage) {
 }
 
 interface UseMonitorChannelOptions {
+  /** Teljes eredmény a munkatársi socket-szobából (csak recepciós felülethez). */
   onCheckInResult?: (payload: CheckInResultPayload) => void;
+  /** Teljes sztornó a munkatársi socket-szobából (csak recepciós felülethez). */
   onCheckInRevoked?: (payload: CheckInRevokedPayload) => void;
+  /** Szűkített eredmény a Vendégmonitornak (socket + helyi BroadcastChannel). */
+  onMonitorCheckIn?: (payload: MonitorCheckInPayload) => void;
+  /** Szűkített sztornó a Vendégmonitornak (socket + helyi BroadcastChannel). */
+  onMonitorCheckInRevoked?: (payload: MonitorCheckInRevokedPayload) => void;
   onTestPing?: (payload: MonitorTestPingPayload) => void;
   onDeviceRevoked?: (payload: MonitorDeviceRevokedPayload) => void;
   enableWakeLock?: boolean;
   enabled?: boolean;
+  /**
+   * Vendégmonitor-kijelzőként csatlakozik: munkatársi tokennel sem kerül a
+   * munkatársi socket-szobába, így teljes beléptetési eredményt nem kap.
+   */
+  displayOnly?: boolean;
 }
 
 export function useMonitorChannel(options: UseMonitorChannelOptions = {}) {
@@ -71,6 +119,20 @@ export function useMonitorChannel(options: UseMonitorChannelOptions = {}) {
   const handleRevoked = useCallback(
     (payload: CheckInRevokedPayload) => {
       options.onCheckInRevoked?.(payload);
+    },
+    [options],
+  );
+
+  const handleMonitorCheckIn = useCallback(
+    (payload: MonitorCheckInPayload) => {
+      options.onMonitorCheckIn?.(payload);
+    },
+    [options],
+  );
+
+  const handleMonitorRevoked = useCallback(
+    (payload: MonitorCheckInRevokedPayload) => {
+      options.onMonitorCheckInRevoked?.(payload);
     },
     [options],
   );
@@ -105,11 +167,11 @@ export function useMonitorChannel(options: UseMonitorChannelOptions = {}) {
     if (typeof window === 'undefined' || !('BroadcastChannel' in window)) return;
     const channel = new BroadcastChannel(MONITOR_BROADCAST_CHANNEL);
 
-    channel.onmessage = (event: MessageEvent<MonitorBroadcastMessage>) => {
+    channel.onmessage = (event: MessageEvent<LocalMonitorMessage>) => {
       if (event.data?.type === 'CHECKIN_RESULT') {
-        handleResult(event.data.payload);
+        handleMonitorCheckIn(event.data.payload);
       } else if (event.data?.type === 'CHECKIN_REVOKED') {
-        handleRevoked(event.data.payload);
+        handleMonitorRevoked(event.data.payload);
       } else if (event.data?.type === 'TEST_PING') {
         handleTestPing(event.data.payload);
       } else if (event.data?.type === 'DEVICE_REVOKED') {
@@ -122,8 +184,8 @@ export function useMonitorChannel(options: UseMonitorChannelOptions = {}) {
     };
   }, [
     channelEnabled,
-    handleResult,
-    handleRevoked,
+    handleMonitorCheckIn,
+    handleMonitorRevoked,
     handleTestPing,
     handleDeviceRevoked,
   ]);
@@ -142,7 +204,7 @@ export function useMonitorChannel(options: UseMonitorChannelOptions = {}) {
       'http://localhost:3001';
 
     const socket: Socket = io(`${wsBaseUrl}${SOCKET_NAMESPACE}`, {
-      auth: { token },
+      auth: { token, displayOnly: options.displayOnly === true },
       transports: ['websocket', 'polling'],
       reconnectionAttempts: 10,
       reconnectionDelay: 2000,
@@ -160,16 +222,34 @@ export function useMonitorChannel(options: UseMonitorChannelOptions = {}) {
       setConnectedDisplays(Math.max(1, state.connectedDisplays));
     });
 
-    socket.on(SOCKET_EVENTS.CHECKIN_RESULT, (payload: CheckInResultPayload) => {
-      handleResult(payload);
-    });
-
-    socket.on(
-      SOCKET_EVENTS.CHECKIN_REVOKED,
-      (payload: CheckInRevokedPayload) => {
-        handleRevoked(payload);
-      },
-    );
+    // Kijelzőként csak a szűkített, recepcióként csak a teljes eseményekre figyelünk.
+    if (options.displayOnly) {
+      socket.on(
+        SOCKET_EVENTS.MONITOR_CHECKIN_RESULT,
+        (payload: MonitorCheckInPayload) => {
+          handleMonitorCheckIn(payload);
+        },
+      );
+      socket.on(
+        SOCKET_EVENTS.MONITOR_CHECKIN_REVOKED,
+        (payload: MonitorCheckInRevokedPayload) => {
+          handleMonitorRevoked(payload);
+        },
+      );
+    } else {
+      socket.on(
+        SOCKET_EVENTS.CHECKIN_RESULT,
+        (payload: CheckInResultPayload) => {
+          handleResult(payload);
+        },
+      );
+      socket.on(
+        SOCKET_EVENTS.CHECKIN_REVOKED,
+        (payload: CheckInRevokedPayload) => {
+          handleRevoked(payload);
+        },
+      );
+    }
 
     socket.on(
       SOCKET_EVENTS.MONITOR_TEST_PING,
@@ -199,8 +279,11 @@ export function useMonitorChannel(options: UseMonitorChannelOptions = {}) {
     channelEnabled,
     accessToken,
     deviceToken,
+    options.displayOnly,
     handleResult,
     handleRevoked,
+    handleMonitorCheckIn,
+    handleMonitorRevoked,
     handleTestPing,
     handleDeviceRevoked,
   ]);

@@ -175,8 +175,10 @@ export const GlobalScannerChannel: React.FC = () => {
     enabled: isListening && !isLoginPage,
   });
 
-  // Másik ablakból (pl. /monitor vagy /tablet vagy /reception) érkező szkenner-események szinkronizálása
+  // Másik ablakból (pl. /monitor vagy /tablet vagy /reception) érkező szkenner-események szinkronizálása.
+  // A Vendégmonitor ablaka nem iratkozik fel: a teljes (tartozást is tartalmazó) eredmény oda nem kerülhet.
   useEffect(() => {
+    if (isMonitorPage) return;
     if (typeof window === 'undefined' || !('BroadcastChannel' in window))
       return;
     const channel = new BroadcastChannel(SCANNER_BROADCAST_CHANNEL);
@@ -196,10 +198,12 @@ export const GlobalScannerChannel: React.FC = () => {
     return () => {
       channel.close();
     };
-  }, [recordCheckInResult, recordRevokedResult, recordScanAttempt, invalidateCheckInQueries]);
+  }, [isMonitorPage, recordCheckInResult, recordRevokedResult, recordScanAttempt, invalidateCheckInQueries]);
 
-  // WebSocket (/monitor) csatornán érkező távoli beléptetések szinkronizálása
+  // WebSocket (/monitor) csatornán érkező távoli beléptetések szinkronizálása.
+  // A Vendégmonitoron nem: ott a MonitorPage `displayOnly` kapcsolata fut, szűkített adattal.
   useMonitorChannel({
+    enabled: !isMonitorPage,
     onCheckInResult: useCallback(
       (payload: CheckInResultPayload) => {
         recordCheckInResult(payload);

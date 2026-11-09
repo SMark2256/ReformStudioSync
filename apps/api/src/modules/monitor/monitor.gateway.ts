@@ -17,6 +17,8 @@ import {
   SOCKET_EVENTS,
   SOCKET_NAMESPACE,
   toAppError,
+  toMonitorPayload,
+  toMonitorRevokedPayload,
 } from '@reform/shared';
 import { Server, Socket } from 'socket.io';
 import { AuthService } from '../auth/auth.service';
@@ -44,8 +46,17 @@ export class MonitorGateway
     private readonly authService: AuthService,
   ) {}
 
+  /** A stúdió minden kliense (munkatárs és párosított kijelző). */
   private getRoomName(studioId: string): string {
     return `studio:${studioId}`;
+  }
+
+  /**
+   * Csak munkatársi (STAFF) tokennel csatlakozott kliensek. A teljes beléptetési
+   * eredmény (tartozás, vonalkód, ok) kizárólag ide mehet, párosított kijelzőre nem.
+   */
+  private getStaffRoomName(studioId: string): string {
+    return `${this.getRoomName(studioId)}:staff`;
   }
 
   isDeviceOnline(deviceId: string): boolean {
@@ -78,6 +89,12 @@ export class MonitorGateway
 
       const room = this.getRoomName(studioId);
       await client.join(room);
+      // A munkatársi tokennel megnyitott Vendégmonitor (`displayOnly`) sem kap
+      // teljes eredményt. A jelző csak szűkíthet, jogosultságot nem ad.
+      const displayOnly = client.handshake.auth?.displayOnly === true;
+      if (validated.type === 'STAFF' && !displayOnly) {
+        await client.join(this.getStaffRoomName(studioId));
+      }
       this.clientStudios.set(client.id, studioId);
       if (validated.type === 'DEVICE' && validated.deviceId) {
         this.clientDevices.set(client.id, validated.deviceId);
@@ -138,8 +155,13 @@ export class MonitorGateway
   ) {
     if (!this.server) return;
     this.server
-      .to(this.getRoomName(studioId))
+      .to(this.getStaffRoomName(studioId))
       .emit(SOCKET_EVENTS.CHECKIN_RESULT, payload);
+    // A munkatársi kliensek a teljes eseményt kapják, a szűkítettet nem.
+    this.server
+      .to(this.getRoomName(studioId))
+      .except(this.getStaffRoomName(studioId))
+      .emit(SOCKET_EVENTS.MONITOR_CHECKIN_RESULT, toMonitorPayload(payload));
 
     // Frissítjük az aktív online kijelzők utolsó aktivitását
     for (const [clientId, deviceId] of this.clientDevices.entries()) {
@@ -160,8 +182,15 @@ export class MonitorGateway
   ) {
     if (!this.server) return;
     this.server
-      .to(this.getRoomName(studioId))
+      .to(this.getStaffRoomName(studioId))
       .emit(SOCKET_EVENTS.CHECKIN_REVOKED, payload);
+    this.server
+      .to(this.getRoomName(studioId))
+      .except(this.getStaffRoomName(studioId))
+      .emit(
+        SOCKET_EVENTS.MONITOR_CHECKIN_REVOKED,
+        toMonitorRevokedPayload(payload),
+      );
 
     for (const [clientId, deviceId] of this.clientDevices.entries()) {
       if (this.clientStudios.get(clientId) === studioId) {
