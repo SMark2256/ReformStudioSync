@@ -63,6 +63,24 @@ export const getJiraIssueUrl = (jiraKey: string): string =>
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    id: 'v0.3-pass-occasion-consistency',
+    version: '0.3',
+    date: '2026-11-09',
+    kind: 'FIX',
+    title: 'Pontos alkalomszám sztornó és visszavonás után',
+    summary:
+      'A bérlet hátralévő alkalmai mindig a ténylegesen levont, vissza nem vont kezelésekből számolódnak, így sztornó vagy visszavonás után sem csúsznak el.',
+    details: [
+      'Ugyanaz a kezelés csak egyszer írható jóvá: a beléptetés sztornója és a levonás visszavonása egymást is lezárja, a napi érkezésekből is kikerül.',
+      'Kezelés csak olyan bérletről vonható le, amely arra a szolgáltatásra szól és már elkezdődött.',
+      'Egy későbbi részletfizetés sztornója nem tiltja le a bérletet, csak az eladási befizetésé.',
+      'A vendég „Kezelések” fülén csak a levonások látszanak; a vásárlás, hosszabbítás és fagyasztás a „Bérletek” fül „Bérlet-előzmények” részébe került, visszavonó gomb nélkül.',
+      'A bérlet állapota (aktív, lejárt, elfogyott, fagyasztott, még nem kezdődött, sztornózva) a lejárat napjának végéig pontos.',
+      'Minden sztornó és visszavonás naplózva van: ki, mikor, miért.',
+    ],
+    jiraKey: 'TICKET-16',
+  },
+  {
     id: 'v0.3-monthly-dues-generation',
     version: '0.3',
     date: '2026-11-08',

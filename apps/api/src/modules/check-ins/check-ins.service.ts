@@ -15,6 +15,13 @@ import {
 } from '@reform/shared';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MonitorGateway } from '../monitor/monitor.gateway';
+import {
+  logCorrection,
+  recordArrival,
+  recordDeduction,
+  reverseDeduction,
+  voidArrival,
+} from '../passes/pass-ledger';
 import { ScanCheckInDto, SyncOfflineScansDto } from './check-ins.dto';
 
 @Injectable()
@@ -185,27 +192,13 @@ export class CheckInsService {
 
       // Ha kifejezetten köredzéses érkezés vagy van aktív havi tagsága: nincs alkalomlevonás!
       if (dto.visitType === VisitType.CIRCUIT_TRAINING && activeMembership) {
-        await tx.visit
-          .create({
-            data: {
-              studioId,
-              guestId: guest.id,
-              visitType: 'CIRCUIT_TRAINING',
-              employeeId: staffUserId,
-            },
-          })
-          .catch(() => null);
-
-        const checkInRecord = await tx.loggedCheckIn.create({
-          data: {
-            studioId,
-            guestId: guest.id,
-            guestPassId: null,
-            userId: staffUserId,
-            visitType: 'CIRCUIT_TRAINING',
-            status: 'SUCCESS',
-            idempotencyKey: dto.idempotencyKey ?? null,
-          },
+        const checkInRecord = await recordArrival(tx, {
+          studioId,
+          guestId: guest.id,
+          guestPassId: null,
+          staffUserId,
+          visitType: 'CIRCUIT_TRAINING',
+          idempotencyKey: dto.idempotencyKey,
         });
 
         return {
@@ -242,27 +235,13 @@ export class CheckInsService {
 
       // Ha nincs aktív bérlete, de van aktív havi tagsága -> köredzéses beléptetés alkalomlevonás nélkül
       if (!activePass && activeMembership) {
-        await tx.visit
-          .create({
-            data: {
-              studioId,
-              guestId: guest.id,
-              visitType: 'CIRCUIT_TRAINING',
-              employeeId: staffUserId,
-            },
-          })
-          .catch(() => null);
-
-        const checkInRecord = await tx.loggedCheckIn.create({
-          data: {
-            studioId,
-            guestId: guest.id,
-            guestPassId: null,
-            userId: staffUserId,
-            visitType: 'CIRCUIT_TRAINING',
-            status: 'SUCCESS',
-            idempotencyKey: dto.idempotencyKey ?? null,
-          },
+        const checkInRecord = await recordArrival(tx, {
+          studioId,
+          guestId: guest.id,
+          guestPassId: null,
+          staffUserId,
+          visitType: 'CIRCUIT_TRAINING',
+          idempotencyKey: dto.idempotencyKey,
         });
 
         return {
@@ -327,68 +306,27 @@ export class CheckInsService {
         dto.visitType === VisitType.CIRCUIT_TRAINING ||
         activePass.type === 'TIME_BASED';
 
+      const checkInRecord = await recordArrival(tx, {
+        studioId,
+        guestId: guest.id,
+        guestPassId: activePass.id,
+        staffUserId,
+        visitType: isCircuitMode ? 'CIRCUIT_TRAINING' : 'TREATMENT',
+        idempotencyKey: dto.idempotencyKey,
+      });
+
       if (!isCircuitMode && activePass.type === 'OCCASION_BASED') {
-        const atomicUpdate = await tx.guestPass.updateMany({
-          where: {
-            id: activePass.id,
-            isActive: true,
-            isFrozen: false,
-            remainingPasses: { gt: 0 },
-          },
-          data: {
-            remainingPasses: { decrement: 1 },
-          },
+        const deduction = await recordDeduction(tx, activePass, {
+          guestId: guest.id,
+          staffUserId,
+          checkInId: checkInRecord.id,
+          note: 'Vonalkódos beléptetés',
+          balanceChangedError: 'CHECKIN.BALANCE_CHANGED',
         });
-
-        if (atomicUpdate.count !== 1) {
-          throw appError('CHECKIN.BALANCE_CHANGED');
-        }
-
-        const calculatedRemaining = (activePass.remainingPasses ?? 1) - 1;
-        newRemaining = calculatedRemaining;
-
-        if (calculatedRemaining <= 0) {
-          await tx.guestPass.update({
-            where: { id: activePass.id },
-            data: { isActive: false },
-          });
-        }
-
-        await tx.passUsageLog.create({
-          data: {
-            guestPassId: activePass.id,
-            guestId: guest.id,
-            employeeId: staffUserId,
-            delta: -1,
-            note: 'Vonalkódos beléptetés',
-          },
-        });
+        newRemaining = deduction.remaining;
       } else if (activePass.type === 'OCCASION_BASED') {
         newRemaining = activePass.remainingPasses ?? 0;
       }
-
-      await tx.visit
-        .create({
-          data: {
-            studioId,
-            guestId: guest.id,
-            visitType: isCircuitMode ? 'CIRCUIT_TRAINING' : 'TREATMENT',
-            employeeId: staffUserId,
-          },
-        })
-        .catch(() => null);
-
-      const checkInRecord = await tx.loggedCheckIn.create({
-        data: {
-          studioId,
-          guestId: guest.id,
-          guestPassId: activePass.id,
-          userId: staffUserId,
-          visitType: isCircuitMode ? 'CIRCUIT_TRAINING' : 'TREATMENT',
-          status: 'SUCCESS',
-          idempotencyKey: dto.idempotencyKey ?? null,
-        },
-      });
 
       if (
         activePass.type === 'OCCASION_BASED' &&
@@ -437,9 +375,16 @@ export class CheckInsService {
     return resultPayload;
   }
 
+  /**
+   * Téves beléptetés sztornója. Ha tartozik hozzá levonás, azt visszavontnak jelöli és 1 alkalmat
+   * jóváír (egyszer — a levonás-visszavonás után már nem sztornózható, és fordítva), a látogatást
+   * törli, és naplózza, ki, mikor és miért sztornózott.
+   */
   async revokeCheckIn(
     checkInId: string,
+    staffUserId: string,
     studioId = DEFAULT_STUDIO_ID,
+    reason?: string,
   ): Promise<CheckInRevokedPayload> {
     const payload = await this.prisma.$transaction(async (tx) => {
       const checkIn = await tx.loggedCheckIn.findFirst({
@@ -447,6 +392,7 @@ export class CheckInsService {
         include: {
           guest: true,
           guestPass: true,
+          passUsage: { include: { guestPass: true } },
         },
       });
 
@@ -454,50 +400,47 @@ export class CheckInsService {
         throw appError('CHECKIN.NOT_FOUND');
       }
 
-      if (checkIn.status !== 'SUCCESS') {
+      const why = reason?.trim() || 'Téves beléptetés';
+      if (
+        checkIn.status !== 'SUCCESS' ||
+        !(await voidArrival(tx, checkIn, `Recepciós sztornó: ${why}`))
+      ) {
         throw appError('CHECKIN.NOT_REVOCABLE');
       }
 
-      let restoredRemaining: number | 'Korlátlan' = 'Korlátlan';
+      const now = new Date();
+      let restoredRemaining: number | 'Korlátlan' =
+        checkIn.guestPass?.type === 'OCCASION_BASED'
+          ? (checkIn.guestPass.remainingPasses ?? 0)
+          : 'Korlátlan';
 
-      if (
-        checkIn.guestPass &&
-        checkIn.guestPass.type === 'OCCASION_BASED' &&
-        checkIn.visitType !== 'CIRCUIT_TRAINING'
-      ) {
-        const updatedPass = await tx.guestPass.update({
-          where: { id: checkIn.guestPass.id },
-          data: {
-            remainingPasses: { increment: 1 },
-            isActive: true,
-          },
-        });
-        restoredRemaining = updatedPass.remainingPasses ?? 1;
-
-        await tx.passUsageLog.create({
-          data: {
-            guestPassId: checkIn.guestPass.id,
-            guestId: checkIn.guestId,
-            delta: 1,
-            note: 'Recepciós sztornó (téves beléptetés visszavonva)',
-          },
-        });
+      const usage = checkIn.passUsage;
+      const reversesDeduction = !!usage && usage.delta < 0 && !usage.reversedAt;
+      if (reversesDeduction) {
+        restoredRemaining = await reverseDeduction(
+          tx,
+          usage,
+          `Beléptetés sztornó: ${why}`,
+          now,
+        );
       }
 
-      await tx.loggedCheckIn.update({
-        where: { id: checkIn.id },
-        data: {
-          status: 'CANCELLED',
-          reason: 'Recepciós által sztornózva',
-        },
+      const guestName = `${checkIn.guest.lastName} ${checkIn.guest.firstName}`;
+      await logCorrection(tx, {
+        studioId,
+        staffUserId,
+        action: 'CHECKIN_REVOKED',
+        entityType: 'LoggedCheckIn',
+        entityId: checkIn.id,
+        details: `Beléptetés sztornózva (${guestName})${reversesDeduction ? ', a levonás visszavonva' : ''}: ${why}`,
       });
 
       return {
         checkInId: checkIn.id,
         guestId: checkIn.guestId,
-        guestName: `${checkIn.guest.lastName} ${checkIn.guest.firstName}`,
+        guestName,
         restoredRemainingPasses: restoredRemaining,
-        timestamp: new Date().toISOString(),
+        timestamp: now.toISOString(),
       } satisfies CheckInRevokedPayload;
     });
 

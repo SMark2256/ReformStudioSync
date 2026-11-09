@@ -35,12 +35,15 @@ describe('PassesService & FinanceService — Kritikus Bérlet, Kezeléslevonás,
         findFirst: vi.fn(),
         create: vi.fn().mockResolvedValue({ id: 'usage-1' }),
         update: vi.fn().mockResolvedValue({}),
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
       },
       loggedCheckIn: {
         create: vi.fn().mockResolvedValue({ id: 'chk-treatment-1' }),
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
       },
       visit: {
         create: vi.fn().mockResolvedValue({ id: 'visit-treatment-1' }),
+        deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
       },
       auditLog: {
         create: vi.fn().mockResolvedValue({ id: 'audit-1' }),
@@ -180,8 +183,9 @@ describe('PassesService & FinanceService — Kritikus Bérlet, Kezeléslevonás,
     expect(addedDays).toBeGreaterThanOrEqual(5);
   });
 
-  it('3. Napi Kasszazárás és Fizetés Sztornó (cancelPayment): a sztornózott fizetés inaktiválja a bérletet és nem számít bele a napi bevételbe', async () => {
-    txMock.payment.findFirst.mockResolvedValue({
+  it('3. Napi Kasszazárás és Fizetés Sztornó (cancelPayment): az eladási befizetés sztornója lezárja a bérletet és nem számít bele a napi bevételbe', async () => {
+    // 1. hívás: a sztornózandó befizetés; 2. hívás: a bérlet eladási (legkorábbi) befizetése
+    txMock.payment.findFirst.mockResolvedValueOnce({
       id: 'pay-to-cancel',
       studioId: 'default-studio',
       guestId: 'guest-1',
@@ -196,6 +200,7 @@ describe('PassesService & FinanceService — Kritikus Bérlet, Kezeléslevonás,
       guestPass: { passTemplate: { name: '5 Alkalmas Bérlet' } },
       recordedBy: { name: 'Recepció' },
     });
+    txMock.payment.findFirst.mockResolvedValueOnce({ id: 'pay-to-cancel' });
 
     txMock.payment.update.mockImplementation(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -223,7 +228,7 @@ describe('PassesService & FinanceService — Kritikus Bérlet, Kezeléslevonás,
     expect(cancelled.isCancelled).toBe(true);
     expect(txMock.guestPass.update).toHaveBeenCalledWith({
       where: { id: 'pass-to-deactivate' },
-      data: { isActive: false },
+      data: { isActive: false, cancelledAt: expect.any(Date) },
     });
 
     prismaMock.payment.findMany.mockResolvedValue([
@@ -283,11 +288,13 @@ describe('PassesService & FinanceService — Kritikus Bérlet, Kezeléslevonás,
       type: 'OCCASION_BASED',
       totalPasses: 10,
       remainingPasses: 3, // Levonás után 2 marad -> LOW_OCCASIONS figyelmeztetés!
+      startDate: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
       expirationDate: new Date(Date.now() + 20 * 24 * 60 * 60 * 1000),
+      usageLogs: Array.from({ length: 7 }, () => ({ delta: -1, reversedAt: null })),
       isActive: true,
       isFrozen: false,
       guest: { id: 'guest-1', firstName: 'Anna', lastName: 'Kovács', barcode: '100001' },
-      passTemplate: { name: '10 Alkalmas Hypoxi Bérlet' },
+      passTemplate: { name: '10 Alkalmas Hypoxi Bérlet', serviceId: 'srv-hypoxi' },
     });
     txMock.service.findFirst.mockResolvedValue({
       id: 'srv-hypoxi',
@@ -314,7 +321,10 @@ describe('PassesService & FinanceService — Kritikus Bérlet, Kezeléslevonás,
     txMock.passUsageLog.findFirst.mockResolvedValue({
       id: 'usage-1',
       guestPassId: 'pass-hypoxi',
+      delta: -1,
       reversedAt: null,
+      checkInId: 'chk-treatment-1',
+      checkIn: { id: 'chk-treatment-1', visitId: 'visit-treatment-1' },
       service: { name: 'Hypoxi Kezelés' },
       guestPass: {
         id: 'pass-hypoxi',
@@ -337,6 +347,17 @@ describe('PassesService & FinanceService — Kritikus Bérlet, Kezeléslevonás,
       'staff-1',
     );
     expect(revRes.restoredRemainingPasses).toBe(3);
+    expect(revRes.checkInId).toBe('chk-treatment-1');
+    expect(txMock.loggedCheckIn.updateMany).toHaveBeenCalledWith({
+      where: { id: 'chk-treatment-1', status: 'SUCCESS' },
+      data: {
+        status: 'CANCELLED',
+        reason: 'Levonás visszavonva: Téves kezelésválasztás',
+      },
+    });
+    expect(txMock.visit.deleteMany).toHaveBeenCalledWith({
+      where: { id: 'visit-treatment-1' },
+    });
     expect(txMock.auditLog.create).toHaveBeenCalledTimes(1);
   });
 

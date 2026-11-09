@@ -1,10 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import {
   appError,
+  computeRemainingPasses,
+  countActiveDeductions,
   DEFAULT_STUDIO_ID,
   DocumentStatus,
   DocumentType,
   GuestDocumentDto,
+  getPassStatus,
   GuestDto,
   GuestNoteDto,
   GuestPassDto,
@@ -522,17 +525,14 @@ export class GuestsService {
         usedAt: l.usedAt.toISOString(),
         reversedAt: l.reversedAt ? l.reversedAt.toISOString() : null,
         reversalReason: l.reversalReason ?? null,
+        checkInId: l.checkInId ?? null,
         note: l.note,
       }));
 
-      const usedPassesCount = usageLogs.filter(
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (u: any) => u.delta < 0 && !u.reversedAt,
-      ).length;
-      const calculatedRemainingPasses =
-        p.totalPasses !== null && p.totalPasses !== undefined
-          ? Math.max(0, p.totalPasses - usedPassesCount)
-          : null;
+      const calculatedRemainingPasses = computeRemainingPasses(
+        p.totalPasses,
+        usageLogs,
+      );
 
       return {
         id: p.id,
@@ -547,12 +547,17 @@ export class GuestsService {
         totalPasses: p.totalPasses,
         remainingPasses: p.remainingPasses,
         calculatedRemainingPasses,
-        usedPassesCount,
+        usedPassesCount: countActiveDeductions(usageLogs),
         startDate: p.startDate.toISOString(),
         expirationDate: p.expirationDate.toISOString(),
         isActive: p.isActive,
         isFrozen: p.isFrozen,
         frozenAt: p.frozenAt ? p.frozenAt.toISOString() : null,
+        cancelledAt: p.cancelledAt ? p.cancelledAt.toISOString() : null,
+        status: getPassStatus(
+          { ...p, remainingPasses: calculatedRemainingPasses },
+          now,
+        ),
         createdAt: p.createdAt.toISOString(),
         usageLogs,
       };
@@ -562,7 +567,7 @@ export class GuestsService {
       .flatMap((p) =>
         (p.usageLogs ?? []).map((u) => ({
           ...u,
-          remainingAfter: p.remainingPasses,
+          remainingAfter: p.calculatedRemainingPasses,
         })),
       )
       .filter((u) => u.delta < 0)

@@ -4,6 +4,7 @@ import {
   DUPLICATE_SCAN_COOLDOWN_SECONDS,
   GuestDto,
   OverdueBucket,
+  PassStatus,
   PassType,
   PaymentMethod,
   ServiceCategory,
@@ -1348,12 +1349,7 @@ export const ReceptionPage: React.FC = () => {
                   <div className="divide-y divide-slate-100 max-h-80 overflow-y-auto">
                     {(guestsQuery.data ?? []).map((g) => {
                       const activePass = (g.passes ?? []).find(
-                        (p) =>
-                          p.isActive &&
-                          !p.isFrozen &&
-                          new Date(p.expirationDate) >= new Date() &&
-                          (p.type === PassType.TIME_BASED ||
-                            (p.remainingPasses ?? 0) > 0),
+                        (p) => p.status === PassStatus.ACTIVE,
                       );
                       const frozenPass = (g.passes ?? []).find(
                         (p) => p.isFrozen,
@@ -1602,8 +1598,11 @@ export const ReceptionPage: React.FC = () => {
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {(guestsQuery.data ?? []).map((g) => {
-                    const activePasses = (g.passes ?? []).filter(
-                      (p) => p.isActive,
+                    // Számolt állapot: a lejárt, elfogyott vagy sztornózott bérlet nem látszik, a fagyasztott igen.
+                    const usablePasses = (g.passes ?? []).filter(
+                      (p) =>
+                        p.status === PassStatus.ACTIVE ||
+                        p.status === PassStatus.FROZEN,
                     );
                     const activeMembership = (g.memberships ?? [])[0];
                     return (
@@ -1637,8 +1636,8 @@ export const ReceptionPage: React.FC = () => {
                               </span>
                             </div>
                           )}
-                          {activePasses.length > 0 ? (
-                            activePasses.map((p) => (
+                          {usablePasses.length > 0 ? (
+                            usablePasses.map((p) => (
                               <div key={p.id} className="text-slate-600">
                                 <span className="font-semibold text-slate-900">
                                   {p.passTemplateName}
@@ -1648,7 +1647,7 @@ export const ReceptionPage: React.FC = () => {
                                   ? 'FAGYASZTVA'
                                   : p.type === PassType.TIME_BASED
                                     ? 'Korlátlan'
-                                    : `${p.remainingPasses} / ${p.totalPasses} alk.`}
+                                    : `${p.calculatedRemainingPasses ?? p.remainingPasses} / ${p.totalPasses} alk.`}
                               </div>
                             ))
                           ) : (
@@ -1683,7 +1682,7 @@ export const ReceptionPage: React.FC = () => {
                                   isOpen: true,
                                   guest: g,
                                   preselectedTemplateId:
-                                    activePasses[0]?.passTemplateId,
+                                    usablePasses[0]?.passTemplateId,
                                 })
                               }
                               className="rounded-lg bg-emerald-600 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500"

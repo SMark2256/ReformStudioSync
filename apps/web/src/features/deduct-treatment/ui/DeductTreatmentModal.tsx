@@ -1,4 +1,10 @@
-import { GuestDto, PassType, ServiceDto } from '@reform/shared';
+import {
+  GuestDto,
+  passCoversService,
+  PassStatus,
+  PassType,
+  ServiceDto,
+} from '@reform/shared';
 import {
   AlertTriangle,
   CheckCircle2,
@@ -59,12 +65,12 @@ export const DeductTreatmentModal: React.FC<DeductTreatmentModalProps> = ({
 
   const selectedGuest = guests.find((g) => g.id === selectedGuestId) ?? null;
 
-  const activePasses = (selectedGuest?.passes ?? []).filter((p) => {
-    if (!p.isActive || p.isFrozen) return false;
-    if (new Date(p.expirationDate) < new Date()) return false;
-    if (p.type === PassType.TIME_BASED) return true;
-    return (p.remainingPasses ?? 0) > 0;
-  });
+  // A szerver szabálya: csak aktív (számolt állapot) bérlet, és ha szolgáltatáshoz kötött, csak arra a kezelésre.
+  const activePasses = (selectedGuest?.passes ?? []).filter(
+    (p) =>
+      p.status === PassStatus.ACTIVE &&
+      passCoversService(p.serviceId, selectedServiceId),
+  );
 
   useEffect(() => {
     if (!selectedGuest) {
@@ -160,7 +166,7 @@ export const DeductTreatmentModal: React.FC<DeductTreatmentModalProps> = ({
               {filteredGuests.map((g) => (
                 <option key={g.id} value={g.id}>
                   {g.lastName} {g.firstName} (#{g.barcode}) —{' '}
-                  {(g.passes ?? []).filter((p) => p.isActive && !p.isFrozen)
+                  {(g.passes ?? []).filter((p) => p.status === PassStatus.ACTIVE)
                     .length}{' '}
                   aktív bérlet
                 </option>

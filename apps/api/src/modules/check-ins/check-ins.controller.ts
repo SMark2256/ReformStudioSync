@@ -3,7 +3,11 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AuthUserDto } from '@reform/shared';
 import { CurrentUser } from '../../common/current-user.decorator';
 import { JwtAuthGuard } from '../../common/jwt-auth.guard';
-import { ScanCheckInDto, SyncOfflineScansDto } from './check-ins.dto';
+import {
+  RevokeCheckInDto,
+  ScanCheckInDto,
+  SyncOfflineScansDto,
+} from './check-ins.dto';
 import { CheckInsService } from './check-ins.service';
 
 @ApiTags('Beléptetés & Sztornó (Check-Ins / Checkins)')
@@ -46,10 +50,20 @@ export class CheckInsController {
 
   @Post(':id/revoke')
   @ApiOperation({
-    summary: 'Téves beléptetés 1 kattintásos sztornózása (alkalom visszaírása +1)',
+    summary:
+      'Téves beléptetés sztornózása: a kapcsolt levonás visszavonása (+1 alkalom, egyszer), naplózva',
   })
-  revoke(@Param('id') id: string, @CurrentUser() user: AuthUserDto) {
-    return this.checkInsService.revokeCheckIn(id, user.studioId);
+  revoke(
+    @Param('id') id: string,
+    @Body() dto: RevokeCheckInDto,
+    @CurrentUser() user: AuthUserDto,
+  ) {
+    return this.checkInsService.revokeCheckIn(
+      id,
+      user.id,
+      user.studioId,
+      dto?.reason,
+    );
   }
 
   @Post('sync-offline')

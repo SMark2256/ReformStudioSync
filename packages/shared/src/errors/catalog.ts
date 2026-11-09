@@ -52,6 +52,8 @@ export const APP_ERROR_CATALOG = {
   'PASS.TEMPLATE_TOTAL_REQUIRED': { status: 400, message: 'Alkalom alapú bérletnél kötelező megadni az alkalmak számát.', action: 'notify' },
   'PASS.NOT_FOUND': { status: 404, message: 'A bérlet nem található.', action: 'notify' },
   'PASS.FROZEN': { status: 400, message: 'Ez a bérlet jelenleg fagyasztva van (szünetel), nem vonható le belőle alkalom.', action: 'notify' },
+  'PASS.NOT_STARTED': { status: 400, message: 'A kiválasztott bérlet még nem kezdődött el, nem vonható le belőle alkalom.', action: 'notify' },
+  'PASS.SERVICE_MISMATCH': { status: 400, message: 'A kiválasztott bérlet nem erre a kezelésre szól.', action: 'notify' },
   'PASS.EXPIRED': { status: 400, message: 'A kiválasztott bérlet lejárt vagy inaktív!', action: 'notify' },
   'PASS.NO_REMAINING': { status: 400, message: 'A bérleten elfogytak a felhasználható alkalmak (0 maradt)!', action: 'notify' },
   'PASS.BALANCE_CHANGED': { status: 409, message: 'Versenyhelyzet észlelve: a bérlet egyenlege időközben módosult, nem történt túlfogyasztás.', action: 'reload' },
@@ -63,7 +65,7 @@ export const APP_ERROR_CATALOG = {
   'CHECKIN.GUEST_NOT_FOUND': { status: 400, message: 'Nem található aktív vendég a megadott vonalkóddal.', action: 'notify' },
   'CHECKIN.BALANCE_CHANGED': { status: 409, message: 'A bérlet egyenlege időközben módosult. Kérjük, próbáld újra!', action: 'reload' },
   'CHECKIN.NOT_FOUND': { status: 404, message: 'A beléptetési naplóbejegyzés nem található.', action: 'notify' },
-  'CHECKIN.NOT_REVOCABLE': { status: 400, message: 'Csak sikeres (SUCCESS) státuszú beléptetés sztornózható.', action: 'notify' },
+  'CHECKIN.NOT_REVOCABLE': { status: 400, message: 'Ez a beléptetés már sztornózva van, vagy nem sikeres beléptetés, ezért nem sztornózható.', action: 'notify' },
 
   // Havi tagság
   'MEMBERSHIP.NOT_FOUND': { status: 404, message: 'A havi tagság nem található.', action: 'notify' },

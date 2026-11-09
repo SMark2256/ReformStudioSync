@@ -8,6 +8,16 @@ export enum PassType {
   TIME_BASED = 'TIME_BASED',
 }
 
+/** Számolt bérletállapot (`getPassStatus`), ezt mutatja a felület az `isActive` jelző helyett. */
+export enum PassStatus {
+  ACTIVE = 'ACTIVE',
+  EXPIRED = 'EXPIRED',
+  DEPLETED = 'DEPLETED',
+  FROZEN = 'FROZEN',
+  NOT_STARTED = 'NOT_STARTED',
+  CANCELLED = 'CANCELLED',
+}
+
 export enum PaymentMethod {
   CASH = 'CASH',
   POS_CARD = 'POS_CARD',

@@ -3,6 +3,7 @@ import {
   DocumentType,
   GuestDto,
   MembershipStatus,
+  PassStatus,
   PassType,
   ServiceDto,
 } from '@reform/shared';
@@ -29,6 +30,16 @@ import { api } from '@/shared/api';
 import { formatBytes, optimizeImageFile } from '@/shared/lib/image';
 import { handleAppError } from '@/shared/lib/errors';
 import { notify } from '@/shared/lib/notify';
+
+/** A számolt bérletállapot (`GuestPassDto.status`) címkéje és színe. */
+const PASS_STATUS_BADGE: Record<PassStatus, { label: string; className: string }> = {
+  [PassStatus.ACTIVE]: { label: 'AKTÍV', className: 'bg-emerald-100 text-emerald-800' },
+  [PassStatus.FROZEN]: { label: 'FAGYASZTVA', className: 'bg-sky-100 text-sky-800' },
+  [PassStatus.NOT_STARTED]: { label: 'MÉG NEM KEZDŐDÖTT', className: 'bg-amber-100 text-amber-800' },
+  [PassStatus.EXPIRED]: { label: 'LEJÁRT', className: 'bg-rose-100 text-rose-800' },
+  [PassStatus.DEPLETED]: { label: 'ELFOGYOTT', className: 'bg-rose-100 text-rose-800' },
+  [PassStatus.CANCELLED]: { label: 'SZTORNÓZVA', className: 'bg-slate-100 text-slate-700' },
+};
 
 type GuestSheetTab =
   | 'overview'
@@ -338,12 +349,17 @@ export const GuestModal: React.FC<GuestModalProps> = ({
     onRefreshAll?.();
   };
 
-  const allUsageLogs = (guest?.passes ?? []).flatMap((p) =>
-    (p.usageLogs ?? []).map((u) => ({
-      ...u,
-      passName: p.passTemplateName ?? 'Bérlet',
-    })),
-  );
+  const allUsageLogs = (guest?.passes ?? [])
+    .flatMap((p) =>
+      (p.usageLogs ?? []).map((u) => ({
+        ...u,
+        passName: p.passTemplateName ?? 'Bérlet',
+      })),
+    )
+    .sort((a, b) => b.usedAt.localeCompare(a.usedAt));
+  // Kezelés csak a levonás (delta < 0); a vásárlás, hosszabbítás, fagyasztás bérlet-előzmény.
+  const treatmentLogs = allUsageLogs.filter((u) => u.delta < 0);
+  const passHistoryLogs = allUsageLogs.filter((u) => u.delta >= 0);
 
   const tabs: { id: GuestSheetTab; label: string; count?: number }[] = [
     { id: 'overview', label: 'Áttekintés' },
@@ -356,7 +372,7 @@ export const GuestModal: React.FC<GuestModalProps> = ({
     {
       id: 'treatments',
       label: 'Kezelések',
-      count: allUsageLogs.length,
+      count: treatmentLogs.length,
     },
     {
       id: 'payments',
@@ -806,8 +822,7 @@ export const GuestModal: React.FC<GuestModalProps> = ({
               </div>
 
               {(guest.passes ?? []).map((pass) => {
-                const isExpired =
-                  new Date(pass.expirationDate).getTime() < Date.now();
+                const badge = PASS_STATUS_BADGE[pass.status];
                 return (
                   <div
                     key={pass.id}
@@ -819,26 +834,18 @@ export const GuestModal: React.FC<GuestModalProps> = ({
                           <span className="font-bold text-slate-900 text-sm">
                             {pass.passTemplateName ?? 'Bérlet'}
                           </span>
-                          {pass.isFrozen ? (
-                            <span className="rounded-full bg-sky-100 px-2.5 py-0.5 text-[11px] font-bold text-sky-800">
-                              FAGYASZTVA
-                            </span>
-                          ) : pass.isActive && !isExpired ? (
-                            <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-[11px] font-bold text-emerald-800">
-                              AKTÍV
-                            </span>
-                          ) : (
-                            <span className="rounded-full bg-rose-100 px-2.5 py-0.5 text-[11px] font-bold text-rose-800">
-                              LEJÁRT / KIMERÜLT
-                            </span>
-                          )}
+                          <span
+                            className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold ${badge.className}`}
+                          >
+                            {badge.label}
+                          </span>
                         </div>
                         <p className="text-xs text-slate-600 mt-0.5">
                           Hátralévő alkalmak:{' '}
                           <strong>
                             {pass.type === PassType.TIME_BASED
                               ? 'Korlátlan'
-                              : `${pass.remainingPasses} / ${pass.totalPasses} db`}
+                              : `${pass.calculatedRemainingPasses ?? pass.remainingPasses} / ${pass.totalPasses} db`}
                           </strong>{' '}
                           (Felhasznált: {pass.usedPassesCount ?? 0} db) • Lejárat:{' '}
                           <strong>
@@ -895,6 +902,28 @@ export const GuestModal: React.FC<GuestModalProps> = ({
                   </div>
                 );
               })}
+
+              {passHistoryLogs.length > 0 && (
+                <div className="space-y-2 pt-2">
+                  <h4 className="text-sm font-bold text-slate-900 dark:text-white">
+                    Bérlet-előzmények
+                  </h4>
+                  <div className="divide-y divide-slate-100 rounded-xl border border-slate-200">
+                    {passHistoryLogs.map((u) => (
+                      <div key={u.id} className="p-3 text-xs">
+                        <span className="font-bold text-slate-900">
+                          {u.passName}
+                        </span>{' '}
+                        • <span className="text-slate-700">{u.note}</span>
+                        <div className="text-[11px] text-slate-500">
+                          Rögzítette: {u.employeeName ?? 'Recepció'} •{' '}
+                          {new Date(u.usedAt).toLocaleString('hu-HU')}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -903,7 +932,7 @@ export const GuestModal: React.FC<GuestModalProps> = ({
             <div className="space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <h4 className="text-sm font-bold text-slate-900 dark:text-white">
-                  Kezelési és Bérletlevonási Előzmények
+                  Kezelési előzmények (alkalomlevonások)
                 </h4>
                 <input
                   type="text"
@@ -914,13 +943,13 @@ export const GuestModal: React.FC<GuestModalProps> = ({
                 />
               </div>
 
-              {allUsageLogs.length === 0 ? (
+              {treatmentLogs.length === 0 ? (
                 <p className="text-xs text-slate-500">
                   Még nincs rögzített kezeléslevonás ennél a vendégnél.
                 </p>
               ) : (
                 <div className="divide-y divide-slate-100 rounded-xl border border-slate-200">
-                  {allUsageLogs.map((u) => (
+                  {treatmentLogs.map((u) => (
                     <div
                       key={u.id}
                       className={`flex flex-wrap items-center justify-between gap-2 p-3 text-xs ${

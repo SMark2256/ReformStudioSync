@@ -333,13 +333,17 @@ export const api = {
     });
   },
 
-  revokeCheckIn(checkInId: string): Promise<CheckInRevokedPayload> {
+  revokeCheckIn(
+    checkInId: string,
+    reason?: string,
+  ): Promise<CheckInRevokedPayload> {
     return request<CheckInRevokedPayload>(
       `/check-ins/${checkInId}/revoke`,
       {
         method: 'POST',
+        body: JSON.stringify({ reason }),
       },
-      () => mockStudioEngine.revokeCheckIn(checkInId),
+      () => mockStudioEngine.revokeCheckIn(checkInId, reason),
     ).then((res) => {
       broadcastToLocalMonitors({ type: 'CHECKIN_REVOKED', payload: res });
       return res;
