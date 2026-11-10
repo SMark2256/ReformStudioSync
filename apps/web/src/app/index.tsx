@@ -8,6 +8,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { Toaster } from 'sonner';
 import { App } from './App';
+import { ThemeSync } from './ThemeSync';
 import './styles/index.css';
 import {
   configureErrorHandling,
@@ -58,6 +59,7 @@ const ThemedToaster: React.FC = () => {
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
+      <ThemeSync />
       <App />
       <ThemedToaster />
     </QueryClientProvider>
