@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="hu" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ReformStudio Sync</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <symbol id="i-desk" viewBox="0 0 24 24"><path d="M3 10h18M5 10v9M19 10v9M3 19h18M8 10V6a4 4 0 0 1 8 0v4"/></symbol>
+  <symbol id="i-monitor" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="1.5"/><path d="M9 20h6M12 16v4"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M3 19c.6-3.2 3-5 6-5s5.4 1.8 6 5"/><path d="M16 5.3a3 3 0 0 1 0 5.4M18 14c1.6.6 2.7 2.4 3 5"/></symbol>
+  <symbol id="i-ticket" viewBox="0 0 24 24"><path d="M4 7h16v3a2 2 0 0 0 0 4v3H4v-3a2 2 0 0 0 0-4z"/><path d="M14 7v10" stroke-dasharray="2 2"/></symbol>
+  <symbol id="i-cal" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="1.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l7.5 3v5.5c0 4.5-3.2 8-7.5 9.5-4.3-1.5-7.5-5-7.5-9.5V6z"/><path d="M9 12l2 2 4-4"/></symbol>
+  <symbol id="i-staff" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c.8-3.6 3.6-5.5 7-5.5s6.2 1.9 7 5.5"/></symbol>
+  <symbol id="i-cog" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-2.9-1.2l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.7 1.7 0 0 0 3 14.1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.2-2.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 2.9-1.2V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0 1.2 2.9h.1a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></symbol>
+  <symbol id="i-nfc" viewBox="0 0 24 24"><path d="M6 8.5a5 5 0 0 1 0 7M9.5 6a8.5 8.5 0 0 1 0 12M13 3.5a12 12 0 0 1 0 17"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="1.5"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+</svg>
+
+<a class="skip" href="#view">Ugrás a tartalomra</a>
+<div class="app" id="app">
+  <div class="sidebar" id="sidebar">
+    <div class="sb-head">
+      <div class="logo" aria-hidden="true">RS</div>
+      <div class="sb-title hide-c">ReformStudio Sync<small>Budapest, Belváros</small></div>
+    </div>
+    <nav class="nav" id="nav" aria-label="Főmenü">
+      <p class="nav-group" id="ng1">Napi működés</p>
+      <ul aria-labelledby="ng1">
+        <li><a href="#reception" data-view="reception" title="Recepció" aria-label="Recepció"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-desk"/></svg><span class="hide-c">Recepció</span><span class="count hide-c" id="navIn" aria-hidden="true">0</span></a></li>
+        <li><a href="#monitor" data-view="monitor" title="Vendégmonitor" aria-label="Vendégmonitor"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-monitor"/></svg><span class="hide-c">Vendégmonitor</span></a></li>
+        <li><a href="#schedule" data-view="schedule" title="Órarend" aria-label="Órarend"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-cal"/></svg><span class="hide-c">Órarend</span></a></li>
+      </ul>
+      <p class="nav-group" id="ng2">Ügyfelek</p>
+      <ul aria-labelledby="ng2">
+        <li><a href="#members" data-view="members" title="Vendégek" aria-label="Vendégek"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-users"/></svg><span class="hide-c">Vendégek</span></a></li>
+        <li><a href="#passes" data-view="passes" title="Bérletek és termékek" aria-label="Bérletek és termékek"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-ticket"/></svg><span class="hide-c">Bérletek és termékek</span></a></li>
+      </ul>
+      <p class="nav-group" id="ng3">Adminisztráció</p>
+      <ul aria-labelledby="ng3">
+        <li><a href="#staff" data-view="staff" data-perm="users" title="Felhasználókezelés" aria-label="Felhasználókezelés"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-staff"/></svg><span class="hide-c">Felhasználókezelés</span></a></li>
+        <li><a href="#roles" data-view="roles" data-perm="roles" title="Szerepkörök és jogok" aria-label="Szerepkörök és jogok"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-shield"/></svg><span class="hide-c">Szerepkörök és jogok</span></a></li>
+        <li><a href="#settings" data-view="settings" title="Beállítások" aria-label="Beállítások"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-cog"/></svg><span class="hide-c">Beállítások</span></a></li>
+      </ul>
+    </nav>
+    <section class="sb-foot" aria-label="Bejelentkezett felhasználó">
+      <div class="userbox">
+        <div class="avatar" id="meAv" aria-hidden="true">KA</div>
+        <div class="who hide-c"><b id="meName">Kelemen Anna</b><span id="meRole">Admin</span></div>
+      </div>
+      <div class="field hide-c" style="margin:6px 6px 4px">
+        <label for="roleSwitch">Belépve mint (bemutatóhoz)</label>
+        <select class="input" id="roleSwitch"></select>
+      </div>
+      <div class="collapse-row">
+        <button type="button" class="btn-link hide-c" id="logout">Kijelentkezés</button>
+        <button type="button" class="btn-secondary icon" id="collapse" aria-controls="sidebar" aria-expanded="true" aria-label="Menü összecsukása" title="Menü összecsukása"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-chev"/></svg></button>
+      </div>
+    </section>
+  </div>
+  <div class="scrim" id="scrim"></div>
+
+  <div class="main">
+    <header class="topbar">
+      <button type="button" class="btn-secondary icon menu-btn" id="menuBtn" aria-controls="sidebar" aria-expanded="false" aria-label="Menü megnyitása"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-menu"/></svg></button>
+      <nav class="crumbs" aria-label="Morzsamenü"><ol><li>ReformStudio Sync</li><li aria-current="page"><b id="crumb">Recepció</b></li></ol></nav>
+      <div class="right">
+        <span class="small muted" id="clock"></span>
+        <button type="button" class="btn-secondary icon" id="themeBtn" aria-pressed="false" aria-label="Sötét mód" title="Világos / sötét mód"></button>
+      </div>
+    </header>
+    <main class="content" id="view" tabindex="-1"></main>
+  </div>
+</div>
+
+<div class="overlay" id="overlay"><div class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle"></div></div>
+<div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+<script src="views.js"></script>
+</body>
+</html>

@@ -26,6 +26,8 @@ Az `apps/web/src` könyvtár rétegei felülről lefelé. Egy réteg csak az ala
 
 A szabályokat a [Steiger](https://github.com/feature-sliced/steiger) linter ellenőrzi: `npm run lint:fsd`. A TypeScript- és React-szabályokat az ESLint (`eslint.config.mjs`) a teljes monorepón: `npm run lint` / `npm run lint:fix`.
 
+**UI-irány:** a felület kinézetét és viselkedését (shadcn/ui alap, tokenek, alkalmazáskeret, komponensek a `shared/ui`-ban, oldalak) a [`reformstudio-ui-skill`](../.claude/skills/reformstudio-ui-skill/SKILL.md) határozza meg; minden felületi munkánál ez a mérvadó.
+
 ---
 
 ## 2. Architektúra Döntések (ADR) és Alapterv-Javítások

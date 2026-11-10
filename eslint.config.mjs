@@ -20,6 +20,8 @@ export default tseslint.config(
       'playwright-report/**',
       'blob-report/**',
       'apps/api/prisma/migrations/**',
+      // A UI skill kattintható prototípusa: statikus referencia, nem a projekt kódja.
+      '.claude/skills/*/references/prototype/**',
     ],
   },
 

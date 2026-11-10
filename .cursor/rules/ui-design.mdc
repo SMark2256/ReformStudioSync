@@ -1,0 +1,15 @@
+---
+description: Az apps/web felületének mérvadó UI-iránya a reformstudio-ui-skill (shadcn/ui alap, nyugodt admin felület, egy kiemelő szín).
+globs: apps/web/src/**/*.{tsx,ts,css}
+alwaysApply: true
+---
+
+# UI-irány: `reformstudio-ui-skill`
+
+- Minden `apps/web` felületi munkánál (új vagy átállított oldal, komponens, űrlap, táblázat, modál, menü) a `.claude/skills/reformstudio-ui-skill/SKILL.md` az irányadó. Munka előtt olvasd el, és a szükséges `references/` fájlt is. Kattintható prototípus: `.claude/skills/reformstudio-ui-skill/references/prototype/index.html`.
+- **Gomb csak három variánsban:** `primary`, `secondary`, `link`. Negyediket ne találj ki.
+- **Csak tokenszín** (`bg-card`, `text-muted-foreground`, `border-border`, `bg-primary`, …), nyers szín (`slate`, `emerald`, `white`, hexa) nem. A Vendégmonitor (`.monitor-invariant`) kivétel.
+- **Nincs `rounded-xl` és fölötte** (`rounded-2xl`, `rounded-3xl`); gomb és mező `rounded-md`, kártya és modál `rounded-lg`.
+- **Nincs színátmenet és blur** (`bg-gradient-*`, `backdrop-blur`), dekoratív blob vagy animált háttér.
+- **Nincs emoji** a felületen; ikon csak lucide.
+- Ellenőrzés jelentés előtt: a SKILL.md 10.4-es pontja. Minden további részlet (tokenek, keret, komponensek, oldalak, akadálymentesség, reszponzív viselkedés) a SKILL.md-ben van.

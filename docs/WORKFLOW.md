@@ -106,7 +106,8 @@ A Recepció **„Újdonságok”** menüpontja (`pages/reception/ui/WhatsNewPane
 ## 4. Kötelező projektszabályok (minden szál számára)
 
 - **FSD rétegek:** importálni csak alsóbb rétegből, slice-ot csak a publikus `index.ts`-én keresztül (`docs/ARCHITECTURE.md` 1.2, `npm run lint:fsd`).
-- **Sötét/Világos téma:** minden új UI elem támogatja mindkét témát (`.cursor/rules/theme-support.mdc`). Kivétel: a Vendégmonitor fix dizájnja.
+- **UI-irány:** minden `apps/web` felületi munkánál a [`reformstudio-ui-skill`](../.claude/skills/reformstudio-ui-skill/SKILL.md) a mérvadó (tokenek, három gombvariáns, keret, oldalak, ellenőrzőlista).
+- **Sötét/Világos téma:** minden új UI elem támogatja mindkét témát (`.cursor/rules/theme-support.mdc`; új kódban tokenosztályokkal). Kivétel: a Vendégmonitor fix dizájnja.
 - **Nyelv:** felhasználói felület és dokumentáció magyarul.
 - **Mock pár:** minden új vagy módosított API-végponthoz `shared/api/mock-engine.ts` pár.
 - **Tranzakciók:** bérlet-/pénzügyi módosítás csak atomi Prisma `$transaction`-ben.
