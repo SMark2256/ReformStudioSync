@@ -86,8 +86,17 @@ jobs:
       - name: shared build
         run: npm run build:shared
 
+      # A böngésző a Playwright saját tárhelyéről jön, a rendszerfüggőségek az apt-ból (TICKET-33).
       - name: Playwright Chromium telepítése
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install chromium
+
+      # Ha az Ubuntu csomagtükör nem érhető el (2026-11-11: security.ubuntu.com), az apt
+      # percekig vár, majd elbukik. Ilyenkor a runner képén lévő Chrome-függőségekkel megyünk
+      # tovább; ha valami tényleg hiányzik, azt az E2E lépés jelzi.
+      - name: Playwright rendszerfüggőségek
+        continue-on-error: true
+        timeout-minutes: 4
+        run: npx playwright install-deps chromium
 
       - name: E2E tesztek
         run: npm run test:e2e
