@@ -63,6 +63,22 @@ export const getJiraIssueUrl = (jiraKey: string): string =>
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    id: 'v0.3-ui-finance-passes-news',
+    version: '0.3',
+    date: '2026-11-11',
+    kind: 'IMPROVEMENT',
+    title: 'Megújult Pénzügy, Bérletek és termékek, Újdonságok, bejelentkezés és demó',
+    summary:
+      'Ezek az oldalak is az új, nyugodtabb felületet kapták: egységes kártyák, táblázatok, gombok és ablakok, világos és sötét témában is jól olvashatóan. A működésük nem változott.',
+    details: [
+      'Pénzügy: felül a napi kassza négy összesítője, alatta a lejárt tagdíjak és a mai tranzakciók táblázata. A fizetés sztornója előtt megerősítést kér a rendszer.',
+      'Bérletek és termékek: a bérletsablonok és a szolgáltatások táblázatban, alattuk az új tétel űrlapja. A vendégmonitorok párosítása ugyanitt van; a párosítás bontása és a kijelző törlése megerősítést kér.',
+      'A bérleteladás, a befizetés rögzítése és a kezeléslevonás ablaka egységes fejlécet, görgethető törzset, alul Mégse és megerősítő gombot kapott; telefonon teljes képernyős.',
+      'A bejelentkezés, a demó oldal és a v0.2 kiadási jegyzék az új stílust követi. A Vendégmonitor megtartja a fix sötét megjelenését, színátmenetek nélkül.',
+    ],
+    jiraKey: 'TICKET-24',
+  },
+  {
     id: 'v0.3-guests-new-ui',
     version: '0.3',
     date: '2026-11-11',

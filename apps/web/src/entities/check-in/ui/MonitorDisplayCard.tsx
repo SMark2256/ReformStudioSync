@@ -7,7 +7,6 @@ import {
   CheckCircle2,
   Clock,
   RotateCcw,
-  Sparkles,
   Ticket,
 } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
@@ -33,14 +32,16 @@ export const MonitorDisplayCard: React.FC<MonitorDisplayCardProps> = ({
   if (revokedBanner) {
     return (
       <div
-        className={`monitor-invariant flex flex-col items-center justify-center rounded-3xl bg-gradient-to-br from-amber-500 to-orange-600 text-white shadow-2xl transition-all duration-300 ${
+        className={`monitor-invariant flex flex-col items-center justify-center rounded-lg bg-amber-600 text-white ${
           compact ? 'min-h-[340px] p-6' : 'min-h-[78vh] p-12'
         }`}
       >
         <RotateCcw
+          aria-hidden
+          strokeWidth={1.75}
           className={compact ? 'h-14 w-14 mb-3' : 'h-24 w-24 mb-6'}
         />
-        <span className="rounded-full bg-white/20 px-4 py-1 text-xs font-bold uppercase tracking-widest">
+        <span className="rounded-sm bg-white/20 px-3 py-1 text-xs font-semibold">
           Rögzítés Visszavonva
         </span>
         <p
@@ -57,19 +58,22 @@ export const MonitorDisplayCard: React.FC<MonitorDisplayCardProps> = ({
   if (!activeResult) {
     return (
       <div
-        className={`monitor-invariant relative flex flex-col items-center justify-between overflow-hidden rounded-3xl border border-slate-800 bg-gradient-to-br from-slate-950 via-slate-900 to-emerald-950 text-white shadow-2xl ${
+        className={`monitor-invariant relative flex flex-col items-center justify-between overflow-hidden rounded-lg border border-slate-800 bg-slate-950 text-white ${
           compact ? 'min-h-[340px] p-6' : 'min-h-[78vh] p-12'
         }`}
       >
         <div className="flex w-full items-center justify-between text-slate-400">
           <div className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-emerald-400" />
-            <span className="text-xs font-bold uppercase tracking-widest text-emerald-400">
+            <span className="text-xs font-semibold uppercase tracking-wide text-emerald-400">
               RE-FORM STÚDIÓ • Vendégmonitor
             </span>
           </div>
           <div className="flex items-center gap-1.5 font-mono text-sm text-slate-300">
-            <Clock className="h-4 w-4 text-emerald-400" />
+            <Clock
+              aria-hidden
+              strokeWidth={1.75}
+              className="h-4 w-4 text-emerald-400"
+            />
             {clock.toLocaleTimeString('hu-HU', {
               hour: '2-digit',
               minute: '2-digit',
@@ -79,11 +83,15 @@ export const MonitorDisplayCard: React.FC<MonitorDisplayCardProps> = ({
         </div>
 
         <div className="my-auto flex flex-col items-center text-center py-6">
-          <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-500/15 border border-emerald-500/30">
-            <Ticket className="h-8 w-8 text-emerald-400" />
+          <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-lg bg-emerald-500/15 border border-emerald-500/30">
+            <Ticket
+              aria-hidden
+              strokeWidth={1.75}
+              className="h-8 w-8 text-emerald-400"
+            />
           </div>
           <h2
-            className={`font-extrabold tracking-tight text-white ${
+            className={`font-bold tracking-tight text-white ${
               compact ? 'text-2xl' : 'text-5xl'
             }`}
           >
@@ -122,21 +130,21 @@ export const MonitorDisplayCard: React.FC<MonitorDisplayCardProps> = ({
 
   const bgClass = !isSuccess
     ? isDuplicate
-      ? 'from-amber-500 via-amber-600 to-orange-700'
-      : 'from-slate-800 via-slate-900 to-rose-950'
+      ? 'bg-amber-600'
+      : 'bg-rose-900'
     : hasSafeWarnings
-      ? 'from-emerald-600 via-teal-600 to-amber-600'
-      : 'from-emerald-600 via-emerald-500 to-teal-700';
+      ? 'bg-teal-700'
+      : 'bg-emerald-700';
 
   return (
     <div
-      className={`monitor-invariant flex flex-col items-center justify-between rounded-3xl bg-gradient-to-br ${bgClass} text-white shadow-2xl transition-all duration-300 ${
+      className={`monitor-invariant flex flex-col items-center justify-between rounded-lg ${bgClass} text-white ${
         compact ? 'min-h-[340px] p-6' : 'min-h-[78vh] p-12'
       }`}
     >
       {/* Top Bar: NEVER shows barcode or financial details */}
       <div className="flex w-full items-center justify-between">
-        <span className="rounded-full bg-black/20 px-4 py-1 text-xs font-bold uppercase tracking-widest">
+        <span className="rounded-sm bg-black/20 px-3 py-1 text-xs font-semibold">
           {isSuccess
             ? isTreatment
               ? 'Kezelés • Üdvözlés'
@@ -153,10 +161,14 @@ export const MonitorDisplayCard: React.FC<MonitorDisplayCardProps> = ({
       <div className="my-auto flex flex-col items-center text-center py-4">
         {isSuccess ? (
           <CheckCircle2
+            aria-hidden
+            strokeWidth={1.75}
             className={compact ? 'h-14 w-14 mb-3' : 'h-24 w-24 mb-5'}
           />
         ) : (
           <AlertTriangle
+            aria-hidden
+            strokeWidth={1.75}
             className={compact ? 'h-14 w-14 mb-3' : 'h-24 w-24 mb-5'}
           />
         )}
@@ -171,7 +183,7 @@ export const MonitorDisplayCard: React.FC<MonitorDisplayCardProps> = ({
               Üdvözlünk,
             </p>
             <h1
-              className={`mt-1 font-black tracking-tight ${
+              className={`mt-1 font-bold tracking-tight ${
                 compact ? 'text-3xl' : 'text-6xl'
               }`}
             >
@@ -184,12 +196,12 @@ export const MonitorDisplayCard: React.FC<MonitorDisplayCardProps> = ({
           !isTreatment ? (
             /* 5.3 Köredzéses érkezés után: „Üdvözlünk, [Keresztnév]! Jó edzést kívánunk!” */
             <div
-              className={`mt-6 rounded-2xl bg-black/25 backdrop-blur-md border border-white/20 ${
+              className={`mt-6 rounded-lg bg-black/25 border border-white/20 ${
                 compact ? 'px-6 py-4' : 'px-12 py-7'
               }`}
             >
               <p
-                className={`font-extrabold text-white ${
+                className={`font-bold text-white ${
                   compact ? 'text-xl' : 'text-4xl'
                 }`}
               >
@@ -199,12 +211,12 @@ export const MonitorDisplayCard: React.FC<MonitorDisplayCardProps> = ({
           ) : (
             /* 5.3 Alkalmas kezelés levonása után: „Üdvözlünk, [Név]! [Kezelés neve]. Hátralévő alkalmak: [X]. Kellemes kezelést kívánunk!” */
             <div
-              className={`mt-5 flex flex-col items-center gap-3 rounded-2xl bg-black/25 backdrop-blur-md border border-white/20 ${
+              className={`mt-5 flex flex-col items-center gap-3 rounded-lg bg-black/25 border border-white/20 ${
                 compact ? 'px-6 py-4' : 'px-12 py-7'
               }`}
             >
               <span
-                className={`font-extrabold text-emerald-200 ${
+                className={`font-bold text-emerald-200 ${
                   compact ? 'text-lg' : 'text-3xl'
                 }`}
               >
@@ -212,11 +224,11 @@ export const MonitorDisplayCard: React.FC<MonitorDisplayCardProps> = ({
               </span>
 
               <div className="my-1">
-                <span className="block text-xs uppercase tracking-wider text-white/80">
+                <span className="block text-xs text-white/80">
                   Hátralévő alkalmak
                 </span>
                 <span
-                  className={`font-black text-white ${
+                  className={`font-bold tabular-nums text-white ${
                     compact ? 'text-3xl' : 'text-6xl'
                   }`}
                 >
@@ -237,10 +249,8 @@ export const MonitorDisplayCard: React.FC<MonitorDisplayCardProps> = ({
           )
         ) : (
           /* Semleges elutasító üzenet: név, ok és pénzügyi részletek nélkül */
-          <div className="rounded-2xl bg-black/30 px-6 py-4 border border-white/20 max-w-md">
-            <p
-              className={compact ? 'text-xl font-bold' : 'text-4xl font-bold'}
-            >
+          <div className="rounded-lg bg-black/30 px-6 py-4 border border-white/20 max-w-md">
+            <p className={compact ? 'text-xl font-bold' : 'text-4xl font-bold'}>
               Kérjük, fáradj a recepcióhoz!
             </p>
           </div>
@@ -248,8 +258,12 @@ export const MonitorDisplayCard: React.FC<MonitorDisplayCardProps> = ({
 
         {hasSafeWarnings && (
           <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-400 px-3.5 py-1 text-xs font-extrabold text-slate-950 shadow">
-              <AlertTriangle className="h-3.5 w-3.5" />
+            <span className="inline-flex items-center gap-1.5 rounded-sm bg-amber-400 px-3 py-1 text-xs font-semibold text-slate-950">
+              <AlertTriangle
+                aria-hidden
+                strokeWidth={1.75}
+                className="h-3.5 w-3.5"
+              />
               {activeResult.remainingPasses === 0
                 ? 'Ez volt az utolsó alkalmad a bérleten!'
                 : `Már csak ${activeResult.remainingPasses} alkalom maradt a bérleteden!`}
@@ -259,7 +273,7 @@ export const MonitorDisplayCard: React.FC<MonitorDisplayCardProps> = ({
       </div>
 
       <div className="w-full text-center text-xs text-white/75">
-        A képernyő néhány másodperc múlva automatikusan alaphelyzetbe áll...
+        A képernyő néhány másodperc múlva automatikusan alaphelyzetbe áll.
       </div>
     </div>
   );

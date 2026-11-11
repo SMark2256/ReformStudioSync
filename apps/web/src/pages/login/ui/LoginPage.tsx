@@ -1,4 +1,4 @@
-import { Lock, Sparkles, PlayCircle } from 'lucide-react';
+import { Lock } from 'lucide-react';
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ThemeToggleButton } from '@/features/toggle-theme';
@@ -7,12 +7,11 @@ import { api } from '@/shared/api';
 import { handleAppError } from '@/shared/lib/errors';
 import { notify } from '@/shared/lib/notify';
 import { useAuthStore } from '@/shared/auth';
-import { useThemeStore } from '@/shared/theme';
+import { Button, Card, CardContent, Input, Label } from '@/shared/ui';
 
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const { setAuth } = useAuthStore();
-  const { theme } = useThemeStore();
   const [email, setEmail] = useState('admin@reformstudio.hu');
   const [password, setPassword] = useState('Admin123!');
   const [loading, setLoading] = useState(false);
@@ -36,108 +35,99 @@ export const LoginPage: React.FC = () => {
   };
 
   return (
-    <div
-      className={`min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-4 transition-colors duration-200 ${
-        theme === 'dark' ? 'reception-theme-dark dark' : ''
-      }`}
-    >
-      <div className="w-full max-w-md rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-8 text-slate-900 dark:text-white shadow-xl">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-500/15 border border-emerald-500/30">
-              <Sparkles className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-xl font-extrabold tracking-tight text-slate-900 dark:text-white">
-                  ReformStudioSync
-                </h1>
-                <VersionBadge />
+    <div className="flex min-h-screen items-center justify-center bg-background p-4 text-foreground">
+      <Card className="w-full max-w-md">
+        <CardContent className="space-y-6 p-6 md:p-8">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <span
+                aria-hidden
+                className="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary text-[13px] font-bold text-primary-foreground"
+              >
+                RS
+              </span>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h1 className="text-xl font-semibold text-foreground">
+                    ReformStudioSync
+                  </h1>
+                  <VersionBadge />
+                </div>
+                <p className="text-[13px] text-muted-foreground">
+                  Recepció és valós idejű vendégmonitor
+                </p>
               </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                Recepciós & Valós Idejű Vendégmonitor Rendszer
-              </p>
             </div>
-          </div>
-          <ThemeToggleButton />
-        </div>
-
-        <form onSubmit={handleSubmit} className="mt-6 space-y-4">
-          <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
-              E-mail cím
-            </label>
-            <input
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 px-4 py-2.5 text-sm text-slate-900 dark:text-white focus:border-emerald-500 focus:outline-none"
-            />
+            <ThemeToggleButton />
           </div>
 
-          <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
-              Jelszó
-            </label>
-            <input
-              type="password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 px-4 py-2.5 text-sm text-slate-900 dark:text-white focus:border-emerald-500 focus:outline-none"
-            />
-          </div>
+          <form onSubmit={handleSubmit} className="space-y-3.5">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="login-email">E-mail cím</Label>
+              <Input
+                id="login-email"
+                type="email"
+                autoComplete="username"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </div>
 
-          <div className="flex items-center gap-2 text-xs">
-            <button
-              type="button"
-              onClick={() => {
-                setEmail('admin@reformstudio.hu');
-                setPassword('Admin123!');
-              }}
-              className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 px-2.5 py-1 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700"
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="login-password">Jelszó</Label>
+              <Input
+                id="login-password"
+                type="password"
+                autoComplete="current-password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                size="sm"
+                onClick={() => {
+                  setEmail('admin@reformstudio.hu');
+                  setPassword('Admin123!');
+                }}
+              >
+                Admin kitöltés
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => {
+                  setEmail('recepcio@reformstudio.hu');
+                  setPassword('Recepcio123!');
+                }}
+              >
+                Recepciós kitöltés
+              </Button>
+            </div>
+
+            <Button
+              type="submit"
+              variant="primary"
+              disabled={loading}
+              className="w-full"
             >
-              Admin kitöltés
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setEmail('recepcio@reformstudio.hu');
-                setPassword('Recepcio123!');
-              }}
-              className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 px-2.5 py-1 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700"
-            >
-              Recepciós kitöltés
-            </button>
+              <Lock aria-hidden strokeWidth={1.75} />
+              {loading ? 'Bejelentkezés...' : 'Belépés a Recepciós Pultra'}
+            </Button>
+          </form>
+
+          <div className="flex flex-col items-center gap-2 border-t border-border pt-5">
+            <Button variant="link" asChild>
+              <Link to="/demo">Interaktív Demo és tesztelői oldal (/demo)</Link>
+            </Button>
+            <Button variant="link" asChild>
+              <Link to="/monitor">Vendégmonitor megnyitása (/monitor)</Link>
+            </Button>
           </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full flex items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 text-sm font-bold text-white shadow-lg hover:bg-emerald-500 disabled:opacity-50"
-          >
-            <Lock className="h-4 w-4" />
-            {loading ? 'Bejelentkezés...' : 'Belépés a Recepciós Pultra'}
-          </button>
-        </form>
-
-        <div className="mt-6 border-t border-slate-200 dark:border-slate-800 pt-5 flex flex-col gap-2.5">
-          <Link
-            to="/demo"
-            className="flex items-center justify-center gap-2 rounded-xl border border-emerald-500/40 bg-emerald-500/10 py-2.5 text-xs font-semibold text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/20"
-          >
-            <PlayCircle className="h-4 w-4" />
-            Interaktív Demo & Tesztelői Oldal Megnyitása (/demo)
-          </Link>
-          <Link
-            to="/monitor"
-            className="text-center text-xs text-slate-500 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-slate-200"
-          >
-            Másodlagos Kijelző / Vendégmonitor megnyitása (/monitor) →
-          </Link>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };
