@@ -12,11 +12,11 @@ import {
 
 const DAY_TICKET_ROW_TEXT = '1 Alkalmas Napijegy';
 
-/** A recepció „Mai Kassza Gyorsösszesítő” kártyája. */
+/** A recepció „Mai kassza” kártyája. */
 function cashSummary(page: Page) {
   return page
     .locator('div')
-    .filter({ hasText: 'Mai Kassza Gyorsösszesítő' })
+    .filter({ hasText: 'Mai kassza' })
     .filter({ hasText: 'Készpénz' })
     .last();
 }
@@ -29,9 +29,9 @@ test.describe('Bérlet / napijegy eladása', () => {
 
   test('napijegy eladása az azonosított vendégnek készpénzzel', async ({ page }) => {
     await scanBarcode(page, '100003');
-    await expect(page.getByRole('heading', { name: 'Szabó Eszter', level: 4 })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Szabó Eszter', level: 3 })).toBeVisible();
 
-    await page.getByRole('button', { name: 'Új Bérlet Eladása' }).click();
+    await page.getByRole('button', { name: 'Új bérlet eladása' }).click();
     await expect(page.getByText('Vendég: Szabó Eszter (100003)')).toBeVisible();
     await page.getByRole('button', { name: 'Mégse' }).click();
 
@@ -58,7 +58,7 @@ test.describe('Regresszió: TICKET-4', () => {
     'TICKET-4: gyorsgombról nyitva vendéget kell választani, és az eladás a kiválasztott vendéghez kerül',
     async ({ page }) => {
       await loginToReception(page);
-      await page.getByRole('button', { name: /3\. Új bérlet/ }).click();
+      await page.getByRole('button', { name: 'Új bérlet', exact: true }).click();
       await expect(page.getByRole('heading', { name: SELL_MODAL_TITLE })).toBeVisible();
 
       // Vendég nélkül nem lehet eladni, és nincs automatikusan kiválasztott vendég.

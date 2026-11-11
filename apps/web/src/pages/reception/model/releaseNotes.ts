@@ -63,6 +63,22 @@ export const getJiraIssueUrl = (jiraKey: string): string =>
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    id: 'v0.3-reception-desk-new-ui',
+    version: '0.3',
+    date: '2026-11-11',
+    kind: 'IMPROVEMENT',
+    title: 'Megújult Recepció oldal',
+    summary:
+      'A Recepció nyugodtabb, egységes kinézetet kapott: felül a gyorsműveletek és a napi összesítő, alatta két oszlopban a beolvasás, az utoljára azonosított vendég, a vendégkereső, a mai kassza és a mai érkezések.',
+    details: [
+      'Az Új vendég, a Beléptetés, az Alkalom levonása, az Új bérlet és a Befizetés gomb az oldal címe mellett van.',
+      'A napi összesítő négy számot mutat: mai forgalom, mai bevétel, lejárt tagdíjak és lejáró bérletek. A mai ünnepeltek alatta, külön sorban látszanak.',
+      'A beléptetés állapotát (Sikeres, Dupla leolvasás, Elutasítva, Visszavonva) jelvény mutatja, a működés nem változott.',
+      'Világos és sötét témában, telefonon és tableten is jól olvasható.',
+    ],
+    jiraKey: 'TICKET-22',
+  },
+  {
     id: 'v0.3-app-shell-sidebar',
     version: '0.3',
     date: '2026-11-11',

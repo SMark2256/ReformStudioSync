@@ -40,7 +40,7 @@ test.describe('Közvetlen linkek frissítéskor', () => {
   test('/reception frissítés után is a recepciós pultot mutatja', async ({ page }) => {
     await loginToReception(page);
     await page.reload();
-    await expect(page.getByRole('heading', { name: /Vonalkódos Köredzés Érkezés/ })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Vonalkódos beléptetés' })).toBeVisible();
     await expect(page.getByRole('region', { name: 'Bejelentkezett felhasználó' })).toContainText('ReformStudio Adminisztrátor');
   });
 });

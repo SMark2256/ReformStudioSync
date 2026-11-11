@@ -26,7 +26,7 @@ function demoSimulator(page: Page) {
 test.describe('Új vendég felvétele', () => {
   test('a recepción felvett vendég azonnal megjelenik és beolvasható', async ({ page }) => {
     await loginToReception(page);
-    await page.getByRole('button', { name: /5\. Új vendég/ }).click();
+    await page.getByRole('button', { name: 'Új vendég', exact: true }).click();
     await createGuest(page);
 
     const row = quickSearchRow(page, NEW_GUEST.barcode);
@@ -36,7 +36,7 @@ test.describe('Új vendég felvétele', () => {
     // Bérlet nélkül a beolvasás azonosít, de nem léptet be.
     await scanBarcode(page, NEW_GUEST.barcode);
     await expect(toasts(page)).toContainText(`Belépés elutasítva: ${NEW_GUEST_NAME}`);
-    await expect(page.getByRole('heading', { name: NEW_GUEST_NAME, level: 4 })).toBeVisible();
+    await expect(page.getByRole('heading', { name: NEW_GUEST_NAME, level: 3 })).toBeVisible();
   });
 
   test('a /demo oldalon felvett vendég megjelenik a vendéglistában', async ({ page }) => {
@@ -67,7 +67,7 @@ test.describe('Regresszió: TICKET-3', () => {
 
       const reception = await context.newPage();
       await loginToReception(reception);
-      await reception.getByRole('button', { name: /5\. Új vendég/ }).click();
+      await reception.getByRole('button', { name: 'Új vendég', exact: true }).click();
       await createGuest(reception);
 
       await page.bringToFront();

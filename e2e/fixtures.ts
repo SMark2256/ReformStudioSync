@@ -35,10 +35,10 @@ export async function loginToReception(page: Page) {
 /** Vonalkód beírása a recepció beolvasó mezőjébe (ugyanaz az út, mint a kézi szkennelés). */
 export async function scanBarcode(page: Page, barcode: string) {
   await page.getByPlaceholder(/Csippantsd le a QR-kódot/).fill(barcode);
-  await page.getByRole('button', { name: 'Köredzés Beléptetés' }).click();
+  await page.getByRole('button', { name: 'Köredzés beléptetés' }).click();
 }
 
-/** A recepció „Vendég Gyorskereső” listájának egy vendégsora (vonalkód alapján). */
+/** A recepció „Vendégkereső” listájának egy vendégsora (vonalkód alapján). */
 export function quickSearchRow(page: Page, barcode: string) {
   return page
     .locator('div')
@@ -57,9 +57,9 @@ export async function deductTreatment(page: Page, barcode: string) {
 
 export const SELL_MODAL_TITLE = 'Bérletértékesítés & Kassza Rögzítés';
 
-/** Eladás az „Utoljára Azonosított Vendég” kártyáról (a vendég előre ki van választva). */
+/** Eladás az „Utoljára azonosított vendég” kártyáról (a vendég előre ki van választva). */
 export async function sellToIdentifiedGuest(page: Page, templateName: RegExp, paymentMethod?: string) {
-  await page.getByRole('button', { name: 'Új Bérlet Eladása' }).click();
+  await page.getByRole('button', { name: 'Új bérlet eladása' }).click();
   await expect(page.getByRole('heading', { name: SELL_MODAL_TITLE })).toBeVisible();
   await page.getByRole('button', { name: templateName }).click();
   if (paymentMethod) await page.getByRole('button', { name: paymentMethod, exact: true }).click();
