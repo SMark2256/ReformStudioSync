@@ -10,6 +10,11 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      # NODE_ENV=production mellett az npm kihagyná a devDependencies-t (nest CLI, typescript).
+      - key: NPM_CONFIG_INCLUDE
+        value: dev
+      - key: NODE_VERSION
+        value: "22"
       - key: PORT
         value: 3001
       - key: DATABASE_URL
