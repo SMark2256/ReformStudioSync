@@ -21,6 +21,15 @@ Ha egy régebbi szabály vagy dokumentum a felületről mást mond, a `reformstu
 
 Koordinátor és worker szálak, tervek, Újdonságok: [`docs/WORKFLOW.md`](docs/WORKFLOW.md).
 
+## CI
+
+- Push után a CI-ra KIZÁRÓLAG így várj, háttérfeladatként: `bash scripts/ci-wait.sh`
+- SOHA ne írj saját sleep/poll ciklust, és ne futtasd a `gh pr checks --watch`-ot.
+- CI FAIL esetén: `gh run view --log-failed`, javítás, push, utána újra ci-wait.
+- CI TIMEOUT vagy ERROR esetén NE próbáld újra: állj meg, és jelezd, melyik check ragadt be.
+
+A [`scripts/ci-wait.sh`](scripts/ci-wait.sh) az aktuális ág PR-ját figyeli (vagy a megadott PR-számot / ágat). A PR checkjei mellett a commit GitHub Actions futásait is nézi, így a sorban álló, még job nélküli futást sem veszi zöldnek. Utolsó sora `CI PASS` / `CI FAIL` / `CI TIMEOUT` / `CI ERROR`, a kilépési kód 0 / 1 / 2 / 3; az időkorlát `CI_WAIT_TIMEOUT` (alap 1800 mp).
+
 ## Kötelező szabályok
 
 - **Újdonságok:** minden felhasználó számára érzékelhető változáshoz bejegyzés az `apps/web/src/pages/reception/model/releaseNotes.ts`-be, kötelező `jiraKey`-jel ([`docs/WORKFLOW.md`](docs/WORKFLOW.md), [`.cursor/rules/release-notes.mdc`](.cursor/rules/release-notes.mdc)).
