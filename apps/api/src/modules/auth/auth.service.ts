@@ -297,14 +297,11 @@ export class AuthService {
       },
     });
 
-    this.monitorGateway?.emitDeviceRevoked(
-      {
-        deviceId: existing.id,
-        reason: 'A recepció új párosító kódot kért ehhez a kijelzőhöz.',
-        timestamp: new Date().toISOString(),
-      },
-      studioId,
-    );
+    this.monitorGateway?.disconnectDevice({
+      deviceId: existing.id,
+      reason: 'A recepció új párosító kódot kért ehhez a kijelzőhöz.',
+      timestamp: new Date().toISOString(),
+    });
 
     return this.toDisplayDeviceDto(updated);
   }
@@ -350,14 +347,11 @@ export class AuthService {
       where: { id: existing.id },
     });
 
-    this.monitorGateway?.emitDeviceRevoked(
-      {
-        deviceId: existing.id,
-        reason: 'A kijelző párosítása törlésre került a recepcióról.',
-        timestamp: new Date().toISOString(),
-      },
-      studioId,
-    );
+    this.monitorGateway?.disconnectDevice({
+      deviceId: existing.id,
+      reason: 'A kijelző párosítása törlésre került a recepcióról.',
+      timestamp: new Date().toISOString(),
+    });
 
     return { deletedId: existing.id };
   }
@@ -377,14 +371,11 @@ export class AuthService {
       where: { id: device.id },
     });
 
-    this.monitorGateway?.emitDeviceRevoked(
-      {
-        deviceId: device.id,
-        reason: 'A kijelző párosítását megszakították az eszközről.',
-        timestamp: new Date().toISOString(),
-      },
-      device.studioId,
-    );
+    this.monitorGateway?.disconnectDevice({
+      deviceId: device.id,
+      reason: 'A kijelző párosítását megszakították az eszközről.',
+      timestamp: new Date().toISOString(),
+    });
 
     return { unpairedId: device.id };
   }

@@ -8,9 +8,12 @@ import {
   WebSocketServer,
 } from '@nestjs/websockets';
 import {
+  APP_ERROR_CATALOG,
+  appError,
   CheckInResultPayload,
   CheckInRevokedPayload,
   DEFAULT_STUDIO_ID,
+  MonitorAuthRejectedPayload,
   MonitorDeviceRevokedPayload,
   MonitorStatePayload,
   MonitorTestPingPayload,
@@ -20,7 +23,7 @@ import {
   toMonitorPayload,
   toMonitorRevokedPayload,
 } from '@reform/shared';
-import { Server, Socket } from 'socket.io';
+import { Namespace, Socket } from 'socket.io';
 import { AuthService } from '../auth/auth.service';
 
 /** Egy hitelesített, regisztrált socket-kliens. */
@@ -47,11 +50,20 @@ export class MonitorGateway
 {
   private readonly logger = new Logger(MonitorGateway.name);
 
+  /** Namespace-es gatewaynél a Nest a namespace-t adja. */
   @WebSocketServer()
-  server: Server;
+  server: Namespace;
 
   /** Socket-azonosító → kliens. Csak a csatlakozás végén, még élő kliens kerül ide. */
   private clients = new Map<string, MonitorClient>();
+
+  /**
+   * Eszköz → a legutóbbi visszavonásának sorszáma. A visszavonás előtt indult,
+   * de csak utána regisztráló kapcsolat a régi tokennel hitelesült, ezért nem
+   * kerülhet be. Kézi műveletenként egy bejegyzés, ezért nem takarítjuk.
+   */
+  private revokedDevices = new Map<string, number>();
+  private revocationSeq = 0;
 
   constructor(
     @Inject(forwardRef(() => AuthService))
@@ -87,17 +99,16 @@ export class MonitorGateway
   }
 
   async handleConnection(client: Socket) {
+    const startedAtSeq = this.revocationSeq;
     try {
       const token =
         client.handshake.auth?.token ||
         (client.handshake.headers?.authorization?.replace('Bearer ', '') ?? '');
 
       if (!token) {
-        this.logger.warn(
-          `Monitor socket connection rejected (${client.id}): Hiányzó hitelesítő token.`,
-        );
-        client.disconnect(true);
-        return;
+        throw appError('AUTH.UNAUTHENTICATED', {
+          message: 'Hiányzó hitelesítő token.',
+        });
       }
 
       const validated = await this.authService.validateSocketToken(token);
@@ -123,9 +134,16 @@ export class MonitorGateway
         return;
       }
 
+      const deviceId =
+        validated.type === 'DEVICE' ? validated.deviceId : undefined;
+      // A hitelesítés alatt visszavont eszköz: a bontás a szobákból is kivezeti.
+      if (deviceId && (this.revokedDevices.get(deviceId) ?? 0) > startedAtSeq) {
+        throw appError('AUTH.DEVICE_TOKEN_INVALID');
+      }
+
       this.clients.set(client.id, {
         studioId,
-        deviceId: validated.type === 'DEVICE' ? validated.deviceId : undefined,
+        deviceId,
         isDisplay: !isStaffDesk,
       });
       this.broadcastMonitorState(studioId);
@@ -134,6 +152,15 @@ export class MonitorGateway
       this.logger.warn(
         `Monitor socket connection rejected (${client.id}): ${error.code} ${error.message}`,
       );
+      // A kliens így tudja meg az okot. Az engine.io a bontással megvárja, hogy
+      // a pufferben lévő csomagok kimenjenek, ezért ez a bontás előtt célba ér.
+      const payload: MonitorAuthRejectedPayload = {
+        code: error.code,
+        // A katalógus szövege: idegen hiba üzenete nem juthat a kliensre.
+        message: APP_ERROR_CATALOG[error.code].message,
+        timestamp: new Date().toISOString(),
+      };
+      client.emit(SOCKET_EVENTS.MONITOR_AUTH_REJECTED, payload);
       client.disconnect(true);
     }
   }
@@ -241,13 +268,24 @@ export class MonitorGateway
       .emit(SOCKET_EVENTS.MONITOR_TEST_PING, payload);
   }
 
-  emitDeviceRevoked(
-    payload: MonitorDeviceRevokedPayload,
-    studioId = DEFAULT_STUDIO_ID,
-  ) {
-    if (!this.server) return;
-    this.server
-      .to(this.getRoomName(studioId))
-      .emit(SOCKET_EVENTS.MONITOR_DEVICE_REVOKED, payload);
+  /**
+   * Visszavont párosítás: az eszköz minden socketje közvetlenül megkapja az okot,
+   * majd a szerver bontja őket, és a bejegyzésük azonnal törlődik. A stúdió többi
+   * kliense csak az új kijelzőszámot kapja.
+   */
+  disconnectDevice(payload: MonitorDeviceRevokedPayload) {
+    this.revokedDevices.set(payload.deviceId, ++this.revocationSeq);
+
+    let studioId: string | undefined;
+    for (const [socketId, entry] of this.clients) {
+      if (entry.deviceId !== payload.deviceId) continue;
+      // Törlés a bontás előtt: a bontáskori `handleDisconnect` már nem broadcastol.
+      this.clients.delete(socketId);
+      studioId = entry.studioId;
+      const socket = this.server?.sockets.get(socketId);
+      socket?.emit(SOCKET_EVENTS.MONITOR_DEVICE_REVOKED, payload);
+      socket?.disconnect(true);
+    }
+    if (studioId) this.broadcastMonitorState(studioId);
   }
 }

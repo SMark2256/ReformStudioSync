@@ -18,7 +18,16 @@ export const SOCKET_EVENTS = {
   MONITOR_PING: 'monitor:ping',
   MONITOR_CONFIG: 'monitor:config',
   MONITOR_TEST_PING: 'monitor:test-ping',
+  /**
+   * A kijelző párosítását visszavonták (törlés vagy új párosító kód). A szerver
+   * közvetlenül az eszköz socketjeinek küldi, majd bontja őket.
+   */
   MONITOR_DEVICE_REVOKED: 'monitor:device-revoked',
+  /**
+   * A szerver elutasította a csatlakozó socket tokenjét
+   * (`MonitorAuthRejectedPayload`). A bontás előtt megy ki.
+   */
+  MONITOR_AUTH_REJECTED: 'monitor:auth-rejected',
   TABLET_DOCUMENT_PUSHED: 'tablet:document_pushed',
   TABLET_DOCUMENT_SIGNED: 'tablet:document_signed',
 } as const;
@@ -95,5 +104,13 @@ export interface MonitorTestPingPayload {
 export interface MonitorDeviceRevokedPayload {
   deviceId: string;
   reason?: string;
+  timestamp: string;
+}
+
+export interface MonitorAuthRejectedPayload {
+  /** Az elutasítás hibakódja a katalógusból (pl. `AUTH.DEVICE_TOKEN_INVALID`). */
+  code: string;
+  /** A katalógus magyar üzenete. */
+  message: string;
   timestamp: string;
 }
