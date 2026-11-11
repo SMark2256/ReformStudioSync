@@ -11,19 +11,16 @@ import {
   DEFAULT_STUDIO_ID,
   DisplayDeviceDto,
   DisplayDeviceStatus,
-  LoginResponseDto,
   MonitorTestPingPayload,
   PairDisplayResponseDto,
   Role,
 } from '@reform/shared';
-import * as bcrypt from 'bcryptjs';
 import { randomBytes, randomInt } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MonitorGateway } from '../monitor/monitor.gateway';
 import {
   CreateStaffUserDto,
   InitDisplayPairingDto,
-  LoginDto,
   SendMonitorTestSignalDto,
   UnpairSelfDeviceDto,
   UpdateDisplayDeviceDto,
@@ -111,42 +108,6 @@ export class AuthService {
     }
   }
 
-  async login(dto: LoginDto): Promise<LoginResponseDto> {
-    const user = await this.prisma.user.findUnique({
-      where: { email: dto.email.trim().toLowerCase() },
-    });
-
-    if (!user || !user.isActive) {
-      throw appError('AUTH.INVALID_CREDENTIALS');
-    }
-
-    const valid = await bcrypt.compare(dto.password, user.passwordHash);
-    if (!valid) {
-      throw appError('AUTH.INVALID_CREDENTIALS');
-    }
-
-    const authUser: AuthUserDto = {
-      id: user.id,
-      studioId: user.studioId,
-      email: user.email,
-      name: user.name,
-      role: user.role as unknown as Role,
-    };
-
-    const accessToken = await this.jwtService.signAsync({
-      sub: authUser.id,
-      email: authUser.email,
-      studioId: authUser.studioId,
-      role: authUser.role,
-      name: authUser.name,
-    });
-
-    return {
-      accessToken,
-      user: authUser,
-    };
-  }
-
   async listStaffUsers(studioId = DEFAULT_STUDIO_ID) {
     const users = await this.prisma.user.findMany({
       where: { studioId },
@@ -173,13 +134,12 @@ export class AuthService {
       throw appError('AUTH.STAFF_EMAIL_TAKEN');
     }
 
-    const passwordHash = await bcrypt.hash(dto.password, 10);
+    // Jelszó nincs (TICKET-35): a munkatárs az e-mailben kapott kóddal lép be.
     const created = await this.prisma.user.create({
       data: {
         studioId,
         email,
         name: dto.name.trim(),
-        passwordHash,
         role: dto.role ?? Role.RECEPTIONIST,
       },
     });

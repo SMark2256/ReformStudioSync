@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="hu" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta name="supported-color-schemes" content="light dark">
+<title>847291 – ReformStudio Sync belépőkód</title>
+<!--
+  Belépőkód levél — minta a TICKET-35 (kódos belépés) workernek.
+  Helyettesítendő: {{CODE}} (847291), {{NAME}} (Márk), {{REQUESTED_AT}} (2026. november 11., 16:42),
+  {{TTL_MINUTES}} (10). Tárgy: "{{CODE}} – ReformStudio Sync belépőkód".
+  E-mail kliensekhez: táblázatos elrendezés, inline stílusok, külső kép és betűtípus nélkül.
+  A <style> csak a sötét módot és a mobil igazítást adja azoknak a klienseknek, amelyek értik.
+-->
+<style>
+  @media (prefers-color-scheme: dark) {
+    .bg-page { background: #0d1117 !important; }
+    .bg-card { background: #161b22 !important; border-color: #30363d !important; }
+    .bg-code { background: #0f2a28 !important; border-color: #1f5f59 !important; }
+    .tx-main { color: #e6edf3 !important; }
+    .tx-muted { color: #9aa4b2 !important; }
+    .tx-code { color: #5eead4 !important; }
+    .bd-top { border-color: #30363d !important; }
+  }
+  @media only screen and (max-width: 620px) {
+    .card-pad { padding: 28px 22px !important; }
+    .code { font-size: 32px !important; letter-spacing: 8px !important; }
+  }
+</style>
+</head>
+<body class="bg-page" style="margin:0;padding:0;background:#f3f5f7;-webkit-text-size-adjust:100%;">
+  <!-- Előnézeti sor (a levéllistában a tárgy mellett látszik) -->
+  <div style="display:none;max-height:0;overflow:hidden;opacity:0;mso-hide:all;">
+    {{CODE}} – a belépőkódod, {{TTL_MINUTES}} percig érvényes.&#8204;&nbsp;&#8204;&nbsp;&#8204;&nbsp;&#8204;&nbsp;&#8204;&nbsp;&#8204;&nbsp;
+  </div>
+
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="bg-page" style="background:#f3f5f7;">
+    <tr>
+      <td align="center" style="padding:32px 12px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:520px;">
+
+          <!-- Fejléc: RS jel + név -->
+          <tr>
+            <td style="padding:0 4px 16px;">
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td width="32" height="32" align="center" valign="middle" style="width:32px;height:32px;background:#0f766e;border-radius:7px;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:13px;font-weight:700;color:#ffffff;">RS</td>
+                  <td class="tx-main" style="padding-left:10px;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:15px;font-weight:600;color:#111827;">ReformStudio Sync</td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Kártya -->
+          <tr>
+            <td class="bg-card card-pad" style="background:#ffffff;border:1px solid #e5e7eb;border-radius:12px;padding:36px 36px 32px;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+              <h1 class="tx-main" style="margin:0 0 12px;font-size:22px;line-height:1.3;font-weight:600;color:#111827;">Belépőkód</h1>
+              <p class="tx-main" style="margin:0 0 24px;font-size:15px;line-height:1.6;color:#374151;">
+                Szia {{NAME}}! Ezzel a kóddal léphetsz be a ReformStudio Sync recepciós felületére:
+              </p>
+
+              <!-- Kód -->
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td align="center" class="bg-code" style="background:#f0fdfa;border:1px solid #99f6e4;border-radius:10px;padding:20px 12px;">
+                    <span class="code tx-code" style="font-family:'SF Mono',SFMono-Regular,Menlo,Consolas,'Liberation Mono',monospace;font-size:38px;line-height:1;font-weight:700;letter-spacing:12px;color:#0f766e;">{{CODE}}</span>
+                  </td>
+                </tr>
+              </table>
+
+              <p class="tx-muted" style="margin:16px 0 0;font-size:14px;line-height:1.6;color:#6b7280;text-align:center;">
+                A kód <strong class="tx-main" style="color:#374151;">{{TTL_MINUTES}} percig</strong> érvényes, és csak egyszer használható.
+              </p>
+
+              <!-- Biztonsági megjegyzés -->
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:28px;">
+                <tr>
+                  <td class="bd-top" style="border-top:1px solid #e5e7eb;padding-top:20px;">
+                    <p class="tx-muted" style="margin:0 0 8px;font-size:13px;line-height:1.6;color:#6b7280;">
+                      <strong class="tx-main" style="color:#374151;">Nem te kérted?</strong> Akkor nyugodtan hagyd figyelmen kívül ezt a levelet: a kód nélkül senki nem tud belépni a fiókodba. A kódot ne add tovább senkinek, a ReformStudio munkatársai sem kérik el.
+                    </p>
+                    <p class="tx-muted" style="margin:0;font-size:13px;line-height:1.6;color:#6b7280;">
+                      Kérés időpontja: {{REQUESTED_AT}}
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Lábléc -->
+          <tr>
+            <td class="tx-muted" style="padding:20px 4px 0;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:12px;line-height:1.6;color:#9ca3af;text-align:center;">
+              Ezt a levelet a ReformStudio Sync küldte automatikusan, kérjük, ne válaszolj rá.
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

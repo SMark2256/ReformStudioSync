@@ -22,10 +22,24 @@ export const test = base.extend({
 
 export { expect };
 
-/** Mock-módú belépés: az API nem érhető el, ezért a login helyi munkamenettel léptet be. */
-export async function loginToReception(page: Page) {
+/** Az E2E saját tesztmunkatársa (TICKET-35). */
+export const E2E_STAFF_EMAIL = 'e2e@reformstudio.test';
+/** Mock-módban (API nélkül) ezzel a kóddal lehet belépni; valódi API mellett az `AUTH_FIXED_LOGIN_CODE`. */
+export const E2E_LOGIN_CODE = '123456';
+
+/** Belépőkód kérése a `/login` oldalon; utána a kódlépés látszik. */
+export async function requestLoginCode(page: Page, email = E2E_STAFF_EMAIL) {
   await page.goto('/login');
-  await page.getByRole('button', { name: 'Belépés a Recepciós Pultra' }).click();
+  await page.getByLabel('E-mail cím').fill(email);
+  await page.getByRole('button', { name: 'Kód küldése' }).click();
+  await expect(page.getByLabel('Belépőkód')).toBeVisible();
+}
+
+/** Mock-módú belépés: az API nem érhető el, ezért a kódellenőrzés helyi munkamenettel léptet be. */
+export async function loginToReception(page: Page) {
+  await requestLoginCode(page);
+  await page.getByLabel('Belépőkód').fill(E2E_LOGIN_CODE);
+  await page.getByRole('button', { name: 'Belépés', exact: true }).click();
   await expect(page).toHaveURL(/\/reception$/);
   await expect(
     page.getByRole('navigation', { name: 'Főmenü' }).getByRole('link', { name: 'Recepció', exact: true }),

@@ -20,10 +20,9 @@ import {
   getStudioDate,
   MembershipStatus as SharedMembershipStatus,
 } from '@reform/shared';
-import * as bcrypt from 'bcryptjs';
 
 /**
- * Alap- és demóadatok (TICKET-27): felhasználók, szolgáltatások, bérletsablonok és a
+ * Alap- és demóadatok (TICKET-27): munkatársak (TICKET-35: jelszó nélkül, kóddal lépnek be), szolgáltatások, bérletsablonok és a
  * recepció „Gyors tesztkódok” gombjaihoz tartozó 6 tesztvendég, a böngészős mock
  * (`apps/web/src/shared/api/mock-engine.ts`) forgatókönyveivel.
  *
@@ -71,6 +70,17 @@ function sampleSvgDataUrl(label: string, colorHex: string): string {
 // ---------------------------------------------------------------------------
 // Törzsadatok
 // ---------------------------------------------------------------------------
+
+const STAFF: { email: string; name: string; role: Role }[] = [
+  { email: 'smark.siklodi@gmail.com', name: 'Siklódi Márk', role: Role.ADMIN },
+  { email: 'b.siklodi@mediajam.hu', name: 'Siklódi Brigi', role: Role.ADMIN },
+  // Tesztkörnyezetben (rögzített belépőkóddal) az E2E saját munkatársa.
+  ...(process.env.AUTH_FIXED_LOGIN_CODE
+    ? [{ email: 'e2e@reformstudio.test', name: 'E2E Tesztmunkatárs', role: Role.RECEPTIONIST }]
+    : []),
+];
+
+const LEGACY_STAFF_EMAILS = ['admin@reformstudio.hu', 'recepcio@reformstudio.hu'];
 
 const SERVICES = [
   { name: 'Női Köredzés (Havi Tagság)', category: ServiceCategory.CIRCUIT, durationMinutes: 45, priceHuf: 22000 },
@@ -755,31 +765,22 @@ async function deleteDemoGuest(guestId: string) {
 }
 
 async function main() {
-  const adminPasswordHash = await bcrypt.hash('Admin123!', 10);
-  const receptionPasswordHash = await bcrypt.hash('Recepcio123!', 10);
+  // Munkatársak (Megrendelő, 2026-11-11): létrehozza vagy frissíti, jelszó nélkül.
+  const staff = await Promise.all(
+    STAFF.map((member) =>
+      prisma.user.upsert({
+        where: { email: member.email },
+        update: { name: member.name, role: member.role, isActive: true },
+        create: { studioId, ...member },
+      }),
+    ),
+  );
+  const [owner] = staff;
 
-  const admin = await prisma.user.upsert({
-    where: { email: 'admin@reformstudio.hu' },
-    update: {},
-    create: {
-      studioId,
-      email: 'admin@reformstudio.hu',
-      name: 'ReformStudio Adminisztrátor',
-      passwordHash: adminPasswordHash,
-      role: Role.ADMIN,
-    },
-  });
-
-  const receptionist = await prisma.user.upsert({
-    where: { email: 'recepcio@reformstudio.hu' },
-    update: {},
-    create: {
-      studioId,
-      email: 'recepcio@reformstudio.hu',
-      name: 'Recepciós Munkatárs',
-      passwordHash: receptionPasswordHash,
-      role: Role.RECEPTIONIST,
-    },
+  // A régi seed munkatársakra befizetések, belépések hivatkoznak: nem töröljük, csak letiltjuk.
+  const { count: deactivatedLegacyStaff } = await prisma.user.updateMany({
+    where: { email: { in: LEGACY_STAFF_EMAILS }, isActive: true },
+    data: { isActive: false },
   });
 
   // Szolgáltatások: név szerint, a meglévőket nem módosítjuk.
@@ -836,7 +837,7 @@ async function main() {
       }
       await deleteDemoGuest(existing.id);
     }
-    await createDemoGuest(spec, receptionist.id, templates, services);
+    await createDemoGuest(spec, owner.id, templates, services);
     guestResults.push(`${label}: ${existing ? 'újra létrehozva' : 'létrehozva'}`);
   }
 
@@ -847,7 +848,7 @@ async function main() {
     await prisma.auditLog.create({
       data: {
         studioId,
-        userId: receptionist.id,
+        userId: owner.id,
         action: 'SYSTEM_INIT',
         entityType: 'Studio',
         entityId: studioId,
@@ -857,8 +858,8 @@ async function main() {
   }
 
   console.log('Seed completed:', {
-    admin: admin.email,
-    receptionist: receptionist.email,
+    staff: staff.map((u) => u.email),
+    deactivatedLegacyStaff,
     createdServices,
     createdTemplates,
     guests: guestResults,

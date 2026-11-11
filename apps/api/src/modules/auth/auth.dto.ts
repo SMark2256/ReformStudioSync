@@ -1,23 +1,30 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Role } from '@reform/shared';
+import { Transform } from 'class-transformer';
 import {
   IsEmail,
   IsEnum,
   IsNotEmpty,
   IsOptional,
   IsString,
-  MinLength,
+  Matches,
 } from 'class-validator';
 
-export class LoginDto {
-  @ApiProperty({ example: 'recepcio@reformstudio.hu' })
+export class RequestLoginCodeDto {
+  @ApiProperty({ example: 'smark.siklodi@gmail.com' })
+  @IsEmail({}, { message: 'Érvényes e-mail cím megadása kötelező.' })
+  email: string;
+}
+
+export class VerifyLoginCodeDto {
+  @ApiProperty({ example: 'smark.siklodi@gmail.com' })
   @IsEmail({}, { message: 'Érvényes e-mail cím megadása kötelező.' })
   email: string;
 
-  @ApiProperty({ example: 'Recepcio123!' })
-  @IsString()
-  @IsNotEmpty({ message: 'A jelszó megadása kötelező.' })
-  password: string;
+  @ApiProperty({ example: '847291' })
+  @Transform(({ value }) => (typeof value === 'string' ? value.replace(/\s/g, '') : value))
+  @Matches(/^\d{6}$/, { message: 'A belépőkód 6 számjegyből áll.' })
+  code: string;
 }
 
 export class CreateStaffUserDto {
@@ -29,11 +36,6 @@ export class CreateStaffUserDto {
   @IsString()
   @IsNotEmpty({ message: 'A név megadása kötelező.' })
   name: string;
-
-  @ApiProperty({ example: 'Jelszo123!' })
-  @IsString()
-  @MinLength(6, { message: 'A jelszónak legalább 6 karakternek kell lennie.' })
-  password: string;
 
   @ApiPropertyOptional({ enum: Role, default: Role.RECEPTIONIST })
   @IsOptional()

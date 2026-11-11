@@ -30,7 +30,9 @@ export const APP_ERROR_CATALOG = {
 
   // Hitelesítés, jogosultság, kijelzők
   'AUTH.UNAUTHENTICATED': { status: 401, message: 'A munkamenet lejárt. Kérjük, jelentkezz be újra!', action: 'login' },
-  'AUTH.INVALID_CREDENTIALS': { status: 401, message: 'Hibás e-mail cím vagy jelszó.', action: 'notify' },
+  'AUTH.CODE_INVALID': { status: 400, message: 'Hibás vagy lejárt belépőkód. Ha lejárt, kérj újat.', action: 'notify' },
+  'AUTH.CODE_RATE_LIMITED': { status: 429, message: 'Túl sok kódkérés. Várj egy percet, és próbáld újra.', action: 'notify' },
+  'AUTH.MAIL_UNAVAILABLE': { status: 502, message: 'Nem sikerült elküldeni a belépőkódot. Próbáld újra később.', action: 'retry' },
   'AUTH.ACCOUNT_INACTIVE': { status: 401, message: 'A felhasználói fiók nem aktív.', action: 'login' },
   'AUTH.FORBIDDEN': { status: 403, message: 'Nincs jogosultságod a művelet végrehajtásához.', action: 'notify' },
   'AUTH.STAFF_EMAIL_TAKEN': { status: 409, message: 'Ezzel az e-mail címmel már létezik munkatárs.', action: 'notify' },

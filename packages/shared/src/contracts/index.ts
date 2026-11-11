@@ -29,6 +29,28 @@ export interface LoginResponseDto {
   user: AuthUserDto;
 }
 
+/** E-mailben küldött belépőkód (TICKET-35): 6 számjegy, 10 percig érvényes. */
+export const LOGIN_CODE_LENGTH = 6;
+export const LOGIN_CODE_TTL_MINUTES = 10;
+
+/** `POST /auth/code` */
+export interface RequestLoginCodeDto {
+  email: string;
+}
+
+/** Ismeretlen vagy inaktív címre is ugyanez a válasz, csak levél nem megy ki. */
+export interface RequestLoginCodeResponseDto {
+  ok: true;
+  /** Csak a böngészős mock tölti ki (demó mód, szerver nélkül): ezzel a kóddal lehet belépni. */
+  demoCode?: string;
+}
+
+/** `POST /auth/verify` — helyes kódra `LoginResponseDto` a válasz. */
+export interface VerifyLoginCodeDto {
+  email: string;
+  code: string;
+}
+
 export interface ServiceDto {
   id: string;
   studioId: string;
