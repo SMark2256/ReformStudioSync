@@ -10,6 +10,11 @@ interface ScannerChannelState {
   lastCheckInResult: CheckInResultPayload | null;
   lastRevokedResult: CheckInRevokedPayload | null;
   scanHistory: CheckInResultPayload[];
+  /**
+   * Kezelésválasztást igénylő beolvasás (TICKET-39), amelyre a recepció még nem nyitotta meg a
+   * kezelésválasztó ablakot. Bármelyik oldalon csippantott kód ide kerül, a recepció veszi fel.
+   */
+  pendingTreatmentSelection: CheckInResultPayload | null;
 
   setListening: (listening: boolean) => void;
   setProcessing: (processing: boolean) => void;
@@ -17,6 +22,8 @@ interface ScannerChannelState {
   recordCheckInResult: (result: CheckInResultPayload) => void;
   recordRevokedResult: (revoked: CheckInRevokedPayload | null) => void;
   clearLastResult: () => void;
+  requestTreatmentSelection: (result: CheckInResultPayload) => void;
+  clearTreatmentSelection: () => void;
 }
 
 export const useScannerChannelStore = create<ScannerChannelState>((set) => ({
@@ -28,6 +35,7 @@ export const useScannerChannelStore = create<ScannerChannelState>((set) => ({
   lastCheckInResult: null,
   lastRevokedResult: null,
   scanHistory: [],
+  pendingTreatmentSelection: null,
 
   setListening: (isListening) => set({ isListening }),
   setProcessing: (isProcessing) => set({ isProcessing }),
@@ -65,4 +73,11 @@ export const useScannerChannelStore = create<ScannerChannelState>((set) => ({
       lastCheckInResult: null,
       lastRevokedResult: null,
     }),
+  requestTreatmentSelection: (result) =>
+    set({
+      pendingTreatmentSelection: result,
+      lastScannedCode: result.barcode,
+      lastScanAt: result.timestamp,
+    }),
+  clearTreatmentSelection: () => set({ pendingTreatmentSelection: null }),
 }));

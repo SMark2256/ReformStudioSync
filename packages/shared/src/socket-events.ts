@@ -38,6 +38,18 @@ export const SOCKET_EVENTS = {
  * tartalmaz, ezért a Vendégmonitorra soha nem kerülhet: oda a `toMonitorPayload`
  * szűkített változata megy (`MonitorCheckInPayload`).
  */
+/** Kezelésválasztásnál (TICKET-39) szóba jöhető bérlet, a kezelésválasztó előtöltéséhez. */
+export interface TreatmentSelectionOption {
+  passId: string;
+  passName: string;
+  passType: PassType;
+  /** A bérlet szolgáltatása; `null`, ha bármelyik kezelésre levonható. */
+  serviceId: string | null;
+  serviceName: string | null;
+  remainingPasses: number | 'Korlátlan';
+  expirationDate: string;
+}
+
 export interface CheckInResultPayload {
   checkInId?: string;
   usageId?: string;
@@ -60,6 +72,8 @@ export interface CheckInResultPayload {
   suggestedRenewalTemplateId?: string | null;
   /** Sikeres belépésnél: a vendégnek ma (Europe/Budapest) van a születésnapja. */
   isBirthday?: boolean;
+  /** Csak `TREATMENT_SELECTION_REQUIRED` esetén: a választható bérletek, a leghamarabb lejáró elöl. */
+  treatmentOptions?: TreatmentSelectionOption[];
   timestamp: string;
 }
 

@@ -1,5 +1,6 @@
 import {
   appError,
+  ARRIVAL_DENIED_MESSAGES,
   AuditLogDto,
   computeRemainingPasses,
   countActiveDeductions,
@@ -59,6 +60,7 @@ import {
   PaymentDto,
   PaymentMethod,
   RecordPaymentRequestDto,
+  resolveArrivalEntitlement,
   Role,
   ServiceCategory,
   ServiceDto,
@@ -1872,7 +1874,8 @@ class MockStudioEngine {
   }
 
   /**
-   * 2.3 Köredzéses érkezés vagy vonalkódos beléptetés (10 mp dupla leolvasás védelemmel)
+   * 2.3 Vonalkódos beléptetés (10 mp dupla leolvasás védelemmel), az API `processBarcodeCheckIn`
+   * párja: a döntés a közös `resolveArrivalEntitlement`, a beolvasás soha nem von le alkalmat.
    */
   scanCheckIn(input: {
     barcode: string;
@@ -1972,35 +1975,43 @@ class MockStudioEngine {
       warnings.push('MEMBERSHIP_PAUSED');
 
     const passes = guest.passes ?? [];
-    const validPasses = passes.filter((p) => {
-      if (!p.isActive || p.isFrozen) return false;
-      if (new Date(p.startDate) > now || new Date(p.expirationDate) < now) {
-        return false;
+    const entitlement = resolveArrivalEntitlement(
+      {
+        memberships: guest.memberships ?? [],
+        passes: passes.map((p) => ({
+          ...p,
+          serviceCategory:
+            state.services.find((s) => s.id === p.serviceId)?.category ?? null,
+        })),
+      },
+      now,
+    );
+    const overdue = {
+      overdueAmountHuf: overdueAmountHuf > 0 ? overdueAmountHuf : undefined,
+      overdueDays: maxOverdueDays > 0 ? maxOverdueDays : undefined,
+    };
+
+    // Köredzéses érkezés (aktív havi tagság vagy köredzésre érvényes időalapú bérlet) -> NINCS alkalomlevonás!
+    if (
+      entitlement.kind === 'CIRCUIT_MEMBERSHIP' ||
+      entitlement.kind === 'CIRCUIT_PASS'
+    ) {
+      const membership =
+        entitlement.kind === 'CIRCUIT_MEMBERSHIP'
+          ? entitlement.membership
+          : undefined;
+      const circuitPass =
+        entitlement.kind === 'CIRCUIT_PASS' ? entitlement.pass : undefined;
+      if (
+        circuitPass &&
+        Math.ceil(
+          (new Date(circuitPass.expirationDate).getTime() - now.getTime()) /
+            (24 * 60 * 60 * 1000),
+        ) <= EXPIRING_SOON_THRESHOLD_DAYS
+      ) {
+        warnings.push('EXPIRING_SOON');
       }
-      if (p.type === PassType.TIME_BASED) return true;
-      return (p.remainingPasses ?? 0) > 0;
-    });
 
-    validPasses.sort((a, b) => {
-      if (a.type === PassType.TIME_BASED && b.type !== PassType.TIME_BASED)
-        return -1;
-      if (a.type !== PassType.TIME_BASED && b.type === PassType.TIME_BASED)
-        return 1;
-      return (
-        new Date(a.expirationDate).getTime() -
-        new Date(b.expirationDate).getTime()
-      );
-    });
-
-    const activePass = validPasses[0];
-
-    // 2.3 Köredzéses érkezés: ha van aktív havi tagsága, vagy kifejezetten CIRCUIT_TRAINING módot választottak -> NINCS alkalomlevonás!
-    const isCircuitArrival =
-      input.visitType === VisitType.CIRCUIT_TRAINING ||
-      Boolean(activeMembership && input.visitType !== VisitType.TREATMENT) ||
-      activePass?.type === PassType.TIME_BASED;
-
-    if (isCircuitArrival && (activeMembership || activePass)) {
       const visitId = `vis-${Date.now()}`;
       const checkInLog: LoggedCheckInDto = {
         id: `chk-${Date.now()}`,
@@ -2008,10 +2019,10 @@ class MockStudioEngine {
         guestId: guest.id,
         guestName: guestFullName,
         guestBarcode: guest.barcode,
-        guestPassId: activePass?.id ?? null,
-        passName: activeMembership
-          ? `Havi Köredzés Tagság (${activeMembership.monthlyFeeHuf.toLocaleString('hu-HU')} Ft/hó)`
-          : (activePass?.passTemplateName ?? 'Köredzés'),
+        guestPassId: circuitPass?.id ?? null,
+        passName: membership
+          ? `Havi Köredzés Tagság (${membership.monthlyFeeHuf.toLocaleString('hu-HU')} Ft/hó)`
+          : (circuitPass?.passTemplateName ?? 'Köredzés'),
         visitType: VisitType.CIRCUIT_TRAINING,
         serviceName: 'Köredzés',
         userId: 'staff-default-1',
@@ -2052,12 +2063,13 @@ class MockStudioEngine {
         guestName: guestFullName,
         serviceName: 'Köredzés',
         passName: checkInLog.passName ?? 'Köredzés',
+        passType: circuitPass?.type,
         remainingPasses: 'Korlátlan',
-        expirationDate: activePass?.expirationDate ?? null,
+        totalPasses: circuitPass?.totalPasses,
+        expirationDate: circuitPass?.expirationDate ?? null,
         warnings,
-        overdueAmountHuf: overdueAmountHuf > 0 ? overdueAmountHuf : undefined,
-        overdueDays: maxOverdueDays > 0 ? maxOverdueDays : undefined,
-        suggestedRenewalTemplateId: activePass?.passTemplateId ?? 'tpl-unlimited',
+        ...overdue,
+        suggestedRenewalTemplateId: circuitPass?.passTemplateId ?? 'tpl-unlimited',
         isBirthday: isBirthdayToday(guest.birthDate, now),
         timestamp: now.toISOString(),
       };
@@ -2069,64 +2081,77 @@ class MockStudioEngine {
       return circuitPayload;
     }
 
-    if (!activePass) {
-      const hasFrozen = passes.some(
-        (p) => p.isActive && p.isFrozen && new Date(p.expirationDate) >= now,
-      );
-      const reason = hasFrozen
-        ? 'A vendég bérlete jelenleg fagyasztva van (szünetel).'
-        : pausedMembership
-          ? 'A vendég havi tagsága jelenleg szüneteltetve van.'
-          : 'Nincs érvényes bérlet vagy aktív havi tagság (lejárt vagy elfogytak az alkalmak)!';
-      const lastPass = passes[0];
-
-      const deniedLog: LoggedCheckInDto = {
-        id: `chk-${Date.now()}`,
-        studioId: DEFAULT_STUDIO_ID,
-        guestId: guest.id,
-        guestName: guestFullName,
-        guestBarcode: guest.barcode,
-        guestPassId: lastPass?.id ?? null,
-        passName: lastPass?.passTemplateName ?? null,
-        userId: 'staff-default-1',
-        staffName: 'Recepciós Munkatárs',
-        status: CheckInStatus.DENIED,
-        reason,
-        createdAt: now.toISOString(),
-      };
-
-      state.checkIns.unshift(deniedLog);
-      this.save(state);
-
-      const deniedPayload: CheckInResultPayload = {
-        checkInId: deniedLog.id,
-        mode: 'CIRCUIT_GREETING',
-        status: CheckInStatus.DENIED,
+    // Csak kezelésre szóló bérlet (TICKET-39, mint az API-n): nincs belépés és monitor-esemény,
+    // a recepción a kezelésválasztó nyílik meg; a levonás a `deductPassUsage`-dzsel történik.
+    if (entitlement.kind === 'TREATMENT_SELECTION') {
+      return {
+        status: CheckInStatus.TREATMENT_SELECTION_REQUIRED,
         guestId: guest.id,
         barcode: guest.barcode,
         guestName: guestFullName,
-        reason,
+        reason:
+          'Alkalmas bérlet: a belépés a kezelés kiválasztásával és az alkalom levonásával rögzül.',
         warnings,
-        overdueAmountHuf: overdueAmountHuf > 0 ? overdueAmountHuf : undefined,
-        overdueDays: maxOverdueDays > 0 ? maxOverdueDays : undefined,
-        suggestedRenewalTemplateId: lastPass?.passTemplateId ?? 'tpl-10',
+        ...overdue,
+        treatmentOptions: entitlement.passes.map((p) => ({
+          passId: p.id,
+          passName: p.passTemplateName ?? 'Bérlet',
+          passType: p.type,
+          serviceId: p.serviceId ?? null,
+          serviceName:
+            p.serviceName ??
+            state.services.find((s) => s.id === p.serviceId)?.name ??
+            null,
+          remainingPasses:
+            p.type === PassType.TIME_BASED
+              ? ('Korlátlan' as const)
+              : (p.remainingPasses ?? 0),
+          expirationDate: p.expirationDate,
+        })),
         timestamp: now.toISOString(),
       };
-
-      broadcastToLocalMonitors({
-        type: 'CHECKIN_RESULT',
-        payload: deniedPayload,
-      });
-      return deniedPayload;
     }
 
-    // Ha nincs havi tagsága, de van alkalmas bérlete és nem köredzésre jött -> levonás az aktív bérletről
-    return this.deductPassUsage({
+    const reason = ARRIVAL_DENIED_MESSAGES[entitlement.reason];
+    const lastPass = passes[0];
+
+    const deniedLog: LoggedCheckInDto = {
+      id: `chk-${Date.now()}`,
+      studioId: DEFAULT_STUDIO_ID,
       guestId: guest.id,
-      passId: activePass.id,
-      serviceId: activePass.serviceId ?? 'srv-reformer',
-      note: 'Gyors vonalkódos kezeléslevonás',
+      guestName: guestFullName,
+      guestBarcode: guest.barcode,
+      guestPassId: lastPass?.id ?? null,
+      passName: lastPass?.passTemplateName ?? null,
+      userId: 'staff-default-1',
+      staffName: 'Recepciós Munkatárs',
+      status: CheckInStatus.DENIED,
+      reason,
+      createdAt: now.toISOString(),
+    };
+
+    state.checkIns.unshift(deniedLog);
+    this.save(state);
+
+    const deniedPayload: CheckInResultPayload = {
+      checkInId: deniedLog.id,
+      mode: 'CIRCUIT_GREETING',
+      status: CheckInStatus.DENIED,
+      guestId: guest.id,
+      barcode: guest.barcode,
+      guestName: guestFullName,
+      reason,
+      warnings,
+      ...overdue,
+      suggestedRenewalTemplateId: lastPass?.passTemplateId ?? 'tpl-10',
+      timestamp: now.toISOString(),
+    };
+
+    broadcastToLocalMonitors({
+      type: 'CHECKIN_RESULT',
+      payload: deniedPayload,
     });
+    return deniedPayload;
   }
 
   /**
@@ -2924,6 +2949,9 @@ class MockStudioEngine {
     }
     return {
       processed: results.length,
+      treatmentSelectionRequired: results.filter(
+        (r) => r.status === CheckInStatus.TREATMENT_SELECTION_REQUIRED,
+      ).length,
       results,
     };
   }

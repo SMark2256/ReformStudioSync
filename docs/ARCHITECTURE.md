@@ -42,11 +42,12 @@ A szabályokat a [Steiger](https://github.com/feature-sliced/steiger) linter ell
 - **Kontextus:** Az eredeti példakódban a WebSocket `emitCheckInResult` a `prisma.$transaction` callbacken belül futott le.
 - **Megoldás:** A `CheckInsService` minden állapotváltozást (beleértve a `DENIED` elutasítások naplózását is) véglegesít a tranzakcióban, és a `monitorGateway.emitCheckInResult(...)` hívás **kizárólag a tranzakció sikeres commitja után** történik meg.
 
-### ADR-03: Determinisztikus Bérlet-Priorizálás
-- **Szabályok:**
-  1. Csak az `isActive === true`, `isFrozen === false`, `startDate <= now` és `expirationDate >= now` bérletek vehetők figyelembe.
-  2. Ha a vendégnek van aktív `TIME_BASED` (időkorlátos korlátlan) bérlete, a rendszer azt részesíti előnyben, hogy az alkalmas bérlete ne fogyjon.
-  3. Több `OCCASION_BASED` bérlet esetén a **leghamarabb lejáró** (`expirationDate ASC`) bérletből történik a levonás.
+### ADR-03: Determinisztikus Bérlet-Priorizálás és beolvasási döntés (TICKET-39)
+- **Szabályok** (egyetlen forrás: `resolveArrivalEntitlement`, `packages/shared/src/pass-rules.ts`; az API és a mock is ezt hívja):
+  1. Csak a számolt állapot szerint aktív (`getPassStatus === ACTIVE`) bérletek vehetők figyelembe.
+  2. Aktív havi tagság, vagy köredzésre érvényes `TIME_BASED` bérlet (nincs szolgáltatáshoz kötve, vagy a szolgáltatása `CIRCUIT` kategóriájú) → köredzés belépés, 0 levonás.
+  3. Különben, ha van érvényes bérlet (alkalmas, vagy nem köredzés szolgáltatáshoz kötött) → `TREATMENT_SELECTION_REQUIRED`: a beolvasás nem rögzít belépést és nem küld monitor-eseményt; a recepción a kezelésválasztó nyílik meg (a választható bérletek a **leghamarabb lejáróval** kezdődnek), a levonás és az üdvözlés a megerősítéskor (`deductTreatmentUsage`) történik. A beolvasás soha nem von le alkalmat.
+  4. Semmi érvényes → elutasítás (`DENIED`, naplózva).
 
 ### ADR-04: Dual-Mode Vendégmonitor (`BroadcastChannel` + `Socket.io` + `DisplayDevice`)
 - **Másodlagos Monitor (Azonos PC):** A böngésző natív `BroadcastChannel('reform_monitor_channel')` csatornáján `< 1 ms` késleltetéssel kapja meg a beléptetési és sztornó eseményeket.

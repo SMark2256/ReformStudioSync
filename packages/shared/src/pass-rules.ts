@@ -1,4 +1,4 @@
-import { PassStatus, PassType } from './enums';
+import { MembershipStatus, PassStatus, PassType, ServiceCategory } from './enums';
 import type { AppErrorCode } from './errors/catalog';
 import { STUDIO_TIME_ZONE } from './membership-dues';
 
@@ -81,6 +81,93 @@ export function passCoversService(
   serviceId: string,
 ): boolean {
   return !passServiceId || passServiceId === serviceId;
+}
+
+/** A beolvasáskori döntéshez (`resolveArrivalEntitlement`) szükséges bérletadatok. */
+export interface ArrivalPassInput extends PassStatusInput {
+  serviceId?: string | null;
+  /** A bérlet szolgáltatásának kategóriája (szolgáltatáshoz kötött bérletnél). */
+  serviceCategory?: ServiceCategory | string | null;
+}
+
+/**
+ * Köredzésre jogosít-e a bérlet: csak időalapú bérlet, amely nincs szolgáltatáshoz kötve, vagy
+ * a szolgáltatása köredzés (CIRCUIT). Alkalmas bérlet köredzésre sem ad ingyenes belépést.
+ */
+export function passGrantsCircuitEntry(pass: {
+  type: PassType | string;
+  serviceId?: string | null;
+  serviceCategory?: ServiceCategory | string | null;
+}): boolean {
+  return (
+    pass.type === PassType.TIME_BASED &&
+    (!pass.serviceId || pass.serviceCategory === ServiceCategory.CIRCUIT)
+  );
+}
+
+export type ArrivalDeniedReason = 'PASS_FROZEN' | 'MEMBERSHIP_PAUSED' | 'NO_VALID_PASS';
+
+/** Az elutasított beolvasás oka a recepciónak (a monitorra nem kerül). */
+export const ARRIVAL_DENIED_MESSAGES: Record<ArrivalDeniedReason, string> = {
+  PASS_FROZEN: 'A vendég bérlete jelenleg fagyasztva van (szünetel).',
+  MEMBERSHIP_PAUSED: 'A vendég havi tagsága jelenleg szüneteltetve van.',
+  NO_VALID_PASS:
+    'Nincs érvényes bérlet vagy aktív tagság (lejárt vagy elfogytak az alkalmak)!',
+};
+
+export type ArrivalEntitlement<P, M> =
+  /** Aktív havi tagság: köredzés, 0 levonás. */
+  | { kind: 'CIRCUIT_MEMBERSHIP'; membership: M }
+  /** Köredzésre érvényes időalapú bérlet: köredzés, 0 levonás. */
+  | { kind: 'CIRCUIT_PASS'; pass: P }
+  /** Csak kezelésre szóló bérlet: a beolvasás nem léptet be, a kezelésválasztó nyílik meg. */
+  | { kind: 'TREATMENT_SELECTION'; passes: P[] }
+  | { kind: 'DENIED'; reason: ArrivalDeniedReason };
+
+/**
+ * Vonalkódos beolvasás döntése (TICKET-39), egyetlen forrás az API-n és a mockban:
+ * 1. aktív havi tagság → köredzés belépés;
+ * 2. különben a leghamarabb lejáró, köredzésre érvényes időalapú bérlet → köredzés belépés;
+ * 3. különben ha van érvényes (aktív) bérlet → kezelésválasztás, a leghamarabb lejáró elöl;
+ * 4. különben elutasítás (fagyasztott bérlet, szüneteltetett tagság vagy nincs érvényes bérlet).
+ * A beolvasás soha nem von le alkalmat; az a kezelésválasztó megerősítésekor történik.
+ */
+export function resolveArrivalEntitlement<
+  P extends ArrivalPassInput,
+  M extends { status: MembershipStatus | string },
+>(
+  input: { memberships: readonly M[]; passes: readonly P[] },
+  now: Date = new Date(),
+): ArrivalEntitlement<P, M> {
+  const membership = input.memberships.find(
+    (m) => m.status === MembershipStatus.ACTIVE,
+  );
+  if (membership) return { kind: 'CIRCUIT_MEMBERSHIP', membership };
+
+  const usable = input.passes
+    .filter((p) => getPassStatus(p, now) === PassStatus.ACTIVE)
+    .sort(
+      (a, b) =>
+        new Date(a.expirationDate).getTime() - new Date(b.expirationDate).getTime(),
+    );
+
+  const circuitPass = usable.find(passGrantsCircuitEntry);
+  if (circuitPass) return { kind: 'CIRCUIT_PASS', pass: circuitPass };
+
+  if (usable.length > 0) return { kind: 'TREATMENT_SELECTION', passes: usable };
+
+  const today = toStudioDayKey(now);
+  const hasFrozenPass = input.passes.some(
+    (p) =>
+      p.isFrozen &&
+      isPassOpen(p, p.remainingPasses) &&
+      today <= toStudioDayKey(p.expirationDate),
+  );
+  if (hasFrozenPass) return { kind: 'DENIED', reason: 'PASS_FROZEN' };
+  if (input.memberships.some((m) => m.status === MembershipStatus.PAUSED)) {
+    return { kind: 'DENIED', reason: 'MEMBERSHIP_PAUSED' };
+  }
+  return { kind: 'DENIED', reason: 'NO_VALID_PASS' };
 }
 
 /** Miért nem vonható le alkalom az adott állapotú bérletről (`null`, ha levonható). */

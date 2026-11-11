@@ -442,6 +442,8 @@ export interface OfflineScanItemDto {
 
 export interface OfflineSyncResponseDto {
   processed: number;
+  /** Ennyi tételnél kell kezelésválasztás: nem rögzült belépés (TICKET-39). */
+  treatmentSelectionRequired: number;
   results: CheckInResultPayload[];
 }
 

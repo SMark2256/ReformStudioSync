@@ -48,6 +48,7 @@ export interface MonitorCheckInRevokedPayload {
 function toMonitorStatus(status: CheckInStatus): MonitorCheckInStatus {
   if (status === CheckInStatus.SUCCESS) return 'SUCCESS';
   if (status === CheckInStatus.DUPLICATE_SCAN) return 'DUPLICATE';
+  // Elutasítás és kezelésválasztás (TICKET-39): a monitor semlegesen a recepcióhoz küld.
   return 'DENIED';
 }
 

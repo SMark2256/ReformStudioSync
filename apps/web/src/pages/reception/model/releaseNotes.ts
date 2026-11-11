@@ -97,6 +97,16 @@ export const getJiraIssueUrl = (jiraKey: string): string =>
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    id: 'v0.3-fix-scan-treatment-selection',
+    version: '0.3',
+    date: '2026-11-11',
+    kind: 'FIX',
+    title: 'Alkalmas bérletnél kezelésválasztó nyílik',
+    summary:
+      'Alkalmas bérletnél a beolvasás után a kezelésválasztó ablak nyílik meg; nincs ingyenes köredzés.',
+    jiraKey: 'TICKET-39',
+  },
+  {
     id: 'v0.3-whats-new-filter',
     version: '0.3',
     date: '2026-11-11',
