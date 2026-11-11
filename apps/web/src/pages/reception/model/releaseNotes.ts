@@ -63,6 +63,16 @@ export const getJiraIssueUrl = (jiraKey: string): string =>
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    id: 'v0.3-fix-payment-round-amount',
+    version: '0.3',
+    date: '2026-11-11',
+    kind: 'FIX',
+    title: 'Befizetés kerek összeggel is rögzíthető',
+    summary:
+      'A Befizetés rögzítése ablakban bármilyen pozitív, egész forintösszeg megadható, így a havi tagdíj és a kerek összegek (pl. 3 000 Ft) is rögzíthetők. Érvénytelen összegnél (pl. 0 Ft vagy üres mező) a mező alatt hibaüzenet jelenik meg.',
+    jiraKey: 'TICKET-25',
+  },
+  {
     id: 'v0.3-ui-finance-passes-news',
     version: '0.3',
     date: '2026-11-11',
