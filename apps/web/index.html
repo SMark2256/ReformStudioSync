@@ -4,8 +4,40 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>ReformStudioSync — Recepciós & Vendégmonitor Rendszer</title>
+    <!-- A mentett téma és felületszín az első kirajzolás előtt, hogy a sötét vagy színes oldal ne
+         villanjon világosan. A kulcsok és az értékek a src/shared/theme (themeStore, surfaceStore,
+         surface.ts) szerintiek; utána a ThemeSync tartja szinkronban. -->
+    <script>
+      try {
+        var root = document.documentElement;
+        var read = function (key) {
+          var stored = localStorage.getItem(key);
+          return stored ? JSON.parse(stored).state || {} : {};
+        };
+        if (read('reform_studio_reception_theme').theme === 'dark') {
+          root.dataset.theme = 'dark';
+        }
+        var surface = read('reform_studio_surface').surface;
+        if (!surface) {
+          // A korábbi kiemelő szín (hexa) a megfelelő palettára fordul.
+          var legacy = {
+            '#1d4ed8': 'blue',
+            '#4338ca': 'indigo',
+            '#9d174d': 'burgundy',
+            '#b45309': 'amber',
+            '#3f6212': 'olive',
+          };
+          surface = legacy[String(read('reform_studio_accent').accent).toLowerCase()];
+        }
+        if (/^(teal|blue|indigo|burgundy|amber|olive)$/.test(surface || '')) {
+          root.dataset.surface = surface;
+        }
+      } catch (error) {
+        // Nem olvasható tároló: a ThemeSync állítja be a megjelenést.
+      }
+    </script>
   </head>
-  <body class="bg-slate-50 text-slate-900 antialiased selection:bg-emerald-600 selection:text-white">
+  <body class="bg-background text-slate-900 antialiased selection:bg-emerald-600 selection:text-white">
     <div id="root"></div>
     <script type="module" src="/src/app/index.tsx"></script>
   </body>

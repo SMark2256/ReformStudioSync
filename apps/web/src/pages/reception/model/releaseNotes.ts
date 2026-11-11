@@ -63,6 +63,23 @@ export const getJiraIssueUrl = (jiraKey: string): string =>
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    id: 'v0.3-sidebar-settings',
+    version: '0.3',
+    date: '2026-11-11',
+    kind: 'NEW_FEATURE',
+    title: 'Új oldalsáv és Beállítások: téma és felületszín',
+    summary:
+      'A bal oldali menü sötét, lebegő kártya lett. A nevedre kattintva felcsúszó panelből éred el a Beállításokat, a téma kapcsolót és a kijelentkezést. A Beállításokban a téma mellett a felület színét is kiválaszthatod.',
+    details: [
+      'Ikonsávra csukva az egeret a menü fölé húzva kinyílik a tartalom fölött, és elhagyva visszacsukódik. A választás (nyitva vagy ikonsáv) keskeny és széles képernyőn külön mentődik.',
+      'Hat felületszín közül választhatsz (Kékeszöld, Kék, Indigó, Bordó, Borostyán, Olajzöld); a gombok, az aktív menüpont és a jelölők ehhez igazodnak, világos és sötét témában is.',
+      'A téma és a felületszín ezen a gépen mentődik, és újratöltés után villanás nélkül megmarad. A Vendégmonitor megjelenése nem változik.',
+      'A menü alján látszik a futó verzió; rákattintva az Újdonságok nyílnak meg.',
+    ],
+    jiraKey: 'TICKET-28',
+    link: { type: 'route', path: '/settings', label: 'Beállítások megnyitása' },
+  },
+  {
     id: 'v0.3-fix-deduct-treatment-feedback',
     version: '0.3',
     date: '2026-11-11',
@@ -318,3 +335,6 @@ export const RELEASE_NOTES: ReleaseNote[] = [
     jiraKey: null,
   },
 ];
+
+/** A futó verzió: a legújabb bejegyzésé (az oldalsáv alján látszik). */
+export const CURRENT_VERSION = RELEASE_NOTES[0].version;

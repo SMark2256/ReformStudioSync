@@ -1,0 +1,169 @@
+import { Check, Moon, Sun } from 'lucide-react';
+import React from 'react';
+import { useSidebarCollapsed } from '@/widgets/app-shell';
+import { useIsMobile } from '@/shared/lib/hooks';
+import {
+  SURFACE_COLORS,
+  THEME_LABELS,
+  getSurfaceName,
+  isSurfaceColor,
+  saveSurface,
+  saveTheme,
+  useSurfaceStore,
+  useThemeStore,
+  type ReceptionTheme,
+} from '@/shared/theme';
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  Label,
+  PageHeader,
+  Switch,
+  ToggleGroup,
+  ToggleGroupItem,
+} from '@/shared/ui';
+
+const THEME_OPTIONS: { value: ReceptionTheme; icon: typeof Sun }[] = [
+  { value: 'light', icon: Sun },
+  { value: 'dark', icon: Moon },
+];
+
+interface SettingRowProps {
+  id: string;
+  title: string;
+  description: string;
+  children: React.ReactNode;
+}
+
+// Beállítássor (UI-specifikáció 6.9): 220 px leírás + vezérlő; mobilon egymás alatt.
+const SettingRow: React.FC<SettingRowProps> = ({
+  id,
+  title,
+  description,
+  children,
+}) => (
+  <div className="grid gap-x-6 gap-y-2.5 py-4 first:pt-0 last:pb-0 md:grid-cols-[220px_minmax(0,1fr)]">
+    <div>
+      <h3 id={id} className="text-[13px] font-semibold text-foreground">
+        {title}
+      </h3>
+      <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>
+    </div>
+    <div className="min-w-0">{children}</div>
+  </div>
+);
+
+// Beállítások (UI-specifikáció 6.9): a megjelenés ezen a gépen mentődik, azonnal érvényes. A
+// „Stúdió adatai” kártya külön jegyben készül (nincs még hozzá API).
+export const SettingsPage: React.FC = () => {
+  const theme = useThemeStore((state) => state.theme);
+  const surface = useSurfaceStore((state) => state.surface);
+  const { collapsed, setCollapsed } = useSidebarCollapsed();
+  // Mobilon nincs ikonsáv (kihúzható menü van), ott a kapcsoló a tablet beállítását állítaná.
+  const isMobile = useIsMobile();
+
+  return (
+    <>
+      <PageHeader
+        title="Beállítások"
+        description="A megjelenés ezen a gépen mentődik."
+      />
+      <Card>
+        <CardHeader>
+          <CardTitle>Megjelenés</CardTitle>
+        </CardHeader>
+        <CardContent className="divide-y divide-border">
+          <SettingRow
+            id="settings-theme"
+            title="Téma"
+            description="Világos vagy sötét felület"
+          >
+            <ToggleGroup
+              type="single"
+              aria-labelledby="settings-theme"
+              value={theme}
+              // A kijelölt elemre kattintva a csoport kiürülne: az a választás marad.
+              onValueChange={(next) => {
+                if ((next === 'light' || next === 'dark') && next !== theme) {
+                  saveTheme(next);
+                }
+              }}
+            >
+              {THEME_OPTIONS.map(({ value, icon: Icon }) => (
+                <ToggleGroupItem key={value} value={value}>
+                  <Icon aria-hidden strokeWidth={1.75} />
+                  {THEME_LABELS[value]}
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
+          </SettingRow>
+
+          <SettingRow
+            id="settings-surface"
+            title="Felületszín"
+            description="Elsődleges gombok, aktív menüpont, jelölők"
+          >
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+              <ToggleGroup
+                type="single"
+                aria-labelledby="settings-surface"
+                value={surface}
+                onValueChange={(next) => {
+                  if (isSurfaceColor(next) && next !== surface) {
+                    saveSurface(next);
+                  }
+                }}
+                className="gap-2 overflow-visible rounded-none border-0 bg-transparent shadow-none"
+              >
+                {/* Minden minta a saját `data-surface`-ével a saját palettáját mutatja. */}
+                {SURFACE_COLORS.map((color) => (
+                  <ToggleGroupItem
+                    key={color.id}
+                    value={color.id}
+                    data-surface={color.id}
+                    aria-label={color.name}
+                    title={color.name}
+                    className="group size-[30px] flex-none rounded-md border border-border bg-primary p-0 first:border-l hover:bg-primary data-[state=on]:bg-primary data-[state=on]:outline data-[state=on]:outline-2 data-[state=on]:outline-offset-2 data-[state=on]:outline-foreground md:flex-none coarse:size-10 coarse:min-h-10"
+                  >
+                    <Check
+                      aria-hidden
+                      strokeWidth={2.25}
+                      className="hidden text-primary-foreground group-data-[state=on]:block"
+                    />
+                  </ToggleGroupItem>
+                ))}
+              </ToggleGroup>
+              <span className="text-[13px] text-muted-foreground">
+                {getSurfaceName(surface)}
+              </span>
+            </div>
+          </SettingRow>
+
+          {!isMobile && (
+            <SettingRow
+              id="settings-sidebar"
+              title="Oldalsáv"
+              description="Csak ikonok, több hely a tartalomnak. Keskeny és széles képernyőn külön mentődik."
+            >
+              <div className="flex items-center gap-2">
+                <Switch
+                  id="settings-sidebar-collapsed"
+                  checked={collapsed}
+                  onCheckedChange={setCollapsed}
+                />
+                <Label
+                  htmlFor="settings-sidebar-collapsed"
+                  className="text-[13px] font-normal text-foreground"
+                >
+                  Összecsukott oldalsáv
+                </Label>
+              </div>
+            </SettingRow>
+          )}
+        </CardContent>
+      </Card>
+    </>
+  );
+};

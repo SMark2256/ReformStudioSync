@@ -12,7 +12,7 @@ telepítsd. Saját primitívet csak akkor írj, ha a shadcn-ben nincs megfelelő
 | Szövegmező, kereső | `Input` + `Label` | kereső: `type="search"`, `Label` `sr-only`-val |
 | Legördülő | `Select` | rövid listára; hosszú, kereshető listára `Command` + `Popover` |
 | Jelölőnégyzet | `Checkbox` + `Label` | jogosultságtáblában `aria-label="Recepciós: Bérlet hosszabbítása"` |
-| Egy választás 2–5 lehetőségből | `ToggleGroup type="single"` vagy `RadioGroup` | szűrők, téma; `aria-label` a csoporton |
+| Egy választás 2–5 lehetőségből | `ToggleGroup type="single"` vagy `RadioGroup` | szűrők, téma, felületszín minták; `aria-label` a csoporton |
 | Be/ki kapcsoló beállítás | `Switch` + `Label` | csak azonnal érvényes beállításra |
 | Lista adatokkal | `Table` (asztali) + kártyasor (mobil) | `ResponsiveTable`, lásd lent |
 | Blokk | `Card`, `CardHeader`, `CardTitle` (`h2`), `CardContent` | a `CardTitle` legyen `h2` (`asChild` vagy átírás) |
@@ -20,9 +20,10 @@ telepítsd. Saját primitívet csak akkor írj, ha a shadcn-ben nincs megfelelő
 | Figyelmeztetés a blokkban | `Alert` | lejárt bérlet, hiányzó jog; hibánál `role="alert"` |
 | Űrlap, vásárlás, foglalás | `Dialog` (asztali), mobilon teljes képernyő | lásd lent |
 | Visszafordíthatatlan művelet | `AlertDialog` | sztornó, letiltás, törlés |
-| Mobil menü | `Sidebar` (magától `Sheet`) | nem kell külön `Sheet` |
+| Oldalsáv elem (menüpont, fiókpanel sora, összecsukó gomb) | `SidebarItem` (`nav` / `panel` / `icon`) | csak a sötét oldalsáv kártyán; `asChild`-dal link |
+| Mobil menü | `Sheet` (`widgets/app-shell` `MobileSidebar`) | ugyanaz a sötét kártya, mint asztalin |
 | Tipp a letiltott gombhoz, ikonsávhoz | `Tooltip` | a tartalom ne legyen fontos info, ami máshol nincs |
-| Felhasználói menü | `DropdownMenu` | az oldalsáv alján |
+| Fiókpanel (Beállítások, Téma, Kijelentkezés) | `SidebarAccount` (`widgets/app-shell`) | a munkatárs sora mögül felcsúszó panel, nem `DropdownMenu` |
 | Morzsamenü | `Breadcrumb` | a fejlécben |
 | Telítettség, hátralévő alkalom | `Progress` | `aria-label` + `aria-valuenow` / `aria-valuemax` |
 | Betöltés | `Skeleton` | nem pörgő ikon a tartalom helyén |
@@ -50,8 +51,8 @@ const buttonVariants = cva(
         // Minden más művelet.
         secondary: 'rounded-md border border-input bg-secondary text-secondary-foreground shadow-sm hover:bg-muted',
         // Navigáció, másodrangú művelet szövegben vagy táblázatsorban.
-        link: 'h-auto p-0 text-primary underline underline-offset-4 decoration-1 hover:decoration-2 ' +
-          'dark:text-[color-mix(in_srgb,hsl(var(--primary))_60%,white)]',
+        // `primary-text`: sötét témában a felületszín világos árnyalata (tokens.md).
+        link: 'h-auto p-0 text-primary-text underline underline-offset-4 decoration-1 hover:decoration-2',
       },
       size: {
         default: 'h-9 px-4 coarse:h-11',
@@ -102,43 +103,47 @@ export { buttonVariants };
 ## Alkalmazáskeret
 
 ```
-<SidebarProvider defaultOpen={!isTablet}>
-  <AppSidebar />                       // <Sidebar collapsible="icon">
-  <SidebarInset>                       // <main>-t renderel: ez a fő tartalom landmark
-    <AppHeader />                      // <header>: SidebarTrigger + Breadcrumb + téma gomb
-    <PageContainer>                    // mx-auto w-full max-w-content px-4 md:px-6 py-6
-      <Outlet />
-    </PageContainer>
-  </SidebarInset>
-</SidebarProvider>
+<AppShell newsCount version>            // widgets/app-shell
+  <SkipLink />
+  <AppSidebar />                         // asztali: fixed, lebegő sötét kártya, peek
+  | <MobileSidebar />                    // 768 px alatt: Sheet, ugyanaz a tartalom
+  <AppHeader />                          // <header>: mobilon menü gomb + Breadcrumb + dátum + téma gomb
+  <div className="ml-[var(--sidebar-offset)]">
+    <PageContainer asChild><main id="main" tabIndex={-1}>…</main></PageContainer>
+  </div>
+</AppShell>
 ```
 
-Ez az `app` réteg (vagy `widgets/app-shell`) dolga. Ha a `SidebarInset` `<main>`-t
-renderel, a fejléc kerüljön elé, egy közös burkolón belül, vagy a fejlécet tedd
-a `SidebarInset` fölé, és a `PageContainer` legyen a `<main id="main" tabIndex={-1}>`.
-A lényeg, hogy a DOM-ban pontosan egy `header`, egy fő `nav` és egy `main` legyen.
+A `--sidebar-offset` (a kártya szélessége + 2 × `--sidebar-inset`) tolja a
+tartalmat és a fejléc belsejét; peek közben nem változik. A DOM-ban pontosan egy
+`header`, egy fő `nav` és egy `main` van. Az állapot a `widgets/app-shell/model/
+sidebarState.ts`-ben: `useSidebarState` (elrendezés + peek) és a publikus
+`useSidebarCollapsed` (a Beállítások kapcsolója).
 
-**Oldalsáv (`AppSidebar`)**
+**Oldalsáv (`SidebarPanel`, asztalin és mobilon ugyanaz)**
 
-- `SidebarHeader`: logó („RS”) + „ReformStudio Sync” + stúdió neve.
-- `SidebarContent`: három `SidebarGroup` `SidebarGroupLabel`-lel:
-  - Napi működés: Recepció (`Badge` a bent lévők számával), Vendégmonitor, Órarend
-  - Ügyfelek: Vendégek, Bérletek és termékek
-  - Adminisztráció: Felhasználókezelés, Szerepkörök és jogok, Beállítások
-- A `SidebarMenuButton` mindig kap `tooltip`-et (összecsukva ez a név) és
-  `isActive`-ot. Az aktív linkre `aria-current="page"` kerül (`NavLink`).
-- Jog nélküli menüpont: látszik, lakat ikonnal, `aria-disabled="true"`, és
-  kattintásra toast: „Ehhez a menüponthoz admin jogosultság kell”. A route
-  maga is védett (az `app` rétegben).
-- `SidebarFooter`: a bejelentkezett munkatárs (név + szerepkör) `DropdownMenu`-ben
-  (Profil, Kijelentkezés), alatta a `SidebarTrigger` az összecsukáshoz.
-- Ikonok: `lucide-react`, 18 px, `aria-hidden`.
+- Fejrész: „RS” jel (ikonsáv) / „ReformStudio Sync” (nyitva), jobbra asztalin az
+  összecsukó gomb (`SidebarItem variant="icon"`, `PanelLeft`, `aria-expanded`).
+- `SidebarNavigation`: `nav aria-label="Főmenü"`, szakaszonként szakaszcím (ikonsávban
+  1 px elválasztó) és `ul`; a menüpont `SidebarItem asChild variant="nav"` +
+  `NavLink end` (az aktív `aria-current="page"`-et a `NavLink` adja). A
+  Vendégmonitor `a` elem, külön ablakban nyílik. Alul az Újdonságok (számláló) és a
+  Demó mód.
+- `SidebarAccount`: `section aria-label="Bejelentkezett felhasználó"`, a munkatárs
+  sora (`aria-expanded`, `aria-controls`) és a fiókpanel (Beállítások, Téma
+  `role="switch"`, Kijelentkezés), alatta a verzió (link az Újdonságokra). Esc,
+  kívüli kattintás, navigálás, csukódás zárja; billentyűzettel nyitva a fókusz a
+  panel első elemére kerül.
+- Nyers `<button>` itt sincs: minden kattintható elem `SidebarItem` (`shared/ui`).
+- Ikonok: `lucide-react`, 18 px a menüben, 16 px a panelen, `strokeWidth={1.75}`,
+  `aria-hidden`. Mozgás csak CSS-átmenettel (`SKILL.md` 3.9).
 
-**Fejléc (`AppHeader`)**: `h-14 border-b bg-card`, a tartalma ugyanabban a
-`max-w-content` szélességben, mint az oldal. Bal oldalon mobilon a
-`SidebarTrigger`, utána a `Breadcrumb` (ReformStudio Sync / oldal neve). Jobb
-oldalon dátum és idő (mobilon rejtve), téma gomb (`Button variant="secondary"
-size="icon"`, `aria-pressed`, `aria-label="Sötét mód"`).
+**Fejléc (`AppHeader`)**: `h-14 border-b bg-card`, a háttere a kártya alatt teljes
+szélességű, a tartalma `pl-[var(--sidebar-offset)]`-tól, a `max-w-content`
+szélességben. Bal oldalon mobilon a menü gomb (`Menu`, `aria-label="Menü
+megnyitása"`), utána a `Breadcrumb` (ReformStudio Sync / oldal neve). Jobb oldalon
+dátum és idő (mobilon rejtve), téma gomb (`Button variant="secondary"
+size="icon"`, `aria-pressed`, `aria-label="Sötét mód"`, `saveTheme`).
 
 ## Oldal felépítése
 

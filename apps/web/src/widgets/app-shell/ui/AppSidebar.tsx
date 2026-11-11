@@ -1,216 +1,131 @@
-import { Role } from '@reform/shared';
-import { FlaskConical, LogOut, Megaphone, Moon, Sun } from 'lucide-react';
-import React from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
-import { useAuthStore } from '@/shared/auth';
-import { APP_ROUTES } from '@/shared/config';
-import { openGuestMonitorWindow } from '@/shared/lib/monitor-channel';
-import { notify } from '@/shared/lib/notify';
-import { useThemeStore } from '@/shared/theme';
+import { PanelLeft } from 'lucide-react';
+import React, { useEffect, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
+import { cn } from '@/shared/lib/utils';
+import { SidebarItem } from '@/shared/ui';
 import {
-  Avatar,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-  Sidebar,
-  SidebarContent,
-  SidebarFooter,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
-  SidebarHeader,
-  SidebarMenu,
-  SidebarMenuBadge,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  SidebarTrigger,
-  useSidebar,
-} from '@/shared/ui';
-import { NAV_GROUPS } from '../model/navigation';
+  SIDEBAR_COLLAPSED_WIDTH,
+  SIDEBAR_EXPANDED_WIDTH,
+} from '../model/sidebarState';
+import { SidebarPanel } from './SidebarPanel';
 
-const ROLE_LABELS: Record<Role, string> = {
-  [Role.ADMIN]: 'Admin',
-  [Role.RECEPTIONIST]: 'Recepciós',
-};
+const SIDEBAR_ID = 'app-sidebar';
 
 interface AppSidebarProps {
-  /** Olvasatlan újdonságok száma (az Újdonságok menüpont számlálója). */
+  isLayoutExpanded: boolean;
+  isVisuallyExpanded: boolean;
+  onPeekChange: (open: boolean) => void;
+  onTogglePinned: () => void;
   newsCount: number;
+  version: string;
 }
 
-export const AppSidebar: React.FC<AppSidebarProps> = ({ newsCount }) => {
-  const navigate = useNavigate();
-  const { isMobile, state, setOpenMobile } = useSidebar();
-  const collapsed = state === 'collapsed' && !isMobile;
-  const user = useAuthStore((s) => s.user);
-  const logout = useAuthStore((s) => s.logout);
-  const theme = useThemeStore((s) => s.theme);
-  const toggleTheme = useThemeStore((s) => s.toggleTheme);
-  const staffName = user?.name ?? 'Recepciós munkatárs';
+/**
+ * Asztali oldalsáv (UI-specifikáció 4.1): sötét, lebegő kártya a tartalom mellett. A szélessége
+ * egy rögzített szélességű belső oszlop fölött változik, így csak a kártya doboza méreteződik.
+ * Ikonsávként egér fölé húzásra vagy billentyűzetes fókuszra a tartalom fölött kinyílik (peek);
+ * kívüli kattintásra, elhagyásra, fókuszvesztésre és navigáláskor visszacsukódik.
+ */
+export const AppSidebar: React.FC<AppSidebarProps> = ({
+  isLayoutExpanded,
+  isVisuallyExpanded,
+  onPeekChange,
+  onTogglePinned,
+  newsCount,
+  version,
+}) => {
+  const { pathname } = useLocation();
+  const cardRef = useRef<HTMLDivElement>(null);
+  // A kattintott link megtartja a DOM-fókuszt, de a peeket csak a billentyűzetes fókusz tartja nyitva.
+  const keyboardFocus = useRef(true);
+  const isPeeking = !isLayoutExpanded && isVisuallyExpanded;
+  const toggleLabel = isLayoutExpanded
+    ? 'Oldalsáv összecsukása'
+    : 'Oldalsáv kinyitása';
 
-  const handleOpenMonitor = (event: React.MouseEvent<HTMLAnchorElement>) => {
-    // Módosító billentyűvel (új lap) a böngésző alapviselkedése marad.
+  useEffect(() => onPeekChange(false), [pathname, onPeekChange]);
+
+  // Kívüli koppintás vagy kattintás visszacsukja; érintésnél a fókusz nem mindig mozdul el.
+  useEffect(() => {
+    if (!isPeeking) return;
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!cardRef.current?.contains(event.target as Node)) onPeekChange(false);
+    };
+    document.addEventListener('pointerdown', handlePointerDown);
+    return () => document.removeEventListener('pointerdown', handlePointerDown);
+  }, [isPeeking, onPeekChange]);
+
+  const handlePointerLeave = (event: React.PointerEvent<HTMLDivElement>) => {
+    // Érintésnél csak a kívüli koppintás csukja, így a fiókpanel használható marad.
+    if (event.pointerType === 'touch') return;
+    const active = document.activeElement;
     if (
-      event.button !== 0 ||
-      event.ctrlKey ||
-      event.metaKey ||
-      event.shiftKey ||
-      event.altKey
+      !keyboardFocus.current ||
+      !active ||
+      !event.currentTarget.contains(active)
     ) {
-      return;
+      onPeekChange(false);
     }
-    event.preventDefault();
-    openGuestMonitorWindow();
-    if (isMobile) setOpenMobile(false);
   };
 
-  const handleLogout = () => {
-    logout();
-    notify.info('Sikeres kijelentkezés', 'A munkamenet lezárult.');
-    navigate('/login');
+  const handleBlur = (event: React.FocusEvent<HTMLDivElement>) => {
+    if (!event.currentTarget.contains(event.relatedTarget)) onPeekChange(false);
   };
 
   return (
-    <Sidebar>
-      <SidebarHeader>
-        <span
-          aria-hidden
-          className="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary text-[13px] font-bold text-primary-foreground"
-        >
-          RS
-        </span>
-        <span className="min-w-0 group-data-[collapsible=icon]:sr-only">
-          <span className="block truncate text-sm font-semibold text-foreground">
-            ReformStudio Sync
-          </span>
-          <span className="block truncate text-[11px] text-muted-foreground">
-            RE-FORM Stúdió
-          </span>
-        </span>
-      </SidebarHeader>
-
-      <SidebarContent>
-        {NAV_GROUPS.map((group) => (
-          <SidebarGroup key={group.label}>
-            <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {group.items.map(({ route, icon: Icon, opensWindow }) => {
-                  const { path, title } = APP_ROUTES[route];
-                  const content = (
-                    <>
-                      <Icon aria-hidden strokeWidth={1.75} />
-                      <span>{title}</span>
-                    </>
-                  );
-                  return (
-                    <SidebarMenuItem key={route}>
-                      <SidebarMenuButton asChild tooltip={title}>
-                        {opensWindow ? (
-                          <a href={path} onClick={handleOpenMonitor}>
-                            {content}
-                          </a>
-                        ) : (
-                          <NavLink to={path} end>
-                            {content}
-                          </NavLink>
-                        )}
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  );
-                })}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        ))}
-      </SidebarContent>
-
-      <SidebarFooter>
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              asChild
-              // Ikonsávban ez a menüpont neve is, így a számláló a felolvasóban is megmarad.
-              tooltip={
-                newsCount > 0
-                  ? `${APP_ROUTES.news.title} (${newsCount} olvasatlan)`
-                  : APP_ROUTES.news.title
-              }
+    <div
+      ref={cardRef}
+      id={SIDEBAR_ID}
+      data-state={isVisuallyExpanded ? 'expanded' : 'collapsed'}
+      className={cn(
+        'fixed bottom-[var(--sidebar-inset)] left-[var(--sidebar-inset)] top-[var(--sidebar-inset)] z-20 overflow-hidden rounded-[14px] bg-sidebar text-sidebar-foreground ring-1 ring-sidebar-border',
+        'transition-[width,box-shadow] duration-200 ease-in-out motion-reduce:transition-none',
+        isPeeking
+          ? 'shadow-[0_18px_48px_rgba(15,18,24,0.45)]'
+          : 'shadow-[0_12px_32px_rgba(15,18,24,0.28)]',
+      )}
+      style={{
+        width: isVisuallyExpanded
+          ? SIDEBAR_EXPANDED_WIDTH
+          : SIDEBAR_COLLAPSED_WIDTH,
+      }}
+      onPointerEnter={() => onPeekChange(true)}
+      onPointerLeave={handlePointerLeave}
+      onPointerDownCapture={() => {
+        keyboardFocus.current = false;
+      }}
+      onKeyDownCapture={() => {
+        keyboardFocus.current = true;
+      }}
+      onFocusCapture={() => onPeekChange(true)}
+      onBlurCapture={handleBlur}
+    >
+      <div className="h-full" style={{ width: SIDEBAR_EXPANDED_WIDTH }}>
+        <SidebarPanel
+          isVisuallyExpanded={isVisuallyExpanded}
+          newsCount={newsCount}
+          version={version}
+          headerAction={
+            // Ikonsávban kívül esik a sávon; a billentyűzetes fókusz előbb kinyitja a peeket.
+            <SidebarItem
+              variant="icon"
+              aria-label={toggleLabel}
+              aria-expanded={isLayoutExpanded}
+              aria-controls={SIDEBAR_ID}
+              title={`${toggleLabel} (Ctrl+B)`}
+              onClick={(event) => {
+                // Egérrel összecsukva a gomb ne tartsa nyitva a peeket a fókuszával.
+                if (isLayoutExpanded && event.detail > 0) {
+                  event.currentTarget.blur();
+                }
+                onTogglePinned();
+              }}
             >
-              <NavLink to={APP_ROUTES.news.path} end>
-                <Megaphone aria-hidden strokeWidth={1.75} />
-                <span>
-                  {APP_ROUTES.news.title}
-                  {newsCount > 0 && (
-                    <span className="sr-only"> ({newsCount} olvasatlan)</span>
-                  )}
-                </span>
-              </NavLink>
-            </SidebarMenuButton>
-            {newsCount > 0 && (
-              <SidebarMenuBadge aria-hidden>{newsCount}</SidebarMenuBadge>
-            )}
-          </SidebarMenuItem>
-          <SidebarMenuItem>
-            <SidebarMenuButton asChild tooltip={APP_ROUTES.demo.title}>
-              <NavLink to={APP_ROUTES.demo.path} end>
-                <FlaskConical aria-hidden strokeWidth={1.75} />
-                <span>{APP_ROUTES.demo.title}</span>
-              </NavLink>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
-
-        <section
-          aria-label="Bejelentkezett felhasználó"
-          className="flex items-center gap-1.5 group-data-[collapsible=icon]:flex-col"
-        >
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <SidebarMenuButton
-                tooltip={staffName}
-                className="h-auto min-h-9 min-w-0 py-1 text-foreground"
-                // A menü nyitása ne zárja be a mobil oldalsávot.
-                onClick={(event) => event.preventDefault()}
-              >
-                <Avatar name={staffName} />
-                <span className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
-                  <span className="block truncate text-[13px] font-semibold text-foreground">
-                    {staffName}
-                  </span>
-                  {user && (
-                    <span className="block truncate text-xs text-muted-foreground">
-                      {ROLE_LABELS[user.role]}
-                    </span>
-                  )}
-                </span>
-              </SidebarMenuButton>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent
-              side={collapsed ? 'right' : 'top'}
-              align="start"
-              className="min-w-48"
-            >
-              <DropdownMenuItem onSelect={() => toggleTheme()}>
-                {theme === 'dark' ? (
-                  <Sun aria-hidden strokeWidth={1.75} />
-                ) : (
-                  <Moon aria-hidden strokeWidth={1.75} />
-                )}
-                {theme === 'dark' ? 'Világos mód' : 'Sötét mód'}
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onSelect={handleLogout}>
-                <LogOut aria-hidden strokeWidth={1.75} />
-                Kijelentkezés
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-          {!isMobile && <SidebarTrigger />}
-        </section>
-      </SidebarFooter>
-    </Sidebar>
+              <PanelLeft aria-hidden strokeWidth={1.75} />
+            </SidebarItem>
+          }
+        />
+      </div>
+    </div>
   );
 };

@@ -13,8 +13,10 @@ export interface CheckInToastCallbacks {
 }
 
 export const notify = {
-  success(title: string, description?: string) {
+  /** `id` megadásakor az azonos azonosítójú toast frissül, nem halmozódik. */
+  success(title: string, description?: string, options?: { id?: string }) {
     toast.success(title, {
+      id: options?.id,
       description,
       duration: 4000,
     });

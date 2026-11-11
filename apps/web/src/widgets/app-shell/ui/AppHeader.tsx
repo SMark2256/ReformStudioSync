@@ -1,6 +1,6 @@
-import { Moon, Sun } from 'lucide-react';
+import { Menu, Moon, Sun } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
-import { useThemeStore } from '@/shared/theme';
+import { saveTheme, useThemeStore } from '@/shared/theme';
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -8,7 +8,6 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
   Button,
-  SidebarTrigger,
 } from '@/shared/ui';
 
 const DAY_FORMAT = new Intl.DateTimeFormat('hu-HU', {
@@ -53,18 +52,34 @@ const useCurrentMinute = () => {
 interface AppHeaderProps {
   /** Az aktuális oldal neve a morzsamenüben. */
   title: string;
+  /** Mobilon a kihúzható menü nyitva van. */
+  menuOpen: boolean;
+  onOpenMenu: () => void;
 }
 
 // Fejléc (UI-specifikáció 4.3): mobilon menü gomb, morzsamenü, dátum (mobilon rejtve), téma gomb.
-export const AppHeader: React.FC<AppHeaderProps> = ({ title }) => {
+// A háttere a lebegő oldalsáv alatt a teljes szélességen fut, a tartalma a kártya mellett indul.
+export const AppHeader: React.FC<AppHeaderProps> = ({
+  title,
+  menuOpen,
+  onOpenMenu,
+}) => {
   const theme = useThemeStore((state) => state.theme);
-  const toggleTheme = useThemeStore((state) => state.toggleTheme);
   const now = useCurrentMinute();
 
   return (
-    <header className="sticky top-0 z-10 h-14 shrink-0 border-b border-border bg-card">
+    <header className="sticky top-0 z-10 h-14 shrink-0 border-b border-border bg-card pl-[var(--sidebar-offset)] transition-[padding] duration-200 ease-in-out motion-reduce:transition-none">
       <div className="mx-auto flex h-full max-w-content items-center gap-3 px-3 md:px-6">
-        <SidebarTrigger mode="mobile" className="md:hidden" />
+        <Button
+          variant="secondary"
+          size="icon"
+          className="md:hidden"
+          aria-label="Menü megnyitása"
+          aria-expanded={menuOpen}
+          onClick={onOpenMenu}
+        >
+          <Menu aria-hidden strokeWidth={1.75} />
+        </Button>
         <Breadcrumb className="min-w-0">
           <BreadcrumbList>
             <BreadcrumbItem className="max-md:hidden">
@@ -88,7 +103,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({ title }) => {
             size="icon"
             aria-label="Sötét mód"
             aria-pressed={theme === 'dark'}
-            onClick={() => toggleTheme()}
+            onClick={() => saveTheme(theme === 'dark' ? 'light' : 'dark')}
           >
             {theme === 'dark' ? (
               <Sun aria-hidden strokeWidth={1.75} />

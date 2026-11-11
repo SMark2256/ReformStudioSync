@@ -1,10 +1,11 @@
 export { useThemeStore } from './themeStore';
 export type { ReceptionTheme } from './themeStore';
-export { useAccentStore } from './accentStore';
+export { useSurfaceStore } from './surfaceStore';
 export {
-  ACCENT_PRESETS,
-  DEFAULT_ACCENT,
-  applyAccent,
-  contrastOnWhite,
-  isAccentHex,
-} from './accent';
+  DEFAULT_SURFACE,
+  SURFACE_COLORS,
+  getSurfaceName,
+  isSurfaceColor,
+} from './surface';
+export type { SurfaceColor } from './surface';
+export { THEME_LABELS, saveSurface, saveTheme } from './appearance';
