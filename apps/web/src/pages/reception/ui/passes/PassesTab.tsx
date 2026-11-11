@@ -28,9 +28,8 @@ import {
   SelectValue,
   type ResponsiveTableColumn,
 } from '@/shared/ui';
+import { formatHuf } from '../desk/format';
 import { MonitorDevicesCard } from './MonitorDevicesCard';
-
-const formatHuf = (amount: number) => `${amount.toLocaleString('hu-HU')} Ft`;
 
 const SERVICE_CATEGORY_LABELS: Record<ServiceCategory, string> = {
   [ServiceCategory.BODY_SHAPING]: 'Alakformáló kezelés',

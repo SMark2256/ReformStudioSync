@@ -237,7 +237,7 @@ export const DeductTreatmentModal: React.FC<DeductTreatmentModalProps> = ({
                         onOpenSellPass(selectedGuest);
                       }}
                     >
-                      Új Bérlet Eladása
+                      Új bérlet eladása
                     </Button>
                   )}
                 </Alert>

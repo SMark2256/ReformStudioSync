@@ -22,9 +22,8 @@ import {
   StatCard,
   type ResponsiveTableColumn,
 } from '@/shared/ui';
+import { formatHuf } from '../desk/format';
 import { ConfirmActionButton } from '../ConfirmActionButton';
-
-const formatHuf = (amount: number) => `${amount.toLocaleString('hu-HU')} Ft`;
 
 const formatShortDate = (iso: string) =>
   new Date(iso).toLocaleDateString('hu-HU', { month: 'short', day: 'numeric' });

@@ -1,38 +1,7 @@
-import {
-  CheckInResultPayload,
-  CheckInStatus,
-  DUPLICATE_SCAN_COOLDOWN_SECONDS,
-  GuestDto,
-  PassStatus,
-  PassType,
-  VisitType,
-} from '@reform/shared';
+import { GuestDto, VisitType } from '@reform/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import {
-  AlertTriangle,
-  ArrowLeft,
-  Barcode,
-  Cake,
-  CheckCircle2,
-  CloudOff,
-  FileSignature,
-  Plus,
-  QrCode,
-  RefreshCw,
-  RotateCcw,
-  Search,
-  Snowflake,
-  Sparkles,
-  Ticket,
-  UserCheck,
-  Users,
-  Volume2,
-  VolumeX,
-  Wallet,
-  XCircle,
-} from 'lucide-react';
 import React, { useCallback, useEffect, useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { normalizeScannedCode } from '@/shared/lib/barcode-scanner';
 import {
   broadcastToScannerChannel,
@@ -41,10 +10,8 @@ import {
 import { api } from '@/shared/api';
 import { handleAppError } from '@/shared/lib/errors';
 import { notify } from '@/shared/lib/notify';
-import { soundFeedback } from '@/shared/lib/sound';
 import { useOfflineQueueStore } from '@/entities/check-in';
 import { useScannerChannelStore } from '@/entities/check-in';
-import { Button } from '@/shared/ui';
 import { DigitalPassCardModal } from '@/entities/guest';
 import { GuestModal } from '@/widgets/guest-profile';
 import { DeductTreatmentModal } from '@/features/deduct-treatment';
