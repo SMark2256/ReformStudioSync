@@ -58,6 +58,8 @@ export interface CheckInResultPayload {
   overdueDays?: number;
   greetingSeconds?: number;
   suggestedRenewalTemplateId?: string | null;
+  /** Sikeres belépésnél: a vendégnek ma (Europe/Budapest) van a születésnapja. */
+  isBirthday?: boolean;
   timestamp: string;
 }
 

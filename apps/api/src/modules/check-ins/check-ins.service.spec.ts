@@ -520,4 +520,56 @@ describe('CheckInsService — Kritikus Beléptetési és Köredzés vs. Kezelés
     expect(txMock.visit.create).toHaveBeenCalledTimes(1);
     expect(monitorGatewayMock.emitCheckInResult).toHaveBeenCalledTimes(1);
   });
+
+  it('10. Születésnapos vendég: sikeres belépésnél isBirthday=true (budapesti naptár szerint), más napon false', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    // Budapesten már november 11. van, UTC szerint még november 10.
+    vi.setSystemTime(new Date('2026-11-10T23:30:00.000Z'));
+    try {
+      const guestWith = (birthDate: Date) => ({
+        id: 'guest-1',
+        firstName: 'Anna',
+        lastName: 'Kovács',
+        barcode: 'RS100001',
+        birthDate,
+        isActive: true,
+        memberships: [],
+        passes: [
+          {
+            id: 'pass-10',
+            passTemplateId: 'tpl-10',
+            type: 'OCCASION_BASED',
+            totalPasses: 10,
+            remainingPasses: 7,
+            startDate: pastDate(5),
+            expirationDate: futureDate(25),
+            isActive: true,
+            isFrozen: false,
+            passTemplate: { name: '10 Alkalmas Reformer Bérlet' },
+          },
+        ],
+      });
+
+      txMock.guest.findUnique.mockResolvedValue(
+        guestWith(new Date('1991-11-11T00:00:00.000Z')),
+      );
+      const birthday = await service.processBarcodeCheckIn(
+        { barcode: 'RS100001' },
+        'staff-1',
+      );
+      expect(birthday.status).toBe(CheckInStatus.SUCCESS);
+      expect(birthday.isBirthday).toBe(true);
+
+      txMock.guest.findUnique.mockResolvedValue(
+        guestWith(new Date('1991-11-10T00:00:00.000Z')),
+      );
+      const regular = await service.processBarcodeCheckIn(
+        { barcode: 'RS100001' },
+        'staff-1',
+      );
+      expect(regular.isBirthday).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

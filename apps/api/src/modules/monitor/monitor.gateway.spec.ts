@@ -607,4 +607,27 @@ describe('toMonitorPayload', () => {
     expect(payload.status).toBe('DENIED');
     expect(payload.displayName).toBeUndefined();
   });
+
+  it('születésnapot csak sikeres belépésnél jelez, elutasításnál és ismételt beolvasásnál nem', () => {
+    expect(
+      toMonitorPayload(
+        fullResult({ mode: 'CIRCUIT_GREETING', isBirthday: true }),
+      ).isBirthday,
+    ).toBe(true);
+    expect(toMonitorPayload(fullResult({ isBirthday: true })).isBirthday).toBe(
+      true,
+    );
+
+    for (const status of [
+      CheckInStatus.DENIED,
+      CheckInStatus.DUPLICATE_SCAN,
+    ]) {
+      expect(
+        toMonitorPayload(fullResult({ status, isBirthday: true })),
+      ).not.toHaveProperty('isBirthday');
+    }
+    expect(
+      toMonitorPayload(fullResult({ isBirthday: false })),
+    ).not.toHaveProperty('isBirthday');
+  });
 });

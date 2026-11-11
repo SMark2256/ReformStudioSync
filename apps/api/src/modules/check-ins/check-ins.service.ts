@@ -8,6 +8,7 @@ import {
   DEFAULT_STUDIO_ID,
   DUPLICATE_SCAN_COOLDOWN_SECONDS,
   EXPIRING_SOON_THRESHOLD_DAYS,
+  isBirthdayToday,
   LoggedCheckInDto,
   OfflineSyncResponseDto,
   PassType,
@@ -113,6 +114,7 @@ export class CheckInsService {
       }
 
       const guestFullName = `${guest.lastName} ${guest.firstName}`;
+      const isBirthday = isBirthdayToday(guest.birthDate, now);
 
       // 10 másodperces dupla leolvasás védelem
       if (!dto.forceDuplicate) {
@@ -214,6 +216,7 @@ export class CheckInsService {
           warnings,
           overdueAmountHuf: overdueAmountHuf > 0 ? overdueAmountHuf : undefined,
           overdueDays: maxOverdueDays > 0 ? maxOverdueDays : undefined,
+          isBirthday,
           timestamp: now.toISOString(),
         } satisfies CheckInResultPayload;
       }
@@ -257,6 +260,7 @@ export class CheckInsService {
           warnings,
           overdueAmountHuf: overdueAmountHuf > 0 ? overdueAmountHuf : undefined,
           overdueDays: maxOverdueDays > 0 ? maxOverdueDays : undefined,
+          isBirthday,
           timestamp: now.toISOString(),
         } satisfies CheckInResultPayload;
       }
@@ -366,6 +370,7 @@ export class CheckInsService {
         overdueAmountHuf: overdueAmountHuf > 0 ? overdueAmountHuf : undefined,
         overdueDays: maxOverdueDays > 0 ? maxOverdueDays : undefined,
         suggestedRenewalTemplateId: activePass.passTemplateId,
+        isBirthday,
         timestamp: now.toISOString(),
       } satisfies CheckInResultPayload;
     });
