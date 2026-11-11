@@ -4,9 +4,9 @@ import { defineConfig, devices } from '@playwright/test';
 /**
  * E2E tesztek mock-módban (TICKET-11).
  *
- * A webet egy nem elérhető API-címmel buildeljük és `vite preview`-val szolgáljuk
- * ki, így minden API-hívás hálózati hibára fut, és a kliens a beépített
- * mock-motorra (`apps/web/src/shared/api/mock-engine.ts`) esik vissza. API és
+ * A webet egy nem elérhető API-címmel és `VITE_DEMO_MODE=true`-val buildeljük,
+ * `vite preview`-val szolgáljuk ki, így minden API-hívás hálózati hibára fut, és
+ * a kliens a beépített mock-motorra (`apps/web/src/shared/api/mock-engine.ts`) esik vissza. API és
  * adatbázis nem kell. A dev szerver helyett azért preview, mert a Vite dev
  * futás közbeni függőség-optimalizálása oldal-újratöltést okoz (flaky tesztek).
  * A részleteket lásd: `e2e/README.md`.
@@ -42,6 +42,8 @@ export default defineConfig({
     env: {
       VITE_API_URL: `${UNREACHABLE_HOST}/api`,
       VITE_WS_URL: UNREACHABLE_HOST,
+      // A mock fallback csak demó módban engedélyezett (TICKET-17).
+      VITE_DEMO_MODE: 'true',
     },
   },
 });

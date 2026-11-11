@@ -9,7 +9,7 @@ A **ReformStudioSync** egy egystúdiós (de `studioId` szinten többstúdiós Sa
 - **`packages/shared` (`@reform/shared`):** Közös TypeScript szerződések, Enumok (`Role`, `PassType`, `PaymentMethod`, `CheckInStatus`), REST DTO interfészek és Socket.io esemény-definíciók (`SOCKET_EVENTS`, `CheckInResultPayload`, `CheckInRevokedPayload`).
 - **`apps/api` (`@reform/api`):** NestJS 10 REST API + Socket.io WebSocket Gateway (`/monitor` névtér) + Prisma ORM + Swagger/OpenAPI (`/api/docs`).
 - **`apps/web` (`@reform/web`):** React 18 + Vite + Tailwind CSS + TanStack Query v5 + Zustand + Sonner Toast értesítési réteg + Kliensoldali Mock Sandbox motor (`shared/api/mock-engine.ts`). A frontend a [Feature-Sliced Design](https://feature-sliced.design) módszertan szerint épül fel (lásd 1.2).
-- **`e2e/` + `playwright.config.ts`:** Playwright böngészős tesztek mock-módban: a web nem elérhető API-címmel buildelve (`.e2e-dist/`, `vite preview`) a mock motorra esik vissza, így API és adatbázis nélkül futnak (`npm run test:e2e`, részletek: `e2e/README.md`). A gate-nek nem része.
+- **`e2e/` + `playwright.config.ts`:** Playwright böngészős tesztek mock-módban: a web nem elérhető API-címmel és `VITE_DEMO_MODE=true`-val buildelve (`.e2e-dist/`, `vite preview`) a mock motorra esik vissza, így API és adatbázis nélkül futnak (`npm run test:e2e`, részletek: `e2e/README.md`). A gate-nek nem része.
 
 ### 1.2. Frontend Rétegek (Feature-Sliced Design)
 
@@ -49,10 +49,14 @@ A szabályokat a [Steiger](https://github.com/feature-sliced/steiger) linter ell
 ### ADR-04: Dual-Mode Vendégmonitor (`BroadcastChannel` + `Socket.io` + `DisplayDevice`)
 - **Másodlagos Monitor (Azonos PC):** A böngésző natív `BroadcastChannel('reform_monitor_channel')` csatornáján `< 1 ms` késleltetéssel kapja meg a beléptetési és sztornó eseményeket.
 - **Önálló Eszköz (Tablet / iPad / Smart TV):** A recepción generált 6 jegyű párosító kóddal (`POST /api/auth/monitor/pair-init` -> `POST /api/auth/monitor/pair-verify`) az eszköz egy dedikált `deviceToken`-t kap, amellyel autentikálódik a `/monitor` Socket.io névtéren.
+- **Adatszűrés (TICKET-17):** A monitorra csak a `toMonitorPayload` (`@reform/shared`) által szűkített `MonitorCheckInPayload` / `MonitorCheckInRevokedPayload` kerül: tartozás, vonalkód, azonosító és elutasítási ok nélkül, elutasításnál név nélkül. A gateway két szobát használ: `studio:<id>` (minden kliens; a `monitor:checkin-result` / `monitor:checkin-revoked` szűkítve, a staff szoba kivételével) és `studio:<id>:staff` (csak munkatársi token, teljes `checkin:result` / `checkin:revoked`). A munkatársi tokennel megnyitott `/monitor` `displayOnly` jelzővel csatlakozik, így a staff szobába nem kerül be, és a recepciós scanner-csatornára sem iratkozik fel. A helyi `broadcastToLocalMonitors` ugyanezzel a függvénnyel szűr.
 
 ### ADR-05: Állandó Recepciós Toast Visszajelző Rendszer Fókusz-Elrablás Nélkül
 - A `QueryClient` `MutationCache` globális `onError` ága minden API- vagy hálózati hibát automatikusan piros Toast üzenetként (`sonner`) jelenít meg.
 - Minden recepciós művelet (beléptetés, elutasítás, dupla leolvasás, bérleteladás, sztornó, vendég-mentés, bérletfagyasztás, hosszabbítás, digitális kártya letöltés) dedikált vizuális Toast visszaigazolást és szintetizált Web Audio API hangjelzést ad, miközben a `useBarcodeScanner` billentyűzet-figyelése zavartalan marad.
+
+### ADR-06: Mock fallback csak demó módban (TICKET-17)
+- A `shared/api/client.ts` `request()` hálózati hibánál csak demó módban (`isDemoMode()`: `VITE_DEMO_MODE=true` build, vagy a `/demo` útvonal) vált a `mock-engine.ts`-re. Élesben `COMMON.NETWORK` hiba és toast jön, így beléptetés, levonás vagy fizetés nem dőlhet el kitalált adaton. Az E2E build `VITE_DEMO_MODE=true`-val fut.
 
 ---
 

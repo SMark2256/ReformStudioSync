@@ -28,9 +28,11 @@ export const notify = {
     });
   },
 
-  error(title: string, description?: string) {
+  /** `id` megadásakor az azonos azonosítójú toast frissül, nem halmozódik. */
+  error(title: string, description?: string, options?: { id?: string }) {
     soundFeedback.playError();
     toast.error(title, {
+      id: options?.id,
       description,
       duration: 6500,
     });

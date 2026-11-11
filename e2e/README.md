@@ -16,8 +16,10 @@ npx playwright show-trace test-results/<teszt>/trace.zip   # hiba utáni trace
   címmel buildeli (`.e2e-dist/`), és `vite preview`-val szolgálja ki a `5180`-as porton
   (`E2E_PORT`-tal módosítható). A 9-es portot a böngésző tiltja, így minden API-hívás
   azonnal `TypeError: Failed to fetch`-csel elhasal.
-- A `shared/api/client.ts` `request()` hálózati hibánál a kliensoldali mock-motorra
-  (`shared/api/mock-engine.ts`) vált. A mock-állapot a `localStorage`-ben van
+- A build `VITE_DEMO_MODE=true`-val készül. A `shared/api/client.ts` `request()`
+  hálózati hibánál csak demó módban (ez a flag, vagy a `/demo` útvonal) vált a
+  kliensoldali mock-motorra (`shared/api/mock-engine.ts`); élesben `COMMON.NETWORK`
+  hibaüzenet jelenik meg. A mock-állapot a `localStorage`-ben van
   (`reform-studio-mock-sandbox-v2`), ezért minden teszt friss böngészőkontextusban,
   a kiinduló demóadatokkal indul.
 - Az óra rögzített (`2026-03-10 12:00`, `e2e/fixtures.ts`): a mock-adatok a „most”-hoz
@@ -29,8 +31,8 @@ npx playwright show-trace test-results/<teszt>/trace.zip   # hiba utáni trace
 
 ## Belépés mock-módban
 
-Az `api.login`-nak nincs mock párja: a `/login` oldalon a „Belépés a Recepciós
-Pultra” gomb a hálózati hiba után helyi munkamenettel léptet be
+Az `api.login` mock párja egy helyi munkamenet: a `/login` oldalon a „Belépés a
+Recepciós Pultra” gomb demó módban a hálózati hiba után ezzel léptet be
 (`accessToken: 'local-session-token'`, a `reform-studio-auth` kulcson), és a
 `/reception`-re visz. Ugyanebben a böngészőkontextusban a `/monitor` is jogosult
 lesz. Belépés nélkül a `/monitor` a párosító nézetet mutatja. A `/demo` sandbox
