@@ -50,6 +50,40 @@ export const RELEASE_NOTE_KIND_LABELS: Record<ReleaseNoteKind, string> = {
   FIX: 'Javítás',
 };
 
+/** Az Újdonságok szűrője: az „Új oldal” az „Új funkció” csoportba tartozik. */
+export type ReleaseNoteFilter = 'all' | 'feature' | 'improvement' | 'fix';
+
+export const RELEASE_NOTE_FILTERS: {
+  value: ReleaseNoteFilter;
+  label: string;
+}[] = [
+  { value: 'all', label: 'Mind' },
+  { value: 'feature', label: 'Új funkció' },
+  { value: 'improvement', label: 'Fejlesztés' },
+  { value: 'fix', label: 'Javítás' },
+];
+
+const RELEASE_NOTE_KIND_FILTER: Record<
+  ReleaseNoteKind,
+  Exclude<ReleaseNoteFilter, 'all'>
+> = {
+  NEW_PAGE: 'feature',
+  NEW_FEATURE: 'feature',
+  IMPROVEMENT: 'improvement',
+  FIX: 'fix',
+};
+
+export const matchesReleaseNoteFilter = (
+  note: ReleaseNote,
+  filter: ReleaseNoteFilter,
+): boolean =>
+  filter === 'all' || RELEASE_NOTE_KIND_FILTER[note.kind] === filter;
+
+export const isReleaseNoteFilter = (
+  value: string,
+): value is ReleaseNoteFilter =>
+  RELEASE_NOTE_FILTERS.some((f) => f.value === value);
+
 const JIRA_BASE_URL = (
   (import.meta.env.VITE_JIRA_BASE_URL as string | undefined) ||
   'https://reformstudiosync.atlassian.net'
@@ -62,6 +96,20 @@ export const getJiraIssueUrl = (jiraKey: string): string =>
   `${JIRA_BASE_URL}/browse/${encodeURIComponent(jiraKey)}`;
 
 export const RELEASE_NOTES: ReleaseNote[] = [
+  {
+    id: 'v0.3-whats-new-filter',
+    version: '0.3',
+    date: '2026-11-11',
+    kind: 'IMPROVEMENT',
+    title: 'Szűrhető Újdonságok',
+    summary:
+      'Az Újdonságok listája típus szerint szűrhető, a részletek pedig kártyánként nyithatók.',
+    details: [
+      'A lista fölötti kapcsolóval csak az új funkciók, a fejlesztések vagy a javítások jeleníthetők meg; a „Mind” visszahozza a teljes listát.',
+      'A részletes leírás alapból rejtve van, a kártya alján a „Részletek” gombbal nyitható ki.',
+    ],
+    jiraKey: 'TICKET-37',
+  },
   {
     id: 'v0.3-page-monitors',
     version: '0.3',
