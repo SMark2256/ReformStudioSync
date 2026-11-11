@@ -6,6 +6,7 @@ import {
   CheckInStatus,
   MonitorDeviceRevokedPayload,
   MonitorStatePayload,
+  ServiceCategory,
   SOCKET_EVENTS,
   toMonitorPayload,
 } from '@reform/shared';
@@ -598,6 +599,55 @@ describe('toMonitorPayload', () => {
       greetingSeconds: 7,
       timestamp: '2026-11-08T10:00:00.000Z',
     });
+  });
+
+  it('TICKET-43: a szolgáltatás kategóriája és a womenOnly jelzés átmegy, érzékeny adat nem', () => {
+    const payload = toMonitorPayload(
+      fullResult({ serviceCategory: ServiceCategory.COSMETIC, womenOnly: false }),
+    );
+    expect(payload).toEqual({
+      status: 'SUCCESS',
+      mode: 'TREATMENT_GREETING',
+      serviceCategory: ServiceCategory.COSMETIC,
+      displayName: 'Kovács Anna',
+      serviceName: 'Hypoxi',
+      remainingPasses: 1,
+      warnings: ['LOW_OCCASIONS'],
+      greetingSeconds: 7,
+      timestamp: '2026-11-08T10:00:00.000Z',
+    });
+
+    const circuit = toMonitorPayload(
+      fullResult({
+        mode: 'CIRCUIT_GREETING',
+        status: CheckInStatus.DUPLICATE_SCAN,
+        serviceCategory: ServiceCategory.CIRCUIT,
+        womenOnly: true,
+      }),
+    );
+    expect(circuit).toMatchObject({
+      status: 'DUPLICATE',
+      serviceCategory: ServiceCategory.CIRCUIT,
+      womenOnly: true,
+    });
+
+    expectNoSensitiveData([payload, circuit]);
+  });
+
+  it('TICKET-43: ismeretlen (null) kategória átmegy, elutasításnál a kategória sem', () => {
+    expect(
+      toMonitorPayload(fullResult({ serviceCategory: null })).serviceCategory,
+    ).toBeNull();
+
+    const denied = toMonitorPayload(
+      fullResult({
+        status: CheckInStatus.DENIED,
+        serviceCategory: ServiceCategory.CIRCUIT,
+        womenOnly: true,
+      }),
+    );
+    expect(denied).not.toHaveProperty('serviceCategory');
+    expect(denied).not.toHaveProperty('womenOnly');
   });
 
   it('a sztornózott (CANCELLED) állapot elutasításként, név nélkül jelenik meg', () => {

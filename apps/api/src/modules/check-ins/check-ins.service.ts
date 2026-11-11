@@ -9,11 +9,13 @@ import {
   DEFAULT_STUDIO_ID,
   DUPLICATE_SCAN_COOLDOWN_SECONDS,
   EXPIRING_SOON_THRESHOLD_DAYS,
+  greetingFields,
   isBirthdayToday,
   LoggedCheckInDto,
   OfflineSyncResponseDto,
   PassType,
   resolveArrivalEntitlement,
+  ServiceCategory,
   VisitType,
   womenOnlyAccess,
 } from '@reform/shared';
@@ -27,6 +29,46 @@ import {
 } from '../passes/pass-ledger';
 import { ScanCheckInDto, SyncOfflineScansDto } from './check-ins.dto';
 
+interface GreetingServiceRow {
+  name: string;
+  category: string;
+  womenOnly: boolean;
+}
+
+/**
+ * Egy korábbi belépés üdvözlése (dupla beolvasás, idempotens visszajátszás, TICKET-43): kezelésnél
+ * a levonás szolgáltatása, köredzésnél a bérlet szolgáltatása, bérlet nélkül a tagságé.
+ */
+function priorCheckInGreeting(
+  checkIn: {
+    visitType: string;
+    guestPass?: {
+      service?: GreetingServiceRow | null;
+      passTemplate?: { service?: GreetingServiceRow | null } | null;
+    } | null;
+    passUsage?: { service?: GreetingServiceRow | null } | null;
+  },
+  memberships: { status: string; service?: GreetingServiceRow | null }[] = [],
+) {
+  const isCircuit = checkIn.visitType === 'CIRCUIT_TRAINING';
+  const membershipService = checkIn.guestPass
+    ? null
+    : ((memberships.find((m) => m.status === 'ACTIVE') ?? memberships[0])
+        ?.service ?? null);
+  const service =
+    checkIn.passUsage?.service ??
+    checkIn.guestPass?.service ??
+    checkIn.guestPass?.passTemplate?.service ??
+    (isCircuit ? membershipService : null);
+  return {
+    mode: isCircuit
+      ? ('CIRCUIT_GREETING' as const)
+      : ('TREATMENT_GREETING' as const),
+    serviceName: service?.name ?? (isCircuit ? 'Köredzés' : undefined),
+    ...greetingFields(service, isCircuit ? ServiceCategory.CIRCUIT : null),
+  };
+}
+
 @Injectable()
 export class CheckInsService {
   constructor(
@@ -37,7 +79,8 @@ export class CheckInsService {
   /**
    * 2.3 Vonalkódos beléptetés (TICKET-39). A döntés a közös `resolveArrivalEntitlement`:
    * - aktív havi tagság vagy köredzésre érvényes időalapú bérlet → köredzéses érkezés
-   *   (visits + logged_check_ins) ALKALOMLEVONÁS NÉLKÜL, a monitorra 'CIRCUIT_GREETING' megy;
+   *   (visits + logged_check_ins) ALKALOMLEVONÁS NÉLKÜL, a monitorra 'CIRCUIT_GREETING' megy
+   *   a szolgáltatás kategóriájával és `womenOnly` jelzésével (TICKET-43);
    * - csak kezelésre szóló bérlet → TREATMENT_SELECTION_REQUIRED: semmi nem rögzül és a monitor
    *   sem kap eseményt; a levonás a kezelésválasztóból (`deductTreatmentUsage`) történik;
    * - semmi érvényes → elutasítás (DENIED napló).
@@ -56,18 +99,32 @@ export class CheckInsService {
         const existingByKey = await tx.loggedCheckIn.findUnique({
           where: { idempotencyKey: dto.idempotencyKey },
           include: {
-            guest: true,
-            guestPass: { include: { passTemplate: true } },
+            guest: {
+              include: {
+                memberships: {
+                  include: { service: true },
+                  orderBy: { createdAt: 'desc' },
+                },
+              },
+            },
+            guestPass: {
+              include: {
+                passTemplate: { include: { service: true } },
+                service: true,
+              },
+            },
+            passUsage: { include: { service: true } },
           },
         });
 
         if (existingByKey) {
+          // A korábbi belépés szövege és kategóriája (TICKET-43).
           return {
             checkInId: existingByKey.id,
-            mode:
-              existingByKey.visitType === 'CIRCUIT_TRAINING'
-                ? ('CIRCUIT_GREETING' as const)
-                : ('TREATMENT_GREETING' as const),
+            ...priorCheckInGreeting(
+              existingByKey,
+              existingByKey.guest.memberships,
+            ),
             status: existingByKey.status as unknown as CheckInStatus,
             guestId: existingByKey.guestId,
             barcode: existingByKey.guest.barcode,
@@ -131,15 +188,22 @@ export class CheckInsService {
             createdAt: { gte: cooldownSince },
           },
           include: {
-            guestPass: { include: { passTemplate: true } },
+            guestPass: {
+              include: {
+                passTemplate: { include: { service: true } },
+                service: true,
+              },
+            },
+            passUsage: { include: { service: true } },
           },
           orderBy: { createdAt: 'desc' },
         });
 
         if (recentCheckIn) {
+          // A korábbi belépés szövege és kategóriája, nem égetett köredzés (TICKET-43).
           return {
             checkInId: recentCheckIn.id,
-            mode: 'CIRCUIT_GREETING',
+            ...priorCheckInGreeting(recentCheckIn, guest.memberships),
             status: CheckInStatus.DUPLICATE_SCAN,
             guestId: guest.id,
             barcode: guest.barcode,
@@ -245,7 +309,11 @@ export class CheckInsService {
           guestId: guest.id,
           barcode: guest.barcode,
           guestName: guestFullName,
-          serviceName: 'Köredzés',
+          serviceName: entitlement.membership.service?.name ?? 'Köredzés',
+          ...greetingFields(
+            entitlement.membership.service,
+            ServiceCategory.CIRCUIT,
+          ),
           passName: `Havi Köredzés Tagság (${entitlement.membership.monthlyFeeHuf.toLocaleString('hu-HU')} Ft/hó)`,
           remainingPasses: 'Korlátlan',
           warnings,
@@ -282,7 +350,9 @@ export class CheckInsService {
           guestId: guest.id,
           barcode: guest.barcode,
           guestName: guestFullName,
-          serviceName: 'Köredzés',
+          // A bérlet valódi szolgáltatása (TICKET-43); szolgáltatás nélküli bérletnél köredzés.
+          serviceName: circuitPass.service?.name ?? 'Köredzés',
+          ...greetingFields(circuitPass.service, ServiceCategory.CIRCUIT),
           passName: circuitPass.passTemplate.name,
           passType: circuitPass.type as unknown as PassType,
           remainingPasses: 'Korlátlan',

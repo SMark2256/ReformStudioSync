@@ -97,6 +97,19 @@ export const getJiraIssueUrl = (jiraKey: string): string =>
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    id: 'v0.3-fix-monitor-service-greeting',
+    version: '0.3',
+    date: '2026-11-11',
+    kind: 'FIX',
+    title: 'Szolgáltatáshoz illő üdvözlés',
+    summary: 'A vendégmonitor a szolgáltatáshoz illően köszönti a vendéget.',
+    details: [
+      'Köredzésnél „Jó edzést kívánunk!” (csak nőknek szóló köredzésnél „Női Köredzés” címkével), alakformáló kezelésnél „Kellemes kezelést kívánunk!”, kozmetikánál „Kellemes kikapcsolódást kívánunk!”.',
+      'Ugyanez a szöveg jelenik meg a recepciós visszajelzésben, az „Utoljára azonosított vendég” kártyán és a kezelésválasztó monitor-előnézetében; dupla beolvasásnál a korábbi belépés szövege marad.',
+    ],
+    jiraKey: 'TICKET-43',
+  },
+  {
     id: 'v0.3-feature-guest-gender-women-only',
     version: '0.3',
     date: '2026-11-11',

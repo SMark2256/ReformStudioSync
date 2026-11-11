@@ -1,4 +1,5 @@
 import {
+  greetingFor,
   GuestDto,
   passCoversService,
   PassStatus,
@@ -416,7 +417,7 @@ export const DeductTreatmentModal: React.FC<DeductTreatmentModalProps> = ({
                   </AlertTitle>
                   „Üdvözlünk, {selectedGuest.lastName} {selectedGuest.firstName}
                   ! {selectedService.name}. Hátralévő alkalmak:{' '}
-                  {remainingAfterDeduction}. Kellemes kezelést kívánunk!”
+                  {remainingAfterDeduction}. {greetingFor(selectedService).wish}”
                 </AlertDescription>
               </Alert>
             )}
