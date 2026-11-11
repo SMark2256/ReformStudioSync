@@ -6,3 +6,4 @@ export * from './errors';
 export * from './membership-dues';
 export * from './birthday';
 export * from './pass-rules';
+export * from './guest-arrivals';

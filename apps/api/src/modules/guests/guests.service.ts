@@ -13,6 +13,7 @@ import {
   GuestPassDto,
   GuestPhotoDto,
   GuestStatus,
+  GUEST_ARRIVALS_LIMIT,
   getOverdueBucket,
   getOverdueDays,
   MeasurementDto,
@@ -23,6 +24,7 @@ import {
   PassType,
   PaymentMethod,
   Role,
+  toGuestArrivals,
 } from '@reform/shared';
 import { randomInt } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -105,6 +107,19 @@ export class GuestsService {
       },
       messageLogs: {
         orderBy: { sentAt: 'desc' as const },
+      },
+      // Belépések (TICKET-40): a dupla beolvasás nem belépés.
+      checkIns: {
+        where: { status: { not: 'DUPLICATE_SCAN' as const } },
+        include: {
+          user: true,
+          guestPass: {
+            include: { passTemplate: { include: { service: true } }, service: true },
+          },
+          passUsage: { include: { service: true } },
+        },
+        orderBy: { createdAt: 'desc' as const },
+        take: GUEST_ARRIVALS_LIMIT,
       },
     };
   }
@@ -592,6 +607,24 @@ export class GuestsService {
       updatedAt: g.updatedAt.toISOString(),
       passes,
       treatmentHistory,
+      arrivals: toGuestArrivals(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (g.checkIns ?? []).map((c: any) => ({
+          id: c.id,
+          createdAt: c.createdAt,
+          visitType: c.visitType,
+          status: c.status,
+          reason: c.reason ?? null,
+          guestPassId: c.guestPassId ?? null,
+          passName: c.guestPass?.passTemplate?.name ?? null,
+          usageServiceName: c.passUsage?.service?.name ?? null,
+          passServiceName:
+            c.guestPass?.service?.name ??
+            c.guestPass?.passTemplate?.service?.name ??
+            null,
+          staffName: c.user?.name ?? null,
+        })),
+      ),
       memberships: (g.memberships ?? []).map(
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (m: any) => ({

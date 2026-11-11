@@ -277,6 +277,33 @@ export interface AuditLogDto {
   details: string;
 }
 
+/** A vendégadatlapon megjelenő belépés állapota: sikeres, sztornózott vagy elutasított. */
+export type GuestArrivalStatus =
+  | CheckInStatus.SUCCESS
+  | CheckInStatus.CANCELLED
+  | CheckInStatus.DENIED;
+
+/**
+ * Egy belépés a vendégadatlapon (TICKET-40): a beléptetési napló (`logged_check_ins`) sora.
+ * A sztornózott belépés látogatása törlődik, a napló sora `CANCELLED` állapotban, a sztornó
+ * okával megmarad; az elutasított beolvasás `DENIED` sor az elutasítás okával.
+ */
+export interface GuestArrivalDto {
+  /** A beléptetés (napló) azonosítója. */
+  id: string;
+  occurredAt: string;
+  visitType: VisitType;
+  /** Kezelésnél a levont szolgáltatás, köredzésnél a bérlet szolgáltatása (ha van). */
+  serviceName: string | null;
+  guestPassId: string | null;
+  /** A bérlet neve; havi tagsággal történt köredzésnél „Havi köredzés tagság”. */
+  passName: string | null;
+  staffName: string;
+  status: GuestArrivalStatus;
+  /** Sztornónál és elutasításnál az ok; sikeres belépésnél nincs. */
+  reason: string | null;
+}
+
 export interface GuestDto {
   id: string;
   studioId: string;
@@ -296,6 +323,8 @@ export interface GuestDto {
   memberships?: MembershipDto[];
   treatmentHistory?: PassUsageLogDto[];
   visits?: VisitDto[];
+  /** Belépések (beléptetési napló), legújabb elöl, legfeljebb `GUEST_ARRIVALS_LIMIT` (TICKET-40). */
+  arrivals?: GuestArrivalDto[];
   payments?: PaymentDto[];
   measurements?: MeasurementDto[];
   photos?: GuestPhotoDto[];
