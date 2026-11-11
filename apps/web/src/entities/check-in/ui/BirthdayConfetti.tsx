@@ -1,18 +1,18 @@
-import { domAnimation, LazyMotion, m, useReducedMotion } from "motion/react";
-import React, { useEffect, useMemo, useState } from "react";
+import { domAnimation, LazyMotion, m, useReducedMotion } from 'motion/react';
+import React, { useEffect, useMemo, useState } from 'react';
 
 /** A robbanás teljes hossza; utána a komponens semmit nem renderel. */
 export const BIRTHDAY_CONFETTI_MS = 2000;
 
 /** Ünnepi színek, amelyek a smaragd/teal monitor-háttéren is jól látszanak. */
 const COLORS = [
-  "#fde047",
-  "#fbbf24",
-  "#f472b6",
-  "#fb7185",
-  "#a78bfa",
-  "#38bdf8",
-  "#ffffff",
+  '#fde047',
+  '#fbbf24',
+  '#f472b6',
+  '#fb7185',
+  '#a78bfa',
+  '#38bdf8',
+  '#ffffff',
 ];
 
 /** Mintavételi pontok a röppálya mentén (lineáris szakaszok = parabola közelítése). */
@@ -105,7 +105,7 @@ export const BirthdayConfetti: React.FC<BirthdayConfettiProps> = ({
               marginLeft: -p.width / 2,
               marginTop: -p.height / 2,
               backgroundColor: p.color,
-              borderRadius: p.round ? "50%" : 1,
+              borderRadius: p.round ? '50%' : 1,
             }}
             initial={{ x: 0, y: 0, rotate: 0, opacity: 1 }}
             animate={{
@@ -114,7 +114,7 @@ export const BirthdayConfetti: React.FC<BirthdayConfettiProps> = ({
               rotate: p.rotate,
               opacity: [1, 1, 1, 1, 1, 0.8, 0.4, 0],
             }}
-            transition={{ duration, delay: p.delay, ease: "linear" }}
+            transition={{ duration, delay: p.delay, ease: 'linear' }}
           />
         ))}
       </LazyMotion>

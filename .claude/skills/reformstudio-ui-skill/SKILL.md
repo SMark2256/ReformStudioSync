@@ -220,7 +220,9 @@ Dőlt betű, csupa nagybetűs szöveg és 700 feletti vastagság nincs (az oldal
   scale(.94)` → `0 / 1`), nyitás 300 ms `cubic-bezier(.22,1,.36,1)`, zárás 240 ms;
   a nyíl 180°-ot fordul.
 - Mobil menü: `translateX` 200 ms.
-- Mindez CSS-átmenet, animációs könyvtár (`motion`, `framer-motion`) nincs.
+- Mindez CSS-átmenet, animációs könyvtár (`motion`, `framer-motion`) nincs. Egyetlen
+  kivétel a Vendégmonitor születésnapi konfettije (`entities/check-in/ui/BirthdayConfetti.tsx`,
+  `motion/react` + `LazyMotion`, TICKET-36): máshol ne használd.
 - Modál: a shadcn alap fade/zoom, ne bővítsd.
 - Toast: 200 ms becsúszás alulról.
 - `prefers-reduced-motion: reduce` esetén minden animáció és átmenet ki.

@@ -1,4 +1,4 @@
-import { getStudioDate } from "./membership-dues";
+import { getStudioDate } from './membership-dues';
 
 /**
  * Születésnapos-e a vendég az adott napon a stúdió naptára (Europe/Budapest) szerint.
@@ -14,7 +14,7 @@ export function isBirthdayToday(
 ): boolean {
   if (!birthDate) return false;
   const iso =
-    typeof birthDate === "string" ? birthDate : birthDate.toISOString();
+    typeof birthDate === 'string' ? birthDate : birthDate.toISOString();
   const birthMonth = Number(iso.slice(5, 7));
   const birthDay = Number(iso.slice(8, 10));
   if (!birthMonth || !birthDay) return false;
