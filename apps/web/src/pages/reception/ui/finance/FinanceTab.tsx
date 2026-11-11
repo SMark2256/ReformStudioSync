@@ -17,13 +17,13 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
+  ConfirmActionButton,
   PageHeader,
   ResponsiveTable,
   StatCard,
   type ResponsiveTableColumn,
 } from '@/shared/ui';
 import { formatHuf } from '../desk/format';
-import { ConfirmActionButton } from '../ConfirmActionButton';
 
 const formatShortDate = (iso: string) =>
   new Date(iso).toLocaleDateString('hu-HU', { month: 'short', day: 'numeric' });
