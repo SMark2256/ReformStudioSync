@@ -76,7 +76,8 @@ Interaktív Swagger/OpenAPI felület elérhető: `GET /api/docs`
 | Modul | Metódus & Útvonal | Leírás | Jogosultság |
 | :--- | :--- | :--- | :--- |
 | **Health** | `GET /api/health` | UptimeRobot ping + 30 percenkénti `SELECT 1` DB keep-alive | Publikus |
-| **Auth** | `POST /api/auth/login` | Bejelentkezés (JWT token kiadása) | Publikus |
+| **Auth** | `POST /api/auth/code` | Belépőkód kérése e-mailben (SendPulse; ismeretlen címre is ugyanaz a válasz) | Publikus |
+| **Auth** | `POST /api/auth/verify` | Belépés a kóddal (JWT token kiadása) | Publikus |
 | **Auth** | `GET /api/auth/me` | Aktuális bejelentkezett felhasználó | JWT |
 | **Auth** | `POST /api/auth/monitor/pair-init` | 6 jegyű párosító kód generálása Tablethez | JWT |
 | **Auth** | `POST /api/auth/monitor/pair-verify` | Párosító kód beváltása `deviceToken`-re | Publikus |

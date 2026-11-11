@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  HttpCode,
   Param,
   Patch,
   Post,
@@ -17,23 +18,39 @@ import { RolesGuard } from '../../common/roles.guard';
 import {
   CreateStaffUserDto,
   InitDisplayPairingDto,
-  LoginDto,
+  RequestLoginCodeDto,
   SendMonitorTestSignalDto,
   UnpairSelfDeviceDto,
   UpdateDisplayDeviceDto,
   VerifyDisplayPairingDto,
+  VerifyLoginCodeDto,
 } from './auth.dto';
 import { AuthService } from './auth.service';
+import { LoginCodeService } from './login-code.service';
 
 @ApiTags('Autentikáció & Kijelző Párosítás')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly loginCodes: LoginCodeService,
+  ) {}
 
-  @Post('login')
-  @ApiOperation({ summary: 'Recepciós vagy Admin bejelentkezés (JWT)' })
-  login(@Body() dto: LoginDto) {
-    return this.authService.login(dto);
+  @Post('code')
+  @HttpCode(200)
+  @ApiOperation({
+    summary:
+      'Belépőkód kérése e-mailben (ismeretlen címre is ugyanaz a válasz, levél nélkül)',
+  })
+  requestLoginCode(@Body() dto: RequestLoginCodeDto) {
+    return this.loginCodes.requestCode(dto);
+  }
+
+  @Post('verify')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Belépés az e-mailben kapott kóddal (JWT)' })
+  verifyLoginCode(@Body() dto: VerifyLoginCodeDto) {
+    return this.loginCodes.verifyCode(dto);
   }
 
   @Get('me')

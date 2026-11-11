@@ -6,7 +6,7 @@ test.describe('Közvetlen linkek frissítéskor', () => {
     await expect(page).toHaveURL(/\/login$/);
     await page.reload();
     await expect(page).toHaveURL(/\/login$/);
-    await expect(page.getByRole('button', { name: 'Belépés a Recepciós Pultra' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Kód küldése' })).toBeVisible();
   });
 
   test('/login frissítés után is betölt', async ({ page }) => {

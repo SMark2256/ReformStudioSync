@@ -31,12 +31,17 @@ npx playwright show-trace test-results/<teszt>/trace.zip   # hiba utáni trace
 
 ## Belépés mock-módban
 
-Az `api.login` mock párja egy helyi munkamenet: a `/login` oldalon a „Belépés a
-Recepciós Pultra” gomb demó módban a hálózati hiba után ezzel léptet be
-(`accessToken: 'local-session-token'`, a `reform-studio-auth` kulcson), és a
-`/reception`-re visz. Ugyanebben a böngészőkontextusban a `/monitor` is jogosult
-lesz. Belépés nélkül a `/monitor` a párosító nézetet mutatja. A `/demo` sandbox
-belépés nélkül is működik. Segédfüggvény: `loginToReception()` az `e2e/fixtures.ts`-ben.
+A belépés e-mailben küldött kóddal megy (TICKET-35). Mock-módban nincs levél: az
+`api.requestLoginCode` mock párja a demókódot (`123456`) adja vissza, a `/login`
+kódlépése ki is írja, az `api.verifyLoginCode` párja pedig erre a kódra helyi
+munkamenettel léptet be (`accessToken: 'local-session-token'`, a `reform-studio-auth`
+kulcson), és a `/reception`-re visz. Ugyanebben a böngészőkontextusban a `/monitor` is
+jogosult lesz. Belépés nélkül a `/monitor` a párosító nézetet mutatja. A `/demo` sandbox
+belépés nélkül is működik. Segédfüggvény: `loginToReception()` az `e2e/fixtures.ts`-ben
+(az E2E saját tesztmunkatársa: `e2e@reformstudio.test`).
+
+Valódi API ellen a rögzített tesztkód az API `AUTH_FIXED_LOGIN_CODE` változója (csak
+`NODE_ENV !== 'production'` mellett); ilyenkor a seed az E2E munkatársat is létrehozza.
 
 ## Mock-adatok, amelyekre a tesztek építenek
 

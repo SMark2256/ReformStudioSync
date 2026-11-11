@@ -29,6 +29,7 @@ import {
   PaymentDto,
   PaymentMethod,
   RecordPaymentRequestDto,
+  RequestLoginCodeResponseDto,
   Role,
   ServiceCategory,
   ServiceDto,
@@ -43,6 +44,9 @@ import { mockStudioEngine } from './mock-engine';
 
 const API_BASE_URL =
   import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+
+/** Demó módban, API nélkül ezzel a kóddal lehet belépni (a mock nem küld levelet). */
+const DEMO_LOGIN_CODE = '123456';
 
 function isNetworkError(err: unknown): err is TypeError {
   return err instanceof TypeError && err.message.toLowerCase().includes('fetch');
@@ -84,25 +88,34 @@ async function request<T>(
 }
 
 export const api = {
-  login(email: string, password: string): Promise<LoginResponseDto> {
-    const isAdmin = email.includes('admin');
+  /** Belépőkód kérése e-mailben (TICKET-35). Ismeretlen címre is `ok` a válasz. */
+  requestLoginCode(email: string): Promise<RequestLoginCodeResponseDto> {
+    return request<RequestLoginCodeResponseDto>(
+      '/auth/code',
+      { method: 'POST', body: JSON.stringify({ email }) },
+      // Demó módban, API nélkül nincs levél: a felület a rögzített demókódot mutatja.
+      () => ({ ok: true, demoCode: DEMO_LOGIN_CODE }),
+    );
+  },
+
+  verifyLoginCode(email: string, code: string): Promise<LoginResponseDto> {
     return request(
-      '/auth/login',
-      {
-        method: 'POST',
-        body: JSON.stringify({ email, password }),
-      },
+      '/auth/verify',
+      { method: 'POST', body: JSON.stringify({ email, code }) },
       // Demó módban, API nélkül helyi munkamenet (a többi hívás a mock-motorra fut).
-      () => ({
-        accessToken: 'local-session-token',
-        user: {
-          id: 'staff-default-1',
-          studioId: 'default-studio',
-          email,
-          name: isAdmin ? 'ReformStudio Adminisztrátor' : 'Recepciós Munkatárs',
-          role: isAdmin ? Role.ADMIN : Role.RECEPTIONIST,
-        },
-      }),
+      () => {
+        if (code !== DEMO_LOGIN_CODE) throw appError('AUTH.CODE_INVALID');
+        return {
+          accessToken: 'local-session-token',
+          user: {
+            id: 'staff-default-1',
+            studioId: 'default-studio',
+            email,
+            name: 'Demó Munkatárs',
+            role: Role.ADMIN,
+          },
+        };
+      },
     );
   },
 

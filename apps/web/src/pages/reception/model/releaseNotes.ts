@@ -63,6 +63,16 @@ export const getJiraIssueUrl = (jiraKey: string): string =>
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    id: 'v0.3-login-email-code',
+    version: '0.3',
+    date: '2026-11-11',
+    kind: 'IMPROVEMENT',
+    title: 'Belépés e-mailben kapott kóddal',
+    summary:
+      'Jelszó helyett e-mailben kapott belépőkóddal lehet belépni. Add meg az e-mail címed, és a levélben érkező 6 jegyű kódot írd be; a kód 10 percig érvényes, és csak egyszer használható.',
+    jiraKey: 'TICKET-35',
+  },
+  {
     id: 'v0.3-fix-monitor-live-status',
     version: '0.3',
     date: '2026-11-11',

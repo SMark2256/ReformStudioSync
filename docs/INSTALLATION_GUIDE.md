@@ -43,9 +43,13 @@ npm run db:push
 npm run db:seed
 ```
 
-A `db:seed` parancs létrehozza az alapértelmezett fiókokat és bérletsablonokat:
-- **Adminisztrátor:** `admin@reformstudio.hu` / `Admin123!`
-- **Recepciós:** `recepcio@reformstudio.hu` / `Recepcio123!`
+A `db:seed` parancs létrehozza a munkatársakat és a bérletsablonokat. Jelszó nincs: a belépés
+e-mailben küldött 6 jegyű kóddal megy (TICKET-35).
+- **Munkatársak (ADMIN):** `smark.siklodi@gmail.com` (Siklódi Márk), `b.siklodi@mediajam.hu` (Siklódi Brigi)
+- A régi `admin@reformstudio.hu` és `recepcio@reformstudio.hu` fiókot a seed letiltja (nem törli).
+
+Helyben `SENDPULSE_API_KEY` nélkül nem megy ki levél: a belépőkód az API naplójába kerül.
+Tesztekhez az `AUTH_FIXED_LOGIN_CODE="123456"` rögzített kódot ad (csak nem production módban).
 
 ### 2.4. Alkalmazások indítása
 
