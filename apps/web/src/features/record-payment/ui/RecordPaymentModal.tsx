@@ -1,5 +1,5 @@
 import { GuestDto, MembershipDueStatus, PaymentMethod } from '@reform/shared';
-import React, { useEffect, useId, useState } from 'react';
+import React, { useEffect, useId, useRef, useState } from 'react';
 import {
   Button,
   Dialog,
@@ -20,6 +20,7 @@ import {
   ToggleGroup,
   ToggleGroupItem,
 } from '@/shared/ui';
+import { cn } from '@/shared/lib/utils';
 
 type TargetType = 'DUE' | 'PASS' | 'CUSTOM';
 
@@ -30,6 +31,9 @@ const PAYMENT_METHODS = [
 ];
 
 const fieldGroupClassName = 'flex flex-col gap-1.5';
+
+const isValidAmount = (amountHuf: number) =>
+  Number.isInteger(amountHuf) && amountHuf >= 1;
 
 interface RecordPaymentModalProps {
   isOpen: boolean;
@@ -67,6 +71,8 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
     PaymentMethod.CASH,
   );
   const [note, setNote] = useState<string>('');
+  const [showAmountError, setShowAmountError] = useState(false);
+  const amountInputRef = useRef<HTMLInputElement>(null);
 
   const selectedGuest = guests.find((g) => g.id === selectedGuestId) ?? null;
 
@@ -83,6 +89,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
     const g = initialGuest ?? guests[0] ?? null;
     setSelectedGuestId(g?.id ?? '');
     setNote('');
+    setShowAmountError(false);
   }, [isOpen, initialGuest]);
 
   useEffect(() => {
@@ -113,9 +120,16 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
 
   if (!isOpen) return null;
 
+  const amountInvalid = showAmountError && !isValidAmount(amountHuf);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedGuestId || amountHuf <= 0) return;
+    if (!isValidAmount(amountHuf)) {
+      setShowAmountError(true);
+      amountInputRef.current?.focus();
+      return;
+    }
+    if (!selectedGuestId) return;
 
     onConfirmPayment({
       guestId: selectedGuestId,
@@ -138,7 +152,10 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+        <form
+          onSubmit={handleSubmit}
+          noValidate
+          className="flex min-h-0 flex-1 flex-col">
           <DialogBody className="space-y-3.5">
             <div className={fieldGroupClassName}>
               <Label htmlFor={`${fieldId}-guest`}>Vendég</Label>
@@ -241,22 +258,30 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
                 <Label htmlFor={`${fieldId}-amount`}>
                   Fizetett összeg (Ft)
                 </Label>
+                {/* Az ellenőrzést az `isValidAmount` végzi (`noValidate`); a `min` és a `required`
+                    csak a léptetőnek és a felolvasónak szól. Lépésköz nincs: bármely egész Ft jó. */}
                 <Input
+                  ref={amountInputRef}
                   id={`${fieldId}-amount`}
                   type="number"
                   min={1}
-                  step={100}
                   required
                   value={amountHuf}
                   onChange={(e) => setAmountHuf(Number(e.target.value))}
+                  aria-invalid={amountInvalid}
                   aria-describedby={`${fieldId}-amount-hint`}
                   className="tabular-nums"
                 />
                 <span
                   id={`${fieldId}-amount-hint`}
-                  className="text-xs text-muted-foreground"
+                  className={cn(
+                    'text-xs',
+                    amountInvalid ? 'text-destructive' : 'text-muted-foreground',
+                  )}
                 >
-                  Részbefizetés és túlfizetés is rögzíthető.
+                  {amountInvalid
+                    ? 'A fizetett összeg legalább 1 Ft-os egész szám legyen. Add meg a befizetett összeget.'
+                    : 'Részbefizetés és túlfizetés is rögzíthető.'}
                 </span>
               </div>
 
@@ -306,7 +331,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
             <Button
               type="submit"
               variant="primary"
-              disabled={isSubmitting || amountHuf <= 0}
+              disabled={isSubmitting}
             >
               {isSubmitting ? 'Rögzítés...' : 'Befizetés rögzítése'}
             </Button>

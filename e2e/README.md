@@ -43,6 +43,7 @@ belépés nélkül is működik. Segédfüggvény: `loginToReception()` az `e2e/
 | Vonalkód | Vendég | Állapot |
 |---|---|---|
 | 100001 | Kovács Anna | havi tagság + 10 alkalmas Hypoxi (7 alk.) |
+| 100002 | Nagy Péter | havi tagság, 3 napja lejárt 22 000 Ft-os tagdíj |
 | 100003 | Szabó Eszter | havi tagság + 10 alkalmas Reformer (2 alk.) |
 | 100005 | Varga Judit | nincs tagság, kimerült bérlet (0 alk.) |
 
@@ -52,6 +53,8 @@ A TICKET-1–4 hibáira írt tesztek `test.fixme(...)`-vel vannak jelölve, és 
 a ticketszámmal kezdődik. A hibát javító ticketben a `fixme`-t `test`-re kell
 cserélni, és a tesztnek zöldnek kell lennie. Egy-egy ticket tesztjei:
 `npm run test:e2e -- -g "TICKET-2"`.
+A javítással együtt írt regressziós tesztek (pl. TICKET-25) eleve `test`-ként
+kerülnek be, a nevük ugyanígy a ticketszámmal kezdődik.
 
 | Ticket | Fájl |
 |---|---|
@@ -59,3 +62,4 @@ cserélni, és a tesztnek zöldnek kell lennie. Egy-egy ticket tesztjei:
 | TICKET-2 | `monitor.spec.ts` |
 | TICKET-3 | `guests.spec.ts` |
 | TICKET-4 | `sell-pass.spec.ts` (a vendégválasztó szerepét a javítás dönti el, a lokátort ahhoz kell igazítani) |
+| TICKET-25 | `record-payment.spec.ts` |
