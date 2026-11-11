@@ -97,6 +97,21 @@ export const getJiraIssueUrl = (jiraKey: string): string =>
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    id: 'v0.3-feature-guest-gender-women-only',
+    version: '0.3',
+    date: '2026-11-11',
+    kind: 'NEW_FEATURE',
+    title: 'Vendég neme, női köredzés',
+    summary: 'Vendég neme; a női köredzés csak női vendégnek adható.',
+    details: [
+      'Új vendég felvételekor a nem kötelező; a rendszer a keresztnévből előtölti, de átírható. A meglévő vendégeknél a keresztnév alapján töltöttük ki, amit nem ismert fel, ott „Nincs megadva” áll: ezt az adatlapon pótold.',
+      'A csak nőknek szóló szolgáltatás (női köredzés) bérlete és havi tagsága férfi vendégnek nem adható el, és vele nem léptethető be; az eladásnál és a kezelésválasztóban ezek nem választhatók.',
+      '„Nincs megadva” nemnél az eladás és a belépés engedélyezett, de figyelmeztetést kapsz, hogy pótold. Új szolgáltatásnál a „Csak nőknek” jelölővel állíthatod be a korlátozást.',
+    ],
+    link: { type: 'receptionTab', tab: 'guests', label: 'Vendégkartoték megnyitása' },
+    jiraKey: 'TICKET-42',
+  },
+  {
     id: 'v0.3-guest-sheet-arrivals',
     version: '0.3',
     date: '2026-11-11',

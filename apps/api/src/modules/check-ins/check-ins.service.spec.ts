@@ -1,4 +1,5 @@
 import {
+  ARRIVAL_DENIED_MESSAGES,
   CheckInStatus,
   DUPLICATE_SCAN_COOLDOWN_SECONDS,
   PassType,
@@ -808,6 +809,123 @@ describe('CheckInsService — Kritikus Beléptetési és Köredzés vs. Kezelés
       expect(txMock.loggedCheckIn.create).not.toHaveBeenCalled();
       expect(txMock.visit.create).not.toHaveBeenCalled();
       expect(monitorGatewayMock.emitCheckInResult).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('TICKET-42 — csak nőknek szóló köredzés a beolvasásnál', () => {
+    const circuitService = {
+      id: 'srv-circuit',
+      name: 'Női Köredzés (Havi Tagság)',
+      category: 'CIRCUIT',
+      womenOnly: true,
+    };
+    const membership = (over: Record<string, unknown> = {}) => ({
+      id: 'mem-1',
+      status: 'ACTIVE',
+      monthlyFeeHuf: 22000,
+      serviceId: 'srv-circuit',
+      service: circuitService,
+      dues: [],
+      ...over,
+    });
+    const circuitPass = (over: Record<string, unknown> = {}) => ({
+      id: 'pass-circuit',
+      passTemplateId: 'tpl-unlimited',
+      serviceId: 'srv-circuit',
+      service: circuitService,
+      type: 'TIME_BASED',
+      totalPasses: null,
+      remainingPasses: null,
+      startDate: pastDate(5),
+      expirationDate: futureDate(25),
+      isActive: true,
+      isFrozen: false,
+      frozenAt: null,
+      cancelledAt: null,
+      passTemplate: { name: 'Havi Korlátlan Köredzés Bérlet' },
+      ...over,
+    });
+    const reformerPass = {
+      ...circuitPass(),
+      id: 'pass-reformer',
+      passTemplateId: 'tpl-10',
+      serviceId: 'srv-reformer',
+      service: {
+        id: 'srv-reformer',
+        name: 'Reformer Pilates',
+        category: 'BODY_SHAPING',
+        womenOnly: false,
+      },
+      type: 'OCCASION_BASED',
+      totalPasses: 10,
+      remainingPasses: 4,
+      passTemplate: { name: '10 Alkalmas Reformer Bérlet' },
+    };
+    const guestWith = (
+      gender: string,
+      memberships: unknown[],
+      passes: unknown[] = [],
+    ) => ({
+      id: 'guest-x',
+      firstName: gender === 'MALE' ? 'Péter' : 'Anna',
+      lastName: 'Teszt',
+      barcode: '100099',
+      gender,
+      isActive: true,
+      memberships,
+      passes,
+    });
+
+    it('női vendég köredzés tagsággal: belép, figyelmeztetés nélkül', async () => {
+      txMock.guest.findUnique.mockResolvedValue(guestWith('FEMALE', [membership()]));
+
+      const res = await service.processBarcodeCheckIn({ barcode: '100099' }, 'staff-1');
+
+      expect(res.status).toBe(CheckInStatus.SUCCESS);
+      expect(res.mode).toBe('CIRCUIT_GREETING');
+      expect(res.warnings).not.toContain('GENDER_MISSING');
+    });
+
+    it('férfi vendég csak nőknek szóló tagsággal: elutasítás WOMEN_ONLY okkal, nincs belépés', async () => {
+      txMock.guest.findUnique.mockResolvedValue(guestWith('MALE', [membership()]));
+
+      const res = await service.processBarcodeCheckIn({ barcode: '100099' }, 'staff-1');
+
+      expect(res.status).toBe(CheckInStatus.DENIED);
+      expect(res.reason).toBe(ARRIVAL_DENIED_MESSAGES.WOMEN_ONLY);
+      expect(txMock.visit.create).not.toHaveBeenCalled();
+      expect(txMock.loggedCheckIn.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ status: 'DENIED' }) }),
+      );
+    });
+
+    it('férfi vendég köredzés bérlettel: elutasítás WOMEN_ONLY okkal', async () => {
+      txMock.guest.findUnique.mockResolvedValue(guestWith('MALE', [], [circuitPass()]));
+
+      const res = await service.processBarcodeCheckIn({ barcode: '100099' }, 'staff-1');
+
+      expect(res.status).toBe(CheckInStatus.DENIED);
+      expect(res.reason).toBe(ARRIVAL_DENIED_MESSAGES.WOMEN_ONLY);
+    });
+
+    it('férfi vendég köredzés tagsággal és Reformer bérlettel: a kezelésválasztó csak a Reformer bérletet kínálja', async () => {
+      txMock.guest.findUnique.mockResolvedValue(
+        guestWith('MALE', [membership()], [circuitPass(), reformerPass]),
+      );
+
+      const res = await service.processBarcodeCheckIn({ barcode: '100099' }, 'staff-1');
+
+      expect(res.status).toBe(CheckInStatus.TREATMENT_SELECTION_REQUIRED);
+      expect(res.treatmentOptions?.map((o) => o.passId)).toEqual(['pass-reformer']);
+    });
+
+    it('nincs megadva nemnél belép, de a recepció GENDER_MISSING figyelmeztetést kap', async () => {
+      txMock.guest.findUnique.mockResolvedValue(guestWith('UNSPECIFIED', [membership()]));
+
+      const res = await service.processBarcodeCheckIn({ barcode: '100099' }, 'staff-1');
+
+      expect(res.status).toBe(CheckInStatus.SUCCESS);
+      expect(res.warnings).toContain('GENDER_MISSING');
     });
   });
 });

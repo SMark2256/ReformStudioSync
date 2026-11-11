@@ -14,6 +14,7 @@ const service = (id: string, isActive = true): ServiceDto => ({
   category: ServiceCategory.BODY_SHAPING,
   durationMinutes: 30,
   priceHuf: 9500,
+  womenOnly: false,
   isActive,
   createdAt: '2026-01-01T00:00:00.000Z',
 });

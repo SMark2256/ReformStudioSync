@@ -3,10 +3,13 @@ import {
   PassTemplateDto,
   PassType,
   PaymentMethod,
+  womenOnlyAccess,
 } from '@reform/shared';
 import { Banknote, Building2, CreditCard } from 'lucide-react';
 import React, { useEffect, useId, useState } from 'react';
 import {
+  Alert,
+  AlertDescription,
   Button,
   Dialog,
   DialogBody,
@@ -60,6 +63,10 @@ export const SellPassModal: React.FC<SellPassModalProps> = ({
   const templatesLabelId = useId();
   const methodsLabelId = useId();
   const activeTemplates = templates.filter((t) => t.isActive);
+  // Csak nőknek szóló bérlet férfi vendégnek nem adható el (TICKET-42, a szerver is ellenőrzi).
+  const isBlocked = (tpl: PassTemplateDto) =>
+    womenOnlyAccess(guest?.gender, tpl.womenOnly) === 'DENIED';
+  const sellableTemplates = activeTemplates.filter((t) => !isBlocked(t));
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(
     PaymentMethod.POS_CARD,
@@ -70,24 +77,28 @@ export const SellPassModal: React.FC<SellPassModalProps> = ({
     if (!isOpen) return;
     if (
       preselectedTemplateId &&
-      activeTemplates.some((t) => t.id === preselectedTemplateId)
+      sellableTemplates.some((t) => t.id === preselectedTemplateId)
     ) {
       setSelectedTemplateId(preselectedTemplateId);
-    } else if (activeTemplates.length > 0) {
-      setSelectedTemplateId(activeTemplates[0].id);
+    } else {
+      setSelectedTemplateId(sellableTemplates[0]?.id ?? '');
     }
     setNote('');
-  }, [isOpen, preselectedTemplateId, templates]);
+  }, [isOpen, preselectedTemplateId, templates, guest?.id]);
 
   if (!isOpen || !guest) return null;
 
-  const selectedTemplate = activeTemplates.find(
+  const selectedTemplate = sellableTemplates.find(
     (t) => t.id === selectedTemplateId,
   );
+  const genderMissing =
+    !!selectedTemplate &&
+    womenOnlyAccess(guest.gender, selectedTemplate.womenOnly) ===
+      'GENDER_MISSING';
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedTemplateId) return;
+    if (!selectedTemplate) return;
     onConfirmSell({
       guestId: guest.id,
       passTemplateId: selectedTemplateId,
@@ -121,12 +132,18 @@ export const SellPassModal: React.FC<SellPassModalProps> = ({
                     key={tpl.id}
                     variant="secondary"
                     aria-pressed={tpl.id === selectedTemplateId}
+                    disabled={isBlocked(tpl)}
                     onClick={() => setSelectedTemplateId(tpl.id)}
                     className={`${optionClassName} flex-col items-start gap-1 p-3 text-left`}
                   >
                     <span className="text-[13px] font-semibold text-foreground">
                       {tpl.name}
                     </span>
+                    {isBlocked(tpl) && (
+                      <span className="text-xs font-normal text-muted-foreground">
+                        Csak nőknek, férfi vendégnek nem adható el
+                      </span>
+                    )}
                     <span className="text-xs font-normal text-muted-foreground">
                       {tpl.type === PassType.TIME_BASED
                         ? 'Korlátlan belépés'
@@ -140,6 +157,15 @@ export const SellPassModal: React.FC<SellPassModalProps> = ({
                 ))}
               </div>
             </div>
+
+            {genderMissing && (
+              <Alert>
+                <AlertDescription>
+                  Ez a bérlet csak nőknek szól, de a vendég neme nincs megadva.
+                  Pótold a vendégadatlapon.
+                </AlertDescription>
+              </Alert>
+            )}
 
             <div role="group" aria-labelledby={methodsLabelId}>
               <h3
@@ -189,7 +215,7 @@ export const SellPassModal: React.FC<SellPassModalProps> = ({
             <Button
               type="submit"
               variant="primary"
-              disabled={isSubmitting || !selectedTemplateId}
+              disabled={isSubmitting || !selectedTemplate}
             >
               {isSubmitting ? 'Rögzítés...' : 'Bérlet Eladása & Fizetés'}
             </Button>

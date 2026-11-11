@@ -15,6 +15,7 @@ import {
   PassType,
   resolveArrivalEntitlement,
   VisitType,
+  womenOnlyAccess,
 } from '@reform/shared';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MonitorGateway } from '../monitor/monitor.gateway';
@@ -102,7 +103,7 @@ export class CheckInsService {
             orderBy: { expirationDate: 'asc' },
           },
           memberships: {
-            include: { dues: true },
+            include: { dues: true, service: true },
             orderBy: { createdAt: 'desc' },
           },
         },
@@ -193,16 +194,34 @@ export class CheckInsService {
         warnings.push('MEMBERSHIP_PAUSED');
       }
 
+      // Csak nőknek szóló tagság / bérlet: férfi vendéggel nem számít (TICKET-42).
       const entitlement = resolveArrivalEntitlement(
         {
-          memberships: guest.memberships ?? [],
+          guestGender: guest.gender,
+          memberships: (guest.memberships ?? []).map((m) => ({
+            ...m,
+            womenOnly: m.service?.womenOnly ?? false,
+          })),
           passes: guest.passes.map((p) => ({
             ...p,
             serviceCategory: p.service?.category ?? null,
+            womenOnly: p.service?.womenOnly ?? false,
           })),
         },
         now,
       );
+      const used =
+        entitlement.kind === 'CIRCUIT_MEMBERSHIP'
+          ? entitlement.membership
+          : entitlement.kind === 'CIRCUIT_PASS'
+            ? entitlement.pass
+            : null;
+      if (
+        used &&
+        womenOnlyAccess(guest.gender, used.womenOnly) === 'GENDER_MISSING'
+      ) {
+        warnings.push('GENDER_MISSING');
+      }
       const overdue = {
         overdueAmountHuf: overdueAmountHuf > 0 ? overdueAmountHuf : undefined,
         overdueDays: maxOverdueDays > 0 ? maxOverdueDays : undefined,

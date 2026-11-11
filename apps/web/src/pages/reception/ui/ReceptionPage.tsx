@@ -1,6 +1,7 @@
 import {
   CheckInResultPayload,
   CheckInStatus,
+  Gender,
   GuestDto,
   TreatmentSelectionOption,
   VisitType,
@@ -355,6 +356,7 @@ export const ReceptionPage: React.FC = () => {
       phone?: string;
       birthDate?: string | null;
       nameDay?: string | null;
+      gender: Gender;
       notes?: string;
     }) => {
       if (data.id) {

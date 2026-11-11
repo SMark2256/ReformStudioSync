@@ -6,6 +6,7 @@ import {
   DEFAULT_STUDIO_ID,
   DocumentStatus,
   DocumentType,
+  Gender,
   GuestDocumentDto,
   getPassStatus,
   GuestDto,
@@ -73,6 +74,7 @@ export class GuestsService {
       },
       memberships: {
         include: {
+          service: true,
           dues: { orderBy: { dueDate: 'desc' as const } },
         },
         orderBy: { createdAt: 'desc' as const },
@@ -205,6 +207,7 @@ export class GuestsService {
         phone: dto.phone?.trim() || null,
         birthDate: dto.birthDate ? new Date(dto.birthDate) : null,
         nameDay: dto.nameDay?.trim() || null,
+        gender: dto.gender,
         status: dto.status ?? GuestStatus.ACTIVE,
         notes: dto.notes?.trim() || null,
       },
@@ -258,6 +261,7 @@ export class GuestsService {
         ...(dto.nameDay !== undefined
           ? { nameDay: dto.nameDay?.trim() || null }
           : {}),
+        ...(dto.gender !== undefined ? { gender: dto.gender } : {}),
         ...(dto.status !== undefined ? { status: dto.status } : {}),
         ...(dto.notes !== undefined ? { notes: dto.notes?.trim() || null } : {}),
       },
@@ -600,6 +604,7 @@ export class GuestsService {
       phone: g.phone,
       birthDate: g.birthDate ? g.birthDate.toISOString().slice(0, 10) : null,
       nameDay: g.nameDay ?? null,
+      gender: (g.gender as Gender) ?? Gender.UNSPECIFIED,
       status: (g.status as GuestStatus) ?? GuestStatus.ACTIVE,
       notes: g.notes,
       isActive: g.isActive,
@@ -632,6 +637,8 @@ export class GuestsService {
           studioId: m.studioId,
           guestId: m.guestId,
           guestName: guestFullName,
+          serviceId: m.serviceId ?? null,
+          serviceName: m.service?.name ?? null,
           monthlyFeeHuf: m.monthlyFeeHuf,
           startDate: m.startDate.toISOString(),
           dueDay: m.dueDay,

@@ -2,6 +2,7 @@ import {
   CheckInStatus,
   DocumentStatus,
   DocumentType,
+  Gender,
   GuestStatus,
   MembershipDueStatus,
   MembershipStatus,
@@ -58,6 +59,8 @@ export interface ServiceDto {
   category: ServiceCategory;
   durationMinutes: number;
   priceHuf: number;
+  /** Csak nőknek szól (pl. női köredzés): férfi vendégnek nem adható el, vele nem léptethető be. */
+  womenOnly: boolean;
   isActive: boolean;
   createdAt: string;
 }
@@ -67,6 +70,8 @@ export interface PassTemplateDto {
   studioId: string;
   serviceId?: string | null;
   serviceName?: string | null;
+  /** A sablon szolgáltatása csak nőknek szól (`ServiceDto.womenOnly`). */
+  womenOnly?: boolean;
   name: string;
   type: PassType;
   totalPasses: number | null;
@@ -144,6 +149,9 @@ export interface MembershipDto {
   studioId: string;
   guestId: string;
   guestName?: string;
+  /** A tagság szolgáltatása (a stúdió köredzése); a csak nőknek szóló korlátozás innen jön. */
+  serviceId?: string | null;
+  serviceName?: string | null;
   monthlyFeeHuf: number;
   startDate: string;
   dueDay: number;
@@ -314,6 +322,7 @@ export interface GuestDto {
   phone: string | null;
   birthDate: string | null;
   nameDay: string | null; // MM-DD format e.g. "07-26"
+  gender: Gender;
   status: GuestStatus;
   notes: string | null;
   isActive: boolean;

@@ -1,6 +1,7 @@
 import {
   DocumentStatus,
   DocumentType,
+  Gender,
   GuestStatus,
   MembershipDueStatus,
   MembershipStatus,
@@ -83,7 +84,8 @@ const STAFF: { email: string; name: string; role: Role }[] = [
 const LEGACY_STAFF_EMAILS = ['admin@reformstudio.hu', 'recepcio@reformstudio.hu'];
 
 const SERVICES = [
-  { name: 'Női Köredzés (Havi Tagság)', category: ServiceCategory.CIRCUIT, durationMinutes: 45, priceHuf: 22000 },
+  // TICKET-42: a köredzés csak nőknek szól (férfi vendégnek nem adható el, vele nem léptethető be).
+  { name: 'Női Köredzés (Havi Tagság)', category: ServiceCategory.CIRCUIT, durationMinutes: 45, priceHuf: 22000, womenOnly: true },
   { name: 'Hypoxi', category: ServiceCategory.BODY_SHAPING, durationMinutes: 30, priceHuf: 9500 },
   { name: 'Reformer Pilates', category: ServiceCategory.BODY_SHAPING, durationMinutes: 50, priceHuf: 6500 },
   { name: 'Ultrahangos Kavitációs Zsírbontás', category: ServiceCategory.BODY_SHAPING, durationMinutes: 40, priceHuf: 12000 },
@@ -155,6 +157,7 @@ interface GuestSpec {
   phone: string;
   birthDate: Date;
   nameDay: string;
+  gender: Gender;
   status: GuestStatus;
   notes: string;
   createdDaysAgo: number;
@@ -174,6 +177,7 @@ const DEMO_GUESTS: GuestSpec[] = [
     phone: '+36 30 412 8891',
     birthDate: dateOnly(1991, today.month, today.day), // mai születésnapos (KPI)
     nameDay: '07-26',
+    gender: Gender.FEMALE,
     status: GuestStatus.ACTIVE,
     notes: 'Köredzés havi tag + Hypoxi alakformáló kúra (kedd/csütörtök)',
     createdDaysAgo: 90,
@@ -341,6 +345,7 @@ const DEMO_GUESTS: GuestSpec[] = [
     phone: '+36 70 331 5520',
     birthDate: dateOnly(1988, 4, 12),
     nameDay: todayMmDd, // mai névnapos (KPI)
+    gender: Gender.MALE,
     status: GuestStatus.ACTIVE,
     notes: '1-5 napos tagdíj késés + utolsó 1 alkalmas bérlet teszteléséhez',
     createdDaysAgo: 45,
@@ -369,6 +374,7 @@ const DEMO_GUESTS: GuestSpec[] = [
     phone: '+36 20 981 1140',
     birthDate: dateOnly(1995, 11, 8),
     nameDay: '05-24',
+    gender: Gender.FEMALE,
     status: GuestStatus.ACTIVE,
     notes: 'Érvényes Reformer bérlet (2 alkalom maradt), tartozás nélkül',
     createdDaysAgo: 60,
@@ -390,6 +396,7 @@ const DEMO_GUESTS: GuestSpec[] = [
     phone: '+36 30 774 2019',
     birthDate: dateOnly(1984, 2, 19),
     nameDay: '03-24',
+    gender: Gender.MALE,
     status: GuestStatus.ACTIVE,
     notes: '15 nap feletti tartozás + lejárt bérlet teszteléséhez',
     createdDaysAgo: 70,
@@ -417,6 +424,7 @@ const DEMO_GUESTS: GuestSpec[] = [
     phone: '+36 30 611 9082',
     birthDate: dateOnly(1993, 9, 14),
     nameDay: '05-15',
+    gender: Gender.FEMALE,
     status: GuestStatus.ACTIVE,
     notes: '6-15 napos részbefizetett tagdíj + kimerült (0 alkalmas) bérlet',
     createdDaysAgo: 60,
@@ -445,6 +453,7 @@ const DEMO_GUESTS: GuestSpec[] = [
     phone: '+36 20 449 3210',
     birthDate: dateOnly(1990, 6, 5),
     nameDay: '02-06',
+    gender: Gender.FEMALE,
     status: GuestStatus.PAUSED,
     notes: 'Síbaleset miatt szüneteltetett tagság és fagyasztott bérlet',
     createdDaysAgo: 20,
@@ -625,7 +634,13 @@ async function createPass(
   }
 }
 
-async function createMembership(tx: Tx, guestId: string, staffId: string, spec: MembershipSpec) {
+async function createMembership(
+  tx: Tx,
+  guestId: string,
+  staffId: string,
+  spec: MembershipSpec,
+  serviceId: string | null,
+) {
   const first = billing(spec.billingDaysAgo);
   const pausedAt = spec.pausedDaysAgo !== undefined ? daysAgo(spec.pausedDaysAgo) : null;
   // Ugyanaz az ütemezés, mint a `createMembership` / havi pótlás az API-n.
@@ -643,6 +658,7 @@ async function createMembership(tx: Tx, guestId: string, staffId: string, spec: 
     data: {
       studioId,
       guestId,
+      serviceId,
       monthlyFeeHuf: spec.monthlyFeeHuf,
       startDate: first.dueDate,
       dueDay: first.dueDay,
@@ -709,6 +725,7 @@ async function createDemoGuest(
           phone: spec.phone,
           birthDate: spec.birthDate,
           nameDay: spec.nameDay,
+          gender: spec.gender,
           status: spec.status,
           notes: spec.notes,
           createdAt: daysAgo(spec.createdDaysAgo),
@@ -716,7 +733,14 @@ async function createDemoGuest(
       });
 
       if (spec.membership) {
-        await createMembership(tx, guest.id, staffId, spec.membership);
+        // A havi tagság a köredzés szolgáltatáshoz kötődik (TICKET-42).
+        await createMembership(
+          tx,
+          guest.id,
+          staffId,
+          spec.membership,
+          services.get('Női Köredzés (Havi Tagság)') ?? null,
+        );
       }
       for (const pass of spec.passes) {
         await createPass(tx, guest.id, staffId, pass, templates, services);

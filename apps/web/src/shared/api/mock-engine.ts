@@ -30,6 +30,8 @@ import {
   getOverdueBucket,
   getOverdueDays,
   getStudioDate,
+  inferGenderFromFirstName,
+  Gender,
   GuestDocumentDto,
   GuestDto,
   GuestNoteDto,
@@ -61,6 +63,7 @@ import {
   PassUsageLogDto,
   PaymentDto,
   PaymentMethod,
+  pickCircuitMembershipService,
   RecordPaymentRequestDto,
   resolveArrivalEntitlement,
   Role,
@@ -71,6 +74,7 @@ import {
   toGuestArrivals,
   VisitDto,
   VisitType,
+  womenOnlyAccess,
 } from '@reform/shared';
 import { broadcastToLocalMonitors } from '@/shared/lib/monitor-channel';
 
@@ -217,6 +221,7 @@ export function createInitialMockDatabase(): MockDatabaseState {
       category: ServiceCategory.CIRCUIT,
       durationMinutes: 45,
       priceHuf: 22000,
+      womenOnly: true,
       isActive: true,
       createdAt: addDays(now, -60),
     },
@@ -227,6 +232,7 @@ export function createInitialMockDatabase(): MockDatabaseState {
       category: ServiceCategory.BODY_SHAPING,
       durationMinutes: 30,
       priceHuf: 9500,
+      womenOnly: false,
       isActive: true,
       createdAt: addDays(now, -60),
     },
@@ -237,6 +243,7 @@ export function createInitialMockDatabase(): MockDatabaseState {
       category: ServiceCategory.BODY_SHAPING,
       durationMinutes: 50,
       priceHuf: 6500,
+      womenOnly: false,
       isActive: true,
       createdAt: addDays(now, -60),
     },
@@ -247,6 +254,7 @@ export function createInitialMockDatabase(): MockDatabaseState {
       category: ServiceCategory.BODY_SHAPING,
       durationMinutes: 40,
       priceHuf: 12000,
+      womenOnly: false,
       isActive: true,
       createdAt: addDays(now, -60),
     },
@@ -257,6 +265,7 @@ export function createInitialMockDatabase(): MockDatabaseState {
       category: ServiceCategory.COSMETIC,
       durationMinutes: 60,
       priceHuf: 16500,
+      womenOnly: false,
       isActive: true,
       createdAt: addDays(now, -60),
     },
@@ -354,6 +363,7 @@ export function createInitialMockDatabase(): MockDatabaseState {
       phone: '+36 30 412 8891',
       birthDate: `1991-${todayMmDd}`, // Mai születésnapos a KPI teszthez!
       nameDay: '07-26',
+      gender: Gender.FEMALE,
       status: GuestStatus.ACTIVE,
       notes: 'Köredzés havi tag + Hypoxi alakformáló kúra (kedd/csütörtök)',
       isActive: true,
@@ -365,6 +375,8 @@ export function createInitialMockDatabase(): MockDatabaseState {
           studioId: DEFAULT_STUDIO_ID,
           guestId: 'guest-1',
           guestName: 'Kovács Anna',
+          serviceId: 'srv-circuit',
+          serviceName: 'Női Köredzés (Havi Tagság)',
           monthlyFeeHuf: 22000,
           startDate: billing1.dueDate,
           dueDay: billing1.dueDay,
@@ -643,6 +655,7 @@ export function createInitialMockDatabase(): MockDatabaseState {
       phone: '+36 70 331 5520',
       birthDate: '1988-04-12',
       nameDay: todayMmDd, // Mai névnapos a KPI teszthez!
+      gender: Gender.MALE,
       status: GuestStatus.ACTIVE,
       notes: '1-5 napos tagdíj késés + utolsó 1 alkalmas bérlet teszteléséhez',
       isActive: true,
@@ -654,6 +667,8 @@ export function createInitialMockDatabase(): MockDatabaseState {
           studioId: DEFAULT_STUDIO_ID,
           guestId: 'guest-2',
           guestName: 'Nagy Péter',
+          serviceId: 'srv-circuit',
+          serviceName: 'Női Köredzés (Havi Tagság)',
           monthlyFeeHuf: 22000,
           startDate: billing2.dueDate,
           dueDay: billing2.dueDay,
@@ -738,6 +753,7 @@ export function createInitialMockDatabase(): MockDatabaseState {
       phone: '+36 20 981 1140',
       birthDate: '1995-11-08',
       nameDay: '05-24',
+      gender: Gender.FEMALE,
       status: GuestStatus.ACTIVE,
       notes: '6-15 napos részbefizetett tagdíj + 2 maradék alkalmas bérlet',
       isActive: true,
@@ -749,6 +765,8 @@ export function createInitialMockDatabase(): MockDatabaseState {
           studioId: DEFAULT_STUDIO_ID,
           guestId: 'guest-3',
           guestName: 'Szabó Eszter',
+          serviceId: 'srv-circuit',
+          serviceName: 'Női Köredzés (Havi Tagság)',
           monthlyFeeHuf: 20000,
           startDate: billing3.dueDate,
           dueDay: billing3.dueDay,
@@ -815,6 +833,7 @@ export function createInitialMockDatabase(): MockDatabaseState {
       phone: '+36 30 774 2019',
       birthDate: '1984-02-19',
       nameDay: '03-24',
+      gender: Gender.MALE,
       status: GuestStatus.ACTIVE,
       notes: '15 nap feletti tartozás + lejárt bérlet teszteléséhez',
       isActive: true,
@@ -826,6 +845,8 @@ export function createInitialMockDatabase(): MockDatabaseState {
           studioId: DEFAULT_STUDIO_ID,
           guestId: 'guest-4',
           guestName: 'Tóth Gábor',
+          serviceId: 'srv-circuit',
+          serviceName: 'Női Köredzés (Havi Tagság)',
           monthlyFeeHuf: 24000,
           startDate: billing4.dueDate,
           dueDay: billing4.dueDay,
@@ -892,6 +913,7 @@ export function createInitialMockDatabase(): MockDatabaseState {
       phone: '+36 30 611 9082',
       birthDate: '1993-09-14',
       nameDay: '12-10',
+      gender: Gender.FEMALE,
       status: GuestStatus.ACTIVE,
       notes: 'Kimerült bérlet (0 alkalom maradt)',
       isActive: true,
@@ -938,6 +960,7 @@ export function createInitialMockDatabase(): MockDatabaseState {
       phone: '+36 20 449 3210',
       birthDate: '1990-06-05',
       nameDay: '02-06',
+      gender: Gender.FEMALE,
       status: GuestStatus.PAUSED,
       notes: 'Síbaleset miatt szüneteltetett tagság és fagyasztott bérlet',
       isActive: true,
@@ -949,6 +972,8 @@ export function createInitialMockDatabase(): MockDatabaseState {
           studioId: DEFAULT_STUDIO_ID,
           guestId: 'guest-6',
           guestName: 'Horváth Dóra',
+          serviceId: 'srv-circuit',
+          serviceName: 'Női Köredzés (Havi Tagság)',
           monthlyFeeHuf: 22000,
           startDate: billing1.dueDate,
           dueDay: billing1.dueDay,
@@ -1226,6 +1251,27 @@ class MockStudioEngine {
       parsed.devices = (parsed.devices ?? [])
         .filter((d) => !(d.id === 'dev-1' && d.name === 'Recepciós Pult Másodlagos Monitor'))
         .map((d) => normalizeDisplayDevice(d));
+      // TICKET-42 előtti tárolt állapot: ugyanaz a pótlás, mint a migrációban (a nem a keresztnévből,
+      // a köredzés csak nőknek, a tagság a stúdió köredzés szolgáltatásához kötve).
+      for (const srv of parsed.services) {
+        srv.womenOnly ??=
+          srv.category === ServiceCategory.CIRCUIT &&
+          srv.name
+            .toLocaleLowerCase('hu-HU')
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .includes('koredzes');
+      }
+      const circuitService = pickCircuitMembershipService(parsed.services);
+      for (const g of parsed.guests) {
+        g.gender ??= inferGenderFromFirstName(g.firstName);
+        for (const m of g.memberships ?? []) {
+          if (m.serviceId === undefined) {
+            m.serviceId = circuitService?.id ?? null;
+            m.serviceName = circuitService?.name ?? null;
+          }
+        }
+      }
       // A bérletállapot időfüggő (lejárat, kezdés), ezért olvasáskor is frissül.
       const now = new Date();
       for (const g of parsed.guests) {
@@ -1299,6 +1345,7 @@ class MockStudioEngine {
     category: ServiceCategory;
     durationMinutes: number;
     priceHuf: number;
+    womenOnly?: boolean;
   }): ServiceDto {
     const state = this.load();
     const created: ServiceDto = {
@@ -1308,6 +1355,7 @@ class MockStudioEngine {
       category: input.category,
       durationMinutes: input.durationMinutes,
       priceHuf: input.priceHuf,
+      womenOnly: input.womenOnly ?? false,
       isActive: true,
       createdAt: new Date().toISOString(),
     };
@@ -1351,6 +1399,7 @@ class MockStudioEngine {
     phone?: string;
     birthDate?: string | null;
     nameDay?: string | null;
+    gender: Gender;
     status?: GuestStatus;
     notes?: string;
   }): GuestDto {
@@ -1378,6 +1427,7 @@ class MockStudioEngine {
       phone: input.phone?.trim() || null,
       birthDate: input.birthDate || null,
       nameDay: input.nameDay?.trim() || null,
+      gender: input.gender,
       status: input.status ?? GuestStatus.ACTIVE,
       notes: input.notes?.trim() || null,
       isActive: true,
@@ -1409,6 +1459,7 @@ class MockStudioEngine {
       phone: string;
       birthDate: string | null;
       nameDay: string | null;
+      gender: Gender;
       status: GuestStatus;
       notes: string;
     }>,
@@ -1444,6 +1495,7 @@ class MockStudioEngine {
         input.nameDay !== undefined
           ? input.nameDay?.trim() || null
           : current.nameDay,
+      gender: input.gender ?? current.gender,
       status: input.status ?? current.status,
       notes:
         input.notes !== undefined ? input.notes.trim() || null : current.notes,
@@ -1457,9 +1509,15 @@ class MockStudioEngine {
 
   getTemplates(includeInactive = false): PassTemplateDto[] {
     const state = this.load();
-    return includeInactive
-      ? state.templates
-      : state.templates.filter((t) => t.isActive);
+    // A csak nőknek szóló jelzés a sablon szolgáltatásáé, mint az API-n.
+    return (
+      includeInactive
+        ? state.templates
+        : state.templates.filter((t) => t.isActive)
+    ).map((t) => ({
+      ...t,
+      womenOnly: !!state.services.find((s) => s.id === t.serviceId)?.womenOnly,
+    }));
   }
 
   createTemplate(input: {
@@ -1533,6 +1591,13 @@ class MockStudioEngine {
       throw appError('PASS.TEMPLATE_NOT_FOUND', {
         message: 'A kiválasztott bérletsablon nem található.',
       });
+    }
+    // Csak nőknek szóló bérlet férfi vendégnek nem adható el (TICKET-42, mint az API-n).
+    const templateService = state.services.find(
+      (s) => s.id === template.serviceId,
+    );
+    if (womenOnlyAccess(guest.gender, templateService?.womenOnly) === 'DENIED') {
+      throw appError('PASS.WOMEN_ONLY');
     }
 
     const now = new Date();
@@ -1649,6 +1714,14 @@ class MockStudioEngine {
       throw appError('PASS.SERVICE_MISMATCH');
     }
 
+    // Csak nőknek szóló kezelés vagy bérlet: férfi vendég nem léptethető be vele (TICKET-42).
+    const womenOnly = womenOnlyAccess(
+      guest.gender,
+      service.womenOnly ||
+        !!state.services.find((s) => s.id === pass.serviceId)?.womenOnly,
+    );
+    if (womenOnly === 'DENIED') throw appError('CHECKIN.WOMEN_ONLY');
+
     const deductionError = passDeductionError(syncPassState(pass, now).status);
     if (deductionError) throw appError(deductionError);
 
@@ -1724,6 +1797,7 @@ class MockStudioEngine {
     this.save(state);
 
     const warnings: CheckInWarningCode[] = [];
+    if (womenOnly === 'GENDER_MISSING') warnings.push('GENDER_MISSING');
     if (pass.type === PassType.OCCASION_BASED && typeof newRemaining === 'number') {
       if (newRemaining === 0) {
         warnings.push('DEPLETED_PASS');
@@ -2017,17 +2091,36 @@ class MockStudioEngine {
       warnings.push('MEMBERSHIP_PAUSED');
 
     const passes = guest.passes ?? [];
+    const serviceOf = (id: string | null | undefined) =>
+      state.services.find((s) => s.id === id);
+    // Csak nőknek szóló tagság / bérlet: férfi vendéggel nem számít (TICKET-42, mint az API-n).
     const entitlement = resolveArrivalEntitlement(
       {
-        memberships: guest.memberships ?? [],
+        guestGender: guest.gender,
+        memberships: (guest.memberships ?? []).map((m) => ({
+          ...m,
+          womenOnly: serviceOf(m.serviceId)?.womenOnly ?? false,
+        })),
         passes: passes.map((p) => ({
           ...p,
-          serviceCategory:
-            state.services.find((s) => s.id === p.serviceId)?.category ?? null,
+          serviceCategory: serviceOf(p.serviceId)?.category ?? null,
+          womenOnly: serviceOf(p.serviceId)?.womenOnly ?? false,
         })),
       },
       now,
     );
+    const used =
+      entitlement.kind === 'CIRCUIT_MEMBERSHIP'
+        ? entitlement.membership
+        : entitlement.kind === 'CIRCUIT_PASS'
+          ? entitlement.pass
+          : null;
+    if (
+      used &&
+      womenOnlyAccess(guest.gender, used.womenOnly) === 'GENDER_MISSING'
+    ) {
+      warnings.push('GENDER_MISSING');
+    }
     const overdue = {
       overdueAmountHuf: overdueAmountHuf > 0 ? overdueAmountHuf : undefined,
       overdueDays: maxOverdueDays > 0 ? maxOverdueDays : undefined,
@@ -2353,6 +2446,7 @@ class MockStudioEngine {
 
   createMembership(input: {
     guestId: string;
+    serviceId?: string;
     monthlyFeeHuf: number;
     startDate?: string;
     dueDay?: number;
@@ -2360,6 +2454,22 @@ class MockStudioEngine {
     const state = this.load();
     const guest = state.guests.find((g) => g.id === input.guestId);
     if (!guest) throw appError('GUEST.NOT_FOUND');
+
+    // A havi tagság a köredzés szolgáltatáshoz kötődik (TICKET-42, mint az API-n).
+    const service = input.serviceId
+      ? state.services.find((s) => s.id === input.serviceId)
+      : pickCircuitMembershipService(state.services);
+    if (input.serviceId && !service) {
+      throw appError('COMMON.NOT_FOUND', {
+        message: 'A tagsághoz kiválasztott szolgáltatás nem található.',
+      });
+    }
+    if (womenOnlyAccess(guest.gender, service?.womenOnly) === 'DENIED') {
+      throw appError('PASS.WOMEN_ONLY', {
+        message:
+          'A köredzés tagság csak nőknek szól, férfi vendégnek nem adható el.',
+      });
+    }
 
     const now = new Date();
     const start = input.startDate ? new Date(input.startDate) : now;
@@ -2369,6 +2479,8 @@ class MockStudioEngine {
       studioId: DEFAULT_STUDIO_ID,
       guestId: guest.id,
       guestName: `${guest.lastName} ${guest.firstName}`,
+      serviceId: service?.id ?? null,
+      serviceName: service?.name ?? null,
       monthlyFeeHuf: input.monthlyFeeHuf,
       startDate: start.toISOString(),
       dueDay: input.dueDay ?? 10,
