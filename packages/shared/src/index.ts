@@ -7,4 +7,5 @@ export * from './membership-dues';
 export * from './birthday';
 export * from './pass-rules';
 export * from './gender';
+export * from './greeting';
 export * from './guest-arrivals';

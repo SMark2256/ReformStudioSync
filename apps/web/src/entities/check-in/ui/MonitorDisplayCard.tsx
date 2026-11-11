@@ -1,4 +1,5 @@
 import {
+  greetingForCheckIn,
   MonitorCheckInPayload,
   MonitorCheckInRevokedPayload,
 } from '@reform/shared';
@@ -128,6 +129,8 @@ export const MonitorDisplayCard: React.FC<MonitorDisplayCardProps> = ({
   const isSuccess = activeResult.status === 'SUCCESS';
   const isDuplicate = activeResult.status === 'DUPLICATE';
   const isTreatment = activeResult.mode === 'TREATMENT_GREETING';
+  // Címke és jókívánság a szolgáltatás kategóriájából (TICKET-43), nem a módból.
+  const greeting = greetingForCheckIn(activeResult);
   const hasSafeWarnings = activeResult.warnings.length > 0;
   // Csak sikeres belépésnél (toMonitorPayload is csak ekkor adja át).
   const isBirthday = isSuccess && activeResult.isBirthday === true;
@@ -150,9 +153,7 @@ export const MonitorDisplayCard: React.FC<MonitorDisplayCardProps> = ({
       <div className="flex w-full items-center justify-between">
         <span className="rounded-sm bg-black/20 px-3 py-1 text-xs font-semibold">
           {isSuccess
-            ? isTreatment
-              ? 'Kezelés • Üdvözlés'
-              : 'Női Köredzés • Érkezés'
+            ? greeting.label
             : isDuplicate
               ? 'Érkezés Már Rögzítve'
               : 'Recepciós Egyeztetés'}
@@ -212,7 +213,7 @@ export const MonitorDisplayCard: React.FC<MonitorDisplayCardProps> = ({
 
         {isSuccess || isDuplicate ? (
           !isTreatment ? (
-            /* 5.3 Köredzéses érkezés után: „Üdvözlünk, [Keresztnév]! Jó edzést kívánunk!” */
+            /* 5.3 Köredzéses érkezés után: „Üdvözlünk, [Keresztnév]! [Jókívánság]” */
             <div
               className={`mt-6 rounded-lg bg-black/25 border border-white/20 ${
                 compact ? 'px-6 py-4' : 'px-12 py-7'
@@ -223,11 +224,11 @@ export const MonitorDisplayCard: React.FC<MonitorDisplayCardProps> = ({
                   compact ? 'text-xl' : 'text-4xl'
                 }`}
               >
-                Jó edzést kívánunk!
+                {greeting.wish}
               </p>
             </div>
           ) : (
-            /* 5.3 Alkalmas kezelés levonása után: „Üdvözlünk, [Név]! [Kezelés neve]. Hátralévő alkalmak: [X]. Kellemes kezelést kívánunk!” */
+            /* 5.3 Alkalmas kezelés levonása után: „Üdvözlünk, [Név]! [Kezelés neve]. Hátralévő alkalmak: [X]. [Jókívánság]” */
             <div
               className={`mt-5 flex flex-col items-center gap-3 rounded-lg bg-black/25 border border-white/20 ${
                 compact ? 'px-6 py-4' : 'px-12 py-7'
@@ -261,7 +262,7 @@ export const MonitorDisplayCard: React.FC<MonitorDisplayCardProps> = ({
                   compact ? 'text-base' : 'text-2xl'
                 }`}
               >
-                Kellemes kezelést kívánunk!
+                {greeting.wish}
               </p>
             </div>
           )

@@ -184,6 +184,30 @@ describe('PassesService — csak nőknek szóló bérlet és kezelés (TICKET-42
       await expect(deduct('srv-hypoxi')).resolves.toMatchObject({ status: 'SUCCESS' });
     });
 
+    it('TICKET-43: a levonás a kezelés kategóriáját és womenOnly jelzését adja a monitornak', async () => {
+      txMock.guest.findFirst.mockResolvedValue(guest('FEMALE'));
+      txMock.guestPass.findFirst.mockResolvedValue(openPass());
+      txMock.service.findFirst.mockResolvedValue({
+        id: 'srv-facial',
+        name: 'Hialuronos Arckezelés',
+        category: 'COSMETIC',
+        womenOnly: false,
+      });
+
+      await expect(deduct('srv-facial')).resolves.toMatchObject({
+        mode: 'TREATMENT_GREETING',
+        serviceName: 'Hialuronos Arckezelés',
+        serviceCategory: 'COSMETIC',
+        womenOnly: false,
+      });
+
+      txMock.service.findFirst.mockResolvedValue(circuitService);
+      await expect(deduct('srv-circuit')).resolves.toMatchObject({
+        serviceCategory: 'CIRCUIT',
+        womenOnly: true,
+      });
+    });
+
     it('nincs megadva nem: levonható, de GENDER_MISSING figyelmeztetéssel', async () => {
       txMock.guest.findFirst.mockResolvedValue(guest('UNSPECIFIED'));
       txMock.guestPass.findFirst.mockResolvedValue(openPass());

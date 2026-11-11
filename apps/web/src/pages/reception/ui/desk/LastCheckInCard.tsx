@@ -1,4 +1,9 @@
-import { CheckInResultPayload, CheckInStatus, GuestDto } from '@reform/shared';
+import {
+  CheckInResultPayload,
+  CheckInStatus,
+  greetingForCheckIn,
+  GuestDto,
+} from '@reform/shared';
 import { AlertTriangle, RotateCcw, Ticket, Users } from 'lucide-react';
 import React from 'react';
 import {
@@ -45,6 +50,8 @@ export const LastCheckInCard: React.FC<LastCheckInCardProps> = ({
     (lastCheckIn?.status === CheckInStatus.SUCCESS ||
       lastCheckIn?.status === CheckInStatus.DUPLICATE_SCAN) &&
     lastCheckIn.mode !== 'CIRCUIT_GREETING';
+  // A szolgáltatás neve a közös üdvözlés-térképből (TICKET-43), mint a monitoron és a toastban.
+  const greeting = lastCheckIn && greetingForCheckIn(lastCheckIn);
 
   return (
     <Card>
@@ -85,8 +92,8 @@ export const LastCheckInCard: React.FC<LastCheckInCardProps> = ({
                   <Badge variant={statusBadge.variant}>{statusBadge.label}</Badge>
                   <Badge variant="secondary" dot={false}>
                     {lastCheckIn.mode === 'CIRCUIT_GREETING'
-                      ? 'Köredzés (0 levonás)'
-                      : `Kezelés: ${lastCheckIn.serviceName ?? 'Alkalom levonás'}`}
+                      ? `${greeting?.kind} (0 levonás)`
+                      : `${greeting?.kind}: ${lastCheckIn.serviceName ?? 'Alkalom levonás'}`}
                   </Badge>
                 </div>
                 <p className="font-mono text-xs text-muted-foreground">

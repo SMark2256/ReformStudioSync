@@ -3,6 +3,7 @@ import {
   CheckInWarningCode,
   MonitorEventMode,
   PassType,
+  ServiceCategory,
 } from './enums';
 
 export const SOCKET_NAMESPACE = '/monitor';
@@ -59,6 +60,13 @@ export interface CheckInResultPayload {
   barcode: string;
   guestName: string;
   serviceName?: string;
+  /**
+   * A belépés szolgáltatásának kategóriája (az üdvözlés szövegéhez, `greetingForCheckIn`);
+   * `null`, ha ismeretlen. Nem érzékeny, a monitorra is átmegy (TICKET-43).
+   */
+  serviceCategory?: ServiceCategory | null;
+  /** A szolgáltatás csak nőknek szól („Női Köredzés”). Nem érzékeny, a monitorra is átmegy. */
+  womenOnly?: boolean;
   passName?: string;
   passType?: PassType;
   remainingPasses?: number | 'Korlátlan';

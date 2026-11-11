@@ -30,6 +30,7 @@ import {
   getOverdueBucket,
   getOverdueDays,
   getStudioDate,
+  greetingFields,
   inferGenderFromFirstName,
   Gender,
   GuestDocumentDto,
@@ -1825,6 +1826,8 @@ class MockStudioEngine {
       barcode: guest.barcode,
       guestName: `${guest.lastName} ${guest.firstName}`,
       serviceName,
+      // A monitor a kezelés kategóriájához illő szöveggel köszön (TICKET-43, mint az API-n).
+      ...greetingFields(service),
       passName: pass.passTemplateName,
       passType: pass.type,
       remainingPasses: newRemaining,
@@ -2030,13 +2033,36 @@ class MockStudioEngine {
         const activePass = (guest.passes ?? []).find(
           (p) => p.id === recent.guestPassId,
         );
+        // A korábbi belépés szövege és kategóriája, nem égetett köredzés (TICKET-43, mint az
+        // API-n): kezelésnél a levonás szolgáltatása, köredzésnél a bérleté, bérlet nélkül a tagságé.
+        const isCircuit = recent.visitType !== VisitType.TREATMENT;
+        const usage = (guest.passes ?? [])
+          .flatMap((p) => p.usageLogs ?? [])
+          .find((u) => u.checkInId === recent.id);
+        const memberships = guest.memberships ?? [];
+        const membership =
+          memberships.find((m) => m.status === MembershipStatus.ACTIVE) ??
+          memberships[0];
+        const priorServiceId =
+          usage?.serviceId ??
+          activePass?.serviceId ??
+          (isCircuit && !activePass ? membership?.serviceId : null);
+        const priorService = priorServiceId
+          ? state.services.find((s) => s.id === priorServiceId)
+          : undefined;
         const dupPayload: CheckInResultPayload = {
           checkInId: recent.id,
-          mode: 'CIRCUIT_GREETING',
+          mode: isCircuit ? 'CIRCUIT_GREETING' : 'TREATMENT_GREETING',
           status: CheckInStatus.DUPLICATE_SCAN,
           guestId: guest.id,
           barcode: guest.barcode,
           guestName: guestFullName,
+          serviceName:
+            priorService?.name ?? (isCircuit ? 'Köredzés' : undefined),
+          ...greetingFields(
+            priorService,
+            isCircuit ? ServiceCategory.CIRCUIT : null,
+          ),
           passName: activePass?.passTemplateName ?? recent.passName ?? undefined,
           passType: activePass?.type,
           remainingPasses:
@@ -2137,6 +2163,10 @@ class MockStudioEngine {
           : undefined;
       const circuitPass =
         entitlement.kind === 'CIRCUIT_PASS' ? entitlement.pass : undefined;
+      // A tagság vagy a bérlet valódi szolgáltatása (TICKET-43); nélküle köredzés.
+      const arrivalService = serviceOf(
+        membership ? membership.serviceId : circuitPass?.serviceId,
+      );
       if (
         circuitPass &&
         Math.ceil(
@@ -2196,7 +2226,8 @@ class MockStudioEngine {
         guestId: guest.id,
         barcode: guest.barcode,
         guestName: guestFullName,
-        serviceName: 'Köredzés',
+        serviceName: arrivalService?.name ?? 'Köredzés',
+        ...greetingFields(arrivalService, ServiceCategory.CIRCUIT),
         passName: checkInLog.passName ?? 'Köredzés',
         passType: circuitPass?.type,
         remainingPasses: 'Korlátlan',

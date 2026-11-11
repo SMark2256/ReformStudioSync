@@ -5,6 +5,7 @@ import {
   expect,
   expectMonitorIdle,
   loginToReception,
+  quickSearchRow,
   scanBarcode,
   test,
   toasts,
@@ -61,6 +62,46 @@ test.describe('Regresszió: TICKET-2', () => {
 
       await expect(monitor.getByText('Hátralévő alkalmak', { exact: true })).toBeVisible({ timeout: 1_000 });
       await expect(monitor.getByRole('heading', { name: 'Kovács Anna!' })).toBeVisible();
+    },
+  );
+});
+
+test.describe('Regresszió: TICKET-43', () => {
+  test(
+    'TICKET-43: köredzésre belépő vendéget a csak nőknek szóló köredzéshez illően köszönti',
+    async ({ page }) => {
+      const monitor = await openReceptionWithMonitor(page);
+      // Kovács Anna (#100001): havi tagság a „Női Köredzés (Havi Tagság)” szolgáltatásra.
+      await scanBarcode(page, '100001');
+
+      await expect(monitor.getByText('Női Köredzés • Érkezés', { exact: true })).toBeVisible({ timeout: 1_000 });
+      await expect(monitor.getByText('Jó edzést kívánunk!', { exact: true })).toBeVisible();
+      await expect(monitor.getByRole('heading', { name: 'Kovács Anna!' })).toBeVisible();
+    },
+  );
+
+  test(
+    'TICKET-43: prémium kozmetikai bérletnél a monitor nem ír „Jó edzést”-et',
+    async ({ page }) => {
+      const monitor = await openReceptionWithMonitor(page);
+      // Kovács Anna (#100001): 5 alkalmas prémium kozmetikai bérlet (Hialuronos arckezelés).
+      await quickSearchRow(page, '100001').getByRole('button', { name: 'Kezelés -1', exact: true }).click();
+      const dialog = page.getByRole('dialog', { name: 'Alkalmas Kezelés Kiválasztása & Bérlet Levonás' });
+      await expect(dialog).toBeVisible();
+      await dialog.getByRole('button', { name: /^Hialuronos Arckezelés/ }).click();
+      await expect(dialog.getByRole('button', { name: /^5 Alkalmas Prémium Kozmetikai Bérlet/ })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      );
+      // A monitor-előnézet is a közös szövegtérképet használja.
+      await expect(dialog).toContainText('Kellemes kikapcsolódást kívánunk!');
+      await dialog.getByRole('button', { name: '1 Alkalom Levonása & Üdvözlés' }).click();
+
+      await expect(monitor.getByText('Kozmetika • Üdvözlés', { exact: true })).toBeVisible({ timeout: 1_000 });
+      await expect(monitor.getByText('Kellemes kikapcsolódást kívánunk!', { exact: true })).toBeVisible();
+      await expect(monitor.getByRole('heading', { name: 'Kovács Anna!' })).toBeVisible();
+      await expect(monitor.getByText('Jó edzést kívánunk!', { exact: true })).toHaveCount(0);
+      await expect(monitor.getByText(/Női Köredzés/)).toHaveCount(0);
     },
   );
 });

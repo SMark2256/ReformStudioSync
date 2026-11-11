@@ -10,6 +10,7 @@ import {
   DEFAULT_STUDIO_ID,
   EXPIRING_SOON_THRESHOLD_DAYS,
   frozenDaysBetween,
+  greetingFields,
   isBirthdayToday,
   getPassStatus,
   isPassFreezable,
@@ -347,6 +348,8 @@ export class PassesService {
             serviceName:
               existingOp.service?.name ??
               existingOp.guestPass.passTemplate.name,
+            // A korábbi levonás szolgáltatásának üdvözlése (TICKET-43).
+            ...greetingFields(existingOp.service),
             passName: existingOp.guestPass.passTemplate.name,
             passType: existingOp.guestPass.type as unknown as PassType,
             remainingPasses:
@@ -475,6 +478,8 @@ export class PassesService {
         barcode: guest.barcode,
         guestName: `${guest.lastName} ${guest.firstName}`,
         serviceName,
+        // A monitor a kezelés kategóriájához illő szöveggel köszön (TICKET-43).
+        ...greetingFields(service),
         passName: pass.passTemplate.name,
         passType: pass.type as unknown as PassType,
         remainingPasses: newRemaining,

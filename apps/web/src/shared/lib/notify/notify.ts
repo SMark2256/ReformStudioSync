@@ -2,6 +2,7 @@ import {
   CheckInResultPayload,
   CheckInStatus,
   DUPLICATE_SCAN_COOLDOWN_SECONDS,
+  greetingForCheckIn,
 } from '@reform/shared';
 import { toast } from 'sonner';
 import { soundFeedback } from '../sound';
@@ -72,6 +73,8 @@ export const notify = {
       }
 
       const isCircuit = payload.mode === 'CIRCUIT_GREETING';
+      // A szolgáltatás neve a közös üdvözlés-térképből (TICKET-43), pl. „Női Köredzés”, „Kozmetika”.
+      const { kind } = greetingForCheckIn(payload);
       const remainingText = isCircuit
         ? 'Köredzés érkezés (0 levonás)'
         : payload.remainingPasses === 'Korlátlan'
@@ -132,8 +135,8 @@ export const notify = {
       } else {
         toast.success(
           isCircuit
-            ? `Köredzés érkezés: ${payload.guestName}`
-            : `Kezelés levonva: ${payload.guestName}`,
+            ? `${kind} érkezés: ${payload.guestName}`
+            : `${kind} levonva: ${payload.guestName}`,
           {
             description,
             duration: 5500,

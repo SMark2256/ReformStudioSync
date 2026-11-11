@@ -1,4 +1,9 @@
-import { CheckInStatus, CheckInWarningCode, MonitorEventMode } from './enums';
+import {
+  CheckInStatus,
+  CheckInWarningCode,
+  MonitorEventMode,
+  ServiceCategory,
+} from './enums';
 import type { CheckInResultPayload, CheckInRevokedPayload } from './socket-events';
 
 export type MonitorCheckInStatus = 'SUCCESS' | 'DUPLICATE' | 'DENIED';
@@ -23,6 +28,13 @@ export type MonitorSafeWarning = (typeof MONITOR_SAFE_WARNINGS)[number];
 export interface MonitorCheckInPayload {
   status: MonitorCheckInStatus;
   mode?: MonitorEventMode;
+  /**
+   * Csak üdvözlésnél (SUCCESS / DUPLICATE): a szolgáltatás kategóriája, ebből jön a címke és a
+   * jókívánság (`greetingForCheckIn`); `null`, ha ismeretlen.
+   */
+  serviceCategory?: ServiceCategory | null;
+  /** Csak üdvözlésnél, és csak ha igaz: csak nőknek szóló szolgáltatás („Női Köredzés”). */
+  womenOnly?: boolean;
   /** Csak üdvözlésnél (SUCCESS / DUPLICATE); elutasításnál hiányzik. */
   displayName?: string;
   /** Csak kezelés-üdvözlésnél (TREATMENT_GREETING). */
@@ -70,6 +82,10 @@ export function toMonitorPayload(
   if (status === 'DENIED') return base;
 
   base.displayName = result.guestName;
+  if (result.serviceCategory !== undefined) {
+    base.serviceCategory = result.serviceCategory;
+  }
+  if (result.womenOnly) base.womenOnly = true;
   if (status === 'SUCCESS' && result.isBirthday) base.isBirthday = true;
   if (result.mode === 'TREATMENT_GREETING') {
     base.serviceName = result.serviceName ?? result.passName;
