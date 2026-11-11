@@ -698,10 +698,11 @@ A fiókpanelből nyílik (4.2), a menüben nincs.
     árnyalatot; kijelölt: 2 px `outline-foreground` 2 px eltolással és `Check`
     ikon; `aria-label` a névvel), mellette a kiválasztott szín neve 13 px
     `muted-foreground`. Egyedi színválasztó nincs.
-  - **Oldalsáv** „Csak ikonok, több hely a tartalomnak. Keskeny és széles
-    képernyőn külön mentődik.” → `Switch` „Összecsukott oldalsáv” (az aktuális
-    sáv beállítása, ugyanaz, mint az összecsukó gomb). Mobilon (768 px alatt)
-    rejtve, mert ott kihúzható menü van, nincs ikonsáv.
+  - **Gombstílusok** „A felület három gombtípusa” → előnézet a felületszínhez:
+    `primary` „Elsődleges” · `secondary` „Másodlagos” · `link` „Link gomb” egy
+    sorban (`gap-2`, `role="group"` a sor címével). A gombok nem csinálnak
+    semmit. Az oldalsáv összecsukása itt nincs: arra az oldalsáv összecsukó
+    gombja és a `Ctrl+B` való.
 - Kártya „Stúdió adatai” (későbbi jegy, még nincs hozzá API): nem adminnál
   fejlécben `secondary` „Csak admin” jelvény `Lock` ikonnal, a mezők letiltva;
   Stúdió neve · Cím · Vendégmonitor kijelzési idő (4 / 6 / 10 mp) · Lejárat előtti
