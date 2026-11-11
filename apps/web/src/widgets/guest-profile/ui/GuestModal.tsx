@@ -68,6 +68,8 @@ import {
   ToggleGroup,
   ToggleGroupItem,
 } from '@/shared/ui';
+import { arrivalsForPass } from '../model/arrivals';
+import { GuestArrivalsSection, PassArrivals } from './GuestArrivals';
 
 const DUE_STATUS_LABEL: Record<MembershipDueStatus, string> = {
   [MembershipDueStatus.PENDING]: 'függőben',
@@ -104,6 +106,7 @@ type GuestSheetTab =
   | 'overview'
   | 'memberships'
   | 'passes'
+  | 'arrivals'
   | 'treatments'
   | 'payments'
   | 'measurements'
@@ -600,6 +603,11 @@ export const GuestModal: React.FC<GuestModalProps> = ({
       count: guest?.memberships?.length ?? 0,
     },
     { id: 'passes', label: 'Bérletek', count: guest?.passes?.length ?? 0 },
+    {
+      id: 'arrivals',
+      label: 'Belépések',
+      count: guest?.arrivals?.length ?? 0,
+    },
     {
       id: 'treatments',
       label: 'Kezelések',
@@ -1227,6 +1235,13 @@ export const GuestModal: React.FC<GuestModalProps> = ({
                       </Button>
                     )}
                   </div>
+
+                  <div className="basis-full">
+                    <PassArrivals
+                      arrivals={arrivalsForPass(guest.arrivals, pass.id)}
+                      passName={passName}
+                    />
+                  </div>
                 </div>
               );
             })}
@@ -1265,6 +1280,11 @@ export const GuestModal: React.FC<GuestModalProps> = ({
               </section>
             )}
           </div>
+        )}
+
+        {/* BELÉPÉSEK (TICKET-40) */}
+        {guest && activeTab === 'arrivals' && (
+          <GuestArrivalsSection arrivals={guest.arrivals ?? []} />
         )}
 
         {/* KEZELÉSI ELŐZMÉNYEK ÉS VISSZAVONÁS */}
