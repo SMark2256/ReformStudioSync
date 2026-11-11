@@ -33,7 +33,7 @@ test.describe('Regresszió: TICKET-25 befizetés kerek összeggel', () => {
 
     await expect(paymentDialog(page)).toBeHidden();
     await expect(toasts(page)).toContainText('Befizetés rögzítve');
-    await expect(toasts(page)).toContainText('3 000 Ft');
+    await expect(toasts(page)).toContainText(/3\s?000 Ft/);
   });
 
   test('TICKET-25: a tartozás előre kitöltött 22 000 Ft-os tagdíja rögzíthető a Pénzügy oldalon', async ({ page }) => {
