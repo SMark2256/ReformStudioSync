@@ -1,6 +1,6 @@
 # ReformStudioSync — Telepítési és Üzemeltetési Útmutató
 
-Ez az útmutató lépésről lépésre bemutatja a **ReformStudioSync** rendszer lokális elindítását, a **0 Ft / hó** felhő-infrastruktúra (Supabase + Render + Vercel + UptimeRobot) beállítását, valamint a recepciós hardverek (vonalkódolvasó, másodlagos monitor, tablet) beüzemelését.
+Ez az útmutató lépésről lépésre bemutatja a **ReformStudioSync** rendszer lokális elindítását, a **0 Ft / hó** felhő-infrastruktúra (Supabase + Render + Cloudflare Workers + UptimeRobot) beállítását, valamint a recepciós hardverek (vonalkódolvasó, másodlagos monitor, tablet) beüzemelését.
 
 ---
 

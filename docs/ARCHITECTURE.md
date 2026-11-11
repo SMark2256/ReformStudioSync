@@ -2,7 +2,7 @@
 
 ## 1. Rendszeráttekintés
 
-A **ReformStudioSync** egy egystúdiós (de `studioId` szinten többstúdiós SaaS modellre felkészített) recepciós, pénzügyi és valós idejű vendégmonitor webalkalmazás, amelynek célja a **0 Ft / hó** fix felhő-infrastruktúra költség (Supabase Free Tier + Render Hobby Tier + Vercel Free Tier + UptimeRobot).
+A **ReformStudioSync** egy egystúdiós (de `studioId` szinten többstúdiós SaaS modellre felkészített) recepciós, pénzügyi és valós idejű vendégmonitor webalkalmazás, amelynek célja a **0 Ft / hó** fix felhő-infrastruktúra költség (Supabase Free Tier + Render Hobby Tier + Cloudflare Workers Free Tier + UptimeRobot).
 
 ### 1.1. Monorepo Felépítés
 
