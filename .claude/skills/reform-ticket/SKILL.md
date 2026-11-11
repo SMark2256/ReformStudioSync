@@ -101,7 +101,8 @@ A projekt szabályai, amelyeket a kódnak követnie kell:
   `@/features/sell-pass/ui/...`). Új slice-nál add hozzá az `index.ts`-t. Ha
   bizonytalan vagy, hova kerüljön valami, a `npm run lint:fsd` megmondja.
 - **Világos és sötét téma** minden recepciós/admin UI-ban (`.cursor/rules/theme-support.mdc`):
-  `dark:` párok vagy a `.reception-theme-dark` szabályok. A Vendégmonitor
+  új vagy átállított kódban csak tokenosztályok, a régi kódban `dark:` párok
+  vagy a `.reception-theme-dark` szabályok. A Vendégmonitor
   (`/monitor`, `.monitor-invariant`) kivétel, az mindig fix sötét/smaragd.
 - **Magyar felületi szöveg**, a meglévő hangnemben. A visszajelzés a
   `shared/lib/notify` toastjain megy, ne írj saját alertet.
@@ -111,7 +112,8 @@ A projekt szabályai, amelyeket a kódnak követnie kell:
 - **Prisma.** Séma módosításakor `npm run db:generate`. Távoli adatbázison
   (`db:push`, `db:migrate`, seed) csak kifejezett kérésre dolgozz, mert az az élő
   stúdió adata.
-- Felületet érintő munkánál használd az `impeccable` skillt.
+- Felületet érintő munkánál használd a `reformstudio-ui-skill`-t
+  (`.claude/skills/reformstudio-ui-skill/SKILL.md`), az a mérvadó UI-irány.
 
 ## 4. Quality gate
 
@@ -146,7 +148,9 @@ van-e rá `test.fixme` regressziós teszt (a tesztnévben a ticketkulcs, pl.
 `fixme`-t cseréld `test`-re, és legyen zöld.
 
 Felületi változásnál indítsd el az appot (`run` skill, vagy `npm run dev:web`), és
-nézd meg a változást a valódi oldalon világos és sötét témában is.
+nézd meg a változást a valódi oldalon világos és sötét témában is. Felületi
+változásnál menj végig a `reformstudio-ui-skill` 10.4-es ellenőrzőlistáján
+(tiltott minták, szélességek, billentyűzet, szkenner, akadálymentesség).
 
 ## 5. Review, utána commit
 
@@ -218,7 +222,7 @@ vidd előbb a `demo`-ra, amelyikre a másik épül.
 | Skill | Mikor | Fázis |
 |---|---|---|
 | `diagnosing-bugs` | hibajavító ticketnél | 1 |
-| `impeccable` | felületet érintő munkánál | 3, 4 |
+| `reformstudio-ui-skill` | felületet érintő munkánál (4. fázisban a 10.4-es ellenőrzőlista) | 3, 4 |
 | `run` | a változás megnézése a futó appban | 4 |
 | `simplify`, majd `code-review` | kódváltozásnál, commit előtt | 5 |
 | `security-best-practices` | auth-, token- vagy jogosultság-változásnál | 5 |
