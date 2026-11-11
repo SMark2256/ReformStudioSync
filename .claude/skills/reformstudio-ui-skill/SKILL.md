@@ -688,9 +688,8 @@ A fiókpanelből nyílik (4.2), a menüben nincs.
 - PageHeader: „Beállítások” / „A megjelenés ezen a gépen mentődik.”
 - Kártya „Megjelenés”, soronként kétoszlopos beállítássor (220 px leírás +
   vezérlő, a sorok között 1 px elválasztó, `py-4`; mobilon egymás alatt). Minden
-  változás azonnal érvényes és mentődik; a téma és a felületszín váltásakor egy
-  közös toast: „Megjelenés mentve” + „Téma: Sötét” / „Felületszín: Kék” (gyors
-  egymás utáni váltásnál ugyanaz frissül).
+  változás azonnal érvényes és mentődik; a téma és a felületszín váltásakor
+  nincs toast (a változás azonnal látszik).
   - **Téma** (`h3`) „Világos vagy sötét felület” → szegmens (`ToggleGroup`):
     Világos (`Sun`) · Sötét (`Moon`). Ugyanez a fiókpanel Téma kapcsolója.
   - **Felületszín** „Elsődleges gombok, aktív menüpont, jelölők” → 6 színminta
