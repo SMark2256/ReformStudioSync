@@ -13,18 +13,12 @@ import {
   VisitType,
 } from '@reform/shared';
 import {
-  Barcode,
-  BellRing,
-  CalendarPlus,
   CheckCircle2,
   CloudOff,
   FileSignature,
   QrCode,
   RefreshCw,
   RotateCcw,
-  Snowflake,
-  Sparkles,
-  Sun,
   Ticket,
   UserPlus,
   Users,
@@ -40,13 +34,57 @@ import { handleAppError } from '@/shared/lib/errors';
 import { notify } from '@/shared/lib/notify';
 import { useOfflineQueueStore } from '@/entities/check-in';
 import { useScannerChannelStore } from '@/entities/check-in';
-import { Button, PageHeader } from '@/shared/ui';
+import {
+  Badge,
+  Button,
+  Card,
+  CardActions,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+  PageHeader,
+} from '@/shared/ui';
 import { DigitalPassCardModal } from '@/entities/guest';
 import { GuestModal } from '@/widgets/guest-profile';
 import { MonitorDisplayCard } from '@/entities/check-in';
 import { DeductTreatmentModal } from '@/features/deduct-treatment';
 import { RecordPaymentModal } from '@/features/record-payment';
 import { SellPassModal } from '@/features/sell-pass';
+
+interface ScenarioButtonProps {
+  /** A gomb nevének eleje (a tesztek erre keresnek), pl. „Kovács Anna (Köredzés)”. */
+  name: string;
+  tag: string;
+  title: string;
+  hint: string;
+  onClick: () => void;
+}
+
+// Szimulált beolvasás egy előre beállított vendéggel és helyzettel.
+const ScenarioButton: React.FC<ScenarioButtonProps> = ({
+  name,
+  tag,
+  title,
+  hint,
+  onClick,
+}) => (
+  <Button
+    variant="secondary"
+    onClick={onClick}
+    className="h-auto flex-col items-start gap-0.5 whitespace-normal p-3 text-left coarse:h-auto"
+  >
+    <span className="flex w-full items-center justify-between gap-2">
+      <span className="text-[13px] font-semibold text-foreground">{name}</span>
+      <span className="font-mono text-xs font-normal text-muted-foreground">
+        {tag}
+      </span>
+    </span>
+    <span className="text-xs font-medium text-foreground">{title}</span>
+    <span className="text-xs font-normal text-muted-foreground">{hint}</span>
+  </Button>
+);
 
 export const DemoSandboxPage: React.FC = () => {
   const location = useLocation();
@@ -108,8 +146,8 @@ export const DemoSandboxPage: React.FC = () => {
   const financeSummary = mockStudioEngine.getDailyFinanceSummary();
 
   const activeModalGuest = guestModalState.guest
-    ? guests.find((g) => g.id === guestModalState.guest?.id) ??
-      guestModalState.guest
+    ? (guests.find((g) => g.id === guestModalState.guest?.id) ??
+      guestModalState.guest)
     : null;
 
   const showOnEmbeddedMonitor = useCallback((payload: CheckInResultPayload) => {
@@ -140,7 +178,10 @@ export const DemoSandboxPage: React.FC = () => {
       try {
         const revoked = mockStudioEngine.revokeCheckIn(checkInId);
         recordRevokedResult(revoked);
-        broadcastToScannerChannel({ type: 'CHECKIN_REVOKED', payload: revoked });
+        broadcastToScannerChannel({
+          type: 'CHECKIN_REVOKED',
+          payload: revoked,
+        });
         showRevokedOnEmbeddedMonitor(revoked);
         notify.success(
           `Beléptetés / Levonás sztornózva: ${revoked.guestName}`,
@@ -239,7 +280,7 @@ export const DemoSandboxPage: React.FC = () => {
     setMonitorResult(null);
     setRevokedBanner(null);
     notify.success(
-      'Demo adatbázis alaphelyzetbe állítva!',
+      'Demo adatbázis alaphelyzetbe állítva',
       'Minden tesztvendég, tagság, bérlet, fotó és pénzügyi tranzakció visszaállt a kiinduló állapotba.',
     );
     forceRender();
@@ -254,7 +295,7 @@ export const DemoSandboxPage: React.FC = () => {
       showOnEmbeddedMonitor(res.results[res.results.length - 1]);
     }
     notify.success(
-      `Offline várólista feldolgozva (${res.processed} db beléptetés)!`,
+      `Offline várólista feldolgozva (${res.processed} db beléptetés)`,
       'Az összes offline beolvasott vonalkód szinkronizálva lett.',
     );
     forceRender();
@@ -296,8 +337,8 @@ export const DemoSandboxPage: React.FC = () => {
       const matched =
         st.guestId && st.guestId !== '__NEW__'
           ? (guests.find((g) => g.id === st.guestId) ??
-              st.guestSnapshot ??
-              null)
+            st.guestSnapshot ??
+            null)
           : null;
       setGuestModalState({ isOpen: true, guest: matched });
     } else {
@@ -326,7 +367,7 @@ export const DemoSandboxPage: React.FC = () => {
         }
       />
 
-      <div className="space-y-6">
+      <div className="space-y-4">
         {guestModalState.isOpen ? (
           <GuestModal
             isOpen={guestModalState.isOpen}
@@ -340,7 +381,7 @@ export const DemoSandboxPage: React.FC = () => {
                   ? mockStudioEngine.updateGuest(data.id, data)
                   : mockStudioEngine.createGuest(data);
                 notify.success(
-                  data.id ? 'Vendég frissítve!' : 'Új tesztvendég létrehozva!',
+                  data.id ? 'Vendég frissítve' : 'Új tesztvendég létrehozva',
                   `${saved.lastName} ${saved.firstName} (#${saved.barcode})`,
                 );
                 if (!data.id) {
@@ -353,12 +394,12 @@ export const DemoSandboxPage: React.FC = () => {
             }}
             onExtendPass={(passId, additionalDays, note) => {
               mockStudioEngine.extendPass(passId, additionalDays, note);
-              notify.success(`Bérlet meghosszabbítva (+${additionalDays} nap)!`);
+              notify.success(`Bérlet meghosszabbítva (+${additionalDays} nap)`);
               forceRender();
             }}
             onToggleFreezePass={(passId, note) => {
               mockStudioEngine.toggleFreezePass(passId, note);
-              notify.success('Bérlet fagyasztási státusza frissítve!');
+              notify.success('Bérlet fagyasztási státusza frissítve');
               forceRender();
             }}
             onOpenDigitalCard={(g) => setDigitalCardGuest(g)}
@@ -366,535 +407,477 @@ export const DemoSandboxPage: React.FC = () => {
           />
         ) : (
           <>
-        {/* Split-Screen Row: Virtual Scanner Simulator (Left) + Live Embedded Guest Monitor (Right) */}
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-          {/* Left: Virtual Barcode Scanner Simulator */}
-          <div className="lg:col-span-6 rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-sm flex flex-col justify-between space-y-5">
-            <div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Barcode className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
-                  <h2 className="text-base font-extrabold text-slate-900 dark:text-white">
+            {/* Szimulátor (bal) + beágyazott, adatvédett vendégmonitor (jobb) */}
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+              <Card className="flex flex-col">
+                <CardHeader>
+                  <CardTitle>
                     1. Köredzés (2.3) vs. Kezelés Levonás (2.4) Szimulátor
-                  </h2>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const next = !isOnline;
-                    setOnline(next);
-                    if (!next) {
-                      notify.warning(
-                        'Offline szimuláció bekapcsolva!',
-                        'A következő vonalkód-beolvasások az Offline Pufferbe kerülnek.',
-                      );
-                    } else {
-                      notify.info('Online mód visszaállítva');
-                    }
-                  }}
-                  className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1 text-xs font-bold border transition-colors ${
-                    isOnline
-                      ? 'border-emerald-200 dark:border-emerald-500/35 bg-emerald-50 dark:bg-emerald-500/15 text-emerald-800 dark:text-emerald-300'
-                      : 'border-amber-300 dark:border-amber-500/40 bg-amber-100 dark:bg-amber-500/20 text-amber-900 dark:text-amber-300'
-                  }`}
-                >
-                  <CloudOff className="h-3.5 w-3.5" />
-                  {isOnline
-                    ? 'Hálózat: Online'
-                    : `OFFLINE MÓD (${offlineQueue.length} várakozik)`}
-                </button>
-              </div>
-              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                Próbáld ki a különbséget a Köredzéses érkezés (0 levonás, diszkrét üdvözlés) és az Alkalmas kezelés (Hypoxi -1 alkalom, hátralévő egyenleg) között! Dupla leolvasás védelem: {DUPLICATE_SCAN_COOLDOWN_SECONDS} mp.
-              </p>
-
-              <div className="mt-4 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-                <button
-                  type="button"
-                  onClick={() =>
-                    handleSimulatedScan(
-                      '100001',
-                      false,
-                      VisitType.CIRCUIT_TRAINING,
-                    )
-                  }
-                  className="flex flex-col items-start rounded-2xl border border-emerald-200 dark:border-emerald-500/30 bg-emerald-50/60 dark:bg-emerald-500/10 p-3.5 text-left hover:bg-emerald-100/70 dark:hover:bg-emerald-500/20 transition"
-                >
-                  <div className="flex w-full items-center justify-between">
-                    <span className="font-bold text-sm text-slate-900 dark:text-slate-100">
-                      Kovács Anna (Köredzés)
-                    </span>
-                    <span className="rounded bg-emerald-600 px-2 py-0.5 font-mono text-[11px] font-bold text-white">
-                      #100001
-                    </span>
-                  </div>
-                  <span className="mt-1 text-xs text-emerald-800 dark:text-emerald-300 font-bold">
-                    2.3 Köredzés Érkezés (0 levonás!)
-                  </span>
-                  <span className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
-                    Monitor: „Üdvözlünk, Kovács Anna! Jó edzést kívánunk!”
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    const anna = guests.find((g) => g.barcode === '100001');
-                    const hypoxiPass = anna?.passes?.find((p) => p.isActive);
-                    if (anna && hypoxiPass) {
-                      const res = mockStudioEngine.deductPassUsage({
-                        guestId: anna.id,
-                        passId: hypoxiPass.id,
-                        serviceId: 'srv-hypoxi',
-                        operationKey: `demo-hypoxi-${Date.now()}`,
-                      });
-                      showOnEmbeddedMonitor(res);
-                      notify.checkInResult(res, {
-                        onRevoke: (chkId) => handleRevokeCheckIn(chkId),
-                      });
-                      forceRender();
-                    }
-                  }}
-                  className="flex flex-col items-start rounded-2xl border border-teal-200 dark:border-teal-500/30 bg-teal-50/70 dark:bg-teal-500/10 p-3.5 text-left hover:bg-teal-100/70 dark:hover:bg-teal-500/20 transition"
-                >
-                  <div className="flex w-full items-center justify-between">
-                    <span className="font-bold text-sm text-slate-900 dark:text-slate-100">
-                      Kovács Anna (Hypoxi -1)
-                    </span>
-                    <span className="rounded bg-teal-600 px-2 py-0.5 font-mono text-[11px] font-bold text-white">
-                      2.4 KEZELÉS
-                    </span>
-                  </div>
-                  <span className="mt-1 text-xs text-teal-900 dark:text-teal-300 font-bold">
-                    Hypoxi Kezelés (-1 alkalom levonás)
-                  </span>
-                  <span className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
-                    Monitor: „Hypoxi Kezelés. Hátralévő alkalmak: X...”
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    handleSimulatedScan(
-                      '100002',
-                      false,
-                      VisitType.CIRCUIT_TRAINING,
-                    )
-                  }
-                  className="flex flex-col items-start rounded-2xl border border-amber-200 dark:border-amber-500/30 bg-amber-50/70 dark:bg-amber-500/10 p-3.5 text-left hover:bg-amber-100/70 dark:hover:bg-amber-500/20 transition"
-                >
-                  <div className="flex w-full items-center justify-between">
-                    <span className="font-bold text-sm text-slate-900 dark:text-slate-100">
-                      Nagy Péter (Tartozás teszt)
-                    </span>
-                    <span className="rounded bg-amber-600 px-2 py-0.5 font-mono text-[11px] font-bold text-white">
-                      #100002
-                    </span>
-                  </div>
-                  <span className="mt-1 text-xs text-amber-900 dark:text-amber-300 font-medium">
-                    1–5 napos tagdíj késés (22 000 Ft)
-                  </span>
-                  <span className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
-                    Recepció látja a tartozást, Vendégmonitor NEM!
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    const peter = guests.find((g) => g.barcode === '100002');
-                    const pass = peter?.passes?.find((p) => p.isActive);
-                    if (peter && pass) {
-                      const res = mockStudioEngine.deductPassUsage({
-                        guestId: peter.id,
-                        passId: pass.id,
-                        serviceId: 'srv-hypoxi',
-                        operationKey: `demo-peter-${Date.now()}`,
-                      });
-                      showOnEmbeddedMonitor(res);
-                      notify.checkInResult(res, {
-                        onRevoke: (chkId) => handleRevokeCheckIn(chkId),
-                      });
-                      forceRender();
-                    }
-                  }}
-                  className="flex flex-col items-start rounded-2xl border border-orange-200 dark:border-orange-500/30 bg-orange-50/70 dark:bg-orange-500/10 p-3.5 text-left hover:bg-orange-100/70 dark:hover:bg-orange-500/20 transition"
-                >
-                  <div className="flex w-full items-center justify-between">
-                    <span className="font-bold text-sm text-slate-900 dark:text-slate-100">
-                      Nagy Péter (Utolsó 1 alk.)
-                    </span>
-                    <span className="rounded bg-orange-600 px-2 py-0.5 font-mono text-[11px] font-bold text-white">
-                      1 ALKALOM
-                    </span>
-                  </div>
-                  <span className="mt-1 text-xs text-orange-900 dark:text-orange-300 font-medium">
-                    Utolsó 1 alkalom levonása (0 marad)
-                  </span>
-                  <span className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
-                    Teszteli: Bérlet kimerülés figyelmeztetés
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handleSimulatedScan('100004')}
-                  className="flex flex-col items-start rounded-2xl border border-rose-200 dark:border-rose-500/30 bg-rose-50/70 dark:bg-rose-500/10 p-3.5 text-left hover:bg-rose-100/70 dark:hover:bg-rose-500/20 transition"
-                >
-                  <div className="flex w-full items-center justify-between">
-                    <span className="font-bold text-sm text-slate-900 dark:text-slate-100">
-                      Tóth Gábor (15+ nap késés)
-                    </span>
-                    <span className="rounded bg-rose-600 px-2 py-0.5 font-mono text-[11px] font-bold text-white">
-                      #100004
-                    </span>
-                  </div>
-                  <span className="mt-1 text-xs text-rose-800 dark:text-rose-300 font-medium">
-                    15+ nap tartozás + Lejárt bérlet
-                  </span>
-                  <span className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
-                    Teszteli: Diszkrét monitor elutasítás
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handleSimulatedScan('100006')}
-                  className="flex flex-col items-start rounded-2xl border border-sky-200 dark:border-sky-500/30 bg-sky-50/70 dark:bg-sky-500/10 p-3.5 text-left hover:bg-sky-100/70 dark:hover:bg-sky-500/20 transition"
-                >
-                  <div className="flex w-full items-center justify-between">
-                    <span className="font-bold text-sm text-slate-900 dark:text-slate-100">
-                      Horváth Dóra
-                    </span>
-                    <span className="rounded bg-sky-600 px-2 py-0.5 font-mono text-[11px] font-bold text-white">
-                      #100006
-                    </span>
-                  </div>
-                  <span className="mt-1 text-xs text-sky-900 dark:text-sky-300 font-medium">
-                    Szüneteltetett tagság & Fagyasztott bérlet
-                  </span>
-                  <span className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
-                    Teszteli: Szüneteltetés ellenőrzés
-                  </span>
-                </button>
-              </div>
-            </div>
-
-            {/* Offline Queue & Quick Modal Triggers */}
-            <div className="border-t border-slate-100 dark:border-slate-800 pt-4 flex flex-wrap items-center justify-between gap-2">
-              <div className="flex flex-wrap items-center gap-2">
-                {offlineQueue.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={handleSyncOffline}
-                    className="inline-flex items-center gap-1.5 rounded-xl bg-amber-500 px-3.5 py-2 text-xs font-extrabold text-slate-950 hover:bg-amber-400"
-                  >
-                    <RefreshCw className="h-3.5 w-3.5" />
-                    Offline Puffer Szinkronizálása ({offlineQueue.length} db)
-                  </button>
-                )}
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    setDeductModalState({ isOpen: true, guest: guests[0] })
-                  }
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-teal-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-teal-500"
-                >
-                  <Ticket className="h-3.5 w-3.5" />
-                  Kezelés Levonó Modál
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    setPaymentModalState({ isOpen: true, guest: guests[1] })
-                  }
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-amber-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-amber-500"
-                >
-                  <Wallet className="h-3.5 w-3.5" />
-                  Tagdíj Befizetés Modál
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => openGuestSheet(guests[0])}
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-3 py-1.5 text-xs font-bold text-white hover:bg-slate-800"
-                >
-                  <Users className="h-3.5 w-3.5" />
-                  Adatlap
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Right: Live Embedded Guest Monitor Preview */}
-          <div className="lg:col-span-6 flex flex-col">
-            <div className="mb-2 flex items-center justify-between px-1">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                2. Élő Adatvédett Vendégmonitor Előnézet (Soha nem mutat tartozást vagy vonalkódot)
-              </span>
-              <span className="text-xs text-emerald-700 font-semibold">
-                Valós idejű szinkron (&lt;1 ms)
-              </span>
-            </div>
-            <MonitorDisplayCard
-              activeResult={monitorResult}
-              revokedBanner={revokedBanner}
-              compact={true}
-            />
-          </div>
-        </div>
-
-        {/* Interactive Guests, Digital Cards, Pass Extend/Freeze & Sztornó Section */}
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-          {/* Guest Cards with 1-Click Actions */}
-          <div className="lg:col-span-8 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <h3 className="text-base font-extrabold text-slate-900">
-                  3. Vendégek, Vendégkartoték, Digitális Kártyák és Bérletkezelés
-                </h3>
-                <p className="text-xs text-slate-500">
-                  Kattints az „Adatlap” gombra a Tagságok, Mérések, Fényképek és Dokumentumok megtekintéséhez!
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => openGuestSheet(null)}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-3.5 py-2 text-xs font-bold text-white hover:bg-slate-800"
-              >
-                <UserPlus className="h-3.5 w-3.5" />
-                + Új Tesztvendég
-              </button>
-            </div>
-
-            <div className="divide-y divide-slate-100">
-              {guests.map((g) => {
-                const pass = (g.passes ?? [])[0];
-                const isExpired =
-                  pass && new Date(pass.expirationDate).getTime() < Date.now();
-
-                return (
-                  <div
-                    key={g.id}
-                    className="flex flex-wrap items-center justify-between gap-3 py-3.5"
-                  >
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => openGuestSheet(g)}
-                          className="font-bold text-slate-900 text-sm hover:text-emerald-600 hover:underline"
-                        >
-                          {g.lastName} {g.firstName}
-                        </button>
-                        <span className="rounded bg-slate-100 px-2 py-0.5 font-mono text-xs font-semibold text-slate-700">
-                          #{g.barcode}
-                        </span>
-                        {pass?.isFrozen && (
-                          <span className="rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-bold text-sky-800">
-                            FAGYASZTVA
-                          </span>
-                        )}
-                        {isExpired && (
-                          <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-bold text-rose-800">
-                            LEJÁRT
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-xs text-slate-500 mt-0.5">
-                        {pass
-                          ? `${pass.passTemplateName} • Egyenleg: ${
-                              pass.type === PassType.TIME_BASED
-                                ? 'Korlátlan'
-                                : `${pass.remainingPasses} / ${pass.totalPasses} alk.`
-                            } • Lejár: ${new Date(pass.expirationDate).toLocaleDateString('hu-HU')}`
-                          : 'Nincs bérlet'}
-                      </p>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          handleSimulatedScan(
-                            g.barcode,
-                            false,
-                            VisitType.CIRCUIT_TRAINING,
-                          )
-                        }
-                        className="rounded-lg bg-emerald-600 px-2.5 py-1.5 text-xs font-bold text-white hover:bg-emerald-500"
-                      >
-                        Köredzés
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setDeductModalState({ isOpen: true, guest: g })
-                        }
-                        className="rounded-lg bg-teal-600 px-2.5 py-1.5 text-xs font-bold text-white hover:bg-teal-500"
-                      >
-                        Kezelés -1
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => openGuestSheet(g)}
-                        className="rounded-lg bg-slate-900 px-2.5 py-1.5 text-xs font-bold text-white hover:bg-slate-800"
-                      >
-                        Adatlap
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setDigitalCardGuest(g)}
-                        className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-                        title="Digitális Belépőkártya Generátor"
-                      >
-                        <QrCode className="h-3.5 w-3.5 text-emerald-600" />
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Right: Check-In Sztornó & Daily Cash Register Summary */}
-          <div className="lg:col-span-4 space-y-6">
-            <div className="rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 text-slate-900 dark:text-white shadow-sm">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
-                  4. Napi Kassza & Fizetés Sztornó
-                </span>
-                <Wallet className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-              </div>
-              <p className="mt-2 text-3xl font-black text-slate-900 dark:text-white">
-                {financeSummary.totalRevenue.toLocaleString('hu-HU')} Ft
-              </p>
-              <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
-                <div className="rounded-xl bg-slate-100 dark:bg-slate-800 p-2">
-                  <span className="text-slate-500 dark:text-slate-400 block">Készpénz</span>
-                  <strong>
-                    {financeSummary.byMethod.CASH.toLocaleString('hu-HU')} Ft
-                  </strong>
-                </div>
-                <div className="rounded-xl bg-slate-100 dark:bg-slate-800 p-2">
-                  <span className="text-slate-500 dark:text-slate-400 block">Kártya</span>
-                  <strong>
-                    {financeSummary.byMethod.POS_CARD.toLocaleString('hu-HU')}{' '}
-                    Ft
-                  </strong>
-                </div>
-                <div className="rounded-xl bg-slate-100 dark:bg-slate-800 p-2">
-                  <span className="text-slate-500 dark:text-slate-400 block">Átutalás</span>
-                  <strong>
-                    {financeSummary.byMethod.BANK_TRANSFER.toLocaleString(
-                      'hu-HU',
-                    )}{' '}
-                    Ft
-                  </strong>
-                </div>
-              </div>
-
-              <div className="mt-4 border-t border-slate-200 dark:border-slate-800 pt-3 space-y-2 max-h-44 overflow-y-auto">
-                {financeSummary.payments.map((pay) => (
-                  <div
-                    key={pay.id}
-                    className={`flex items-center justify-between text-xs ${
-                      pay.isCancelled ? 'line-through text-slate-400' : ''
-                    }`}
-                  >
-                    <div>
-                      <span className="font-bold text-slate-900 dark:text-white">{pay.guestName}</span>
-                      <span className="block text-[11px] text-slate-500 dark:text-slate-400">
-                        {pay.amount.toLocaleString('hu-HU')} Ft (
-                        {pay.paymentMethod === PaymentMethod.CASH
-                          ? 'Készpénz'
-                          : pay.paymentMethod === PaymentMethod.POS_CARD
-                            ? 'Kártya'
-                            : 'Átutalás'}
-                        )
-                      </span>
-                    </div>
-                    {!pay.isCancelled ? (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          mockStudioEngine.cancelPayment(
-                            pay.id,
-                            'Demo kassza sztornó',
-                          );
+                  </CardTitle>
+                  <CardActions>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      aria-pressed={!isOnline}
+                      onClick={() => {
+                        const next = !isOnline;
+                        setOnline(next);
+                        if (!next) {
                           notify.warning(
-                            `Fizetés sztornózva: ${pay.guestName}`,
-                            `${pay.amount.toLocaleString('hu-HU')} Ft levonva a napi kasszából.`,
+                            'Offline szimuláció bekapcsolva',
+                            'A következő vonalkód-beolvasások az Offline Pufferbe kerülnek.',
                           );
+                        } else {
+                          notify.info('Online mód visszaállítva');
+                        }
+                      }}
+                    >
+                      <CloudOff
+                        aria-hidden
+                        strokeWidth={1.75}
+                        className={isOnline ? undefined : 'text-warning'}
+                      />
+                      {isOnline
+                        ? 'Hálózat: Online'
+                        : `Offline mód (${offlineQueue.length} várakozik)`}
+                    </Button>
+                  </CardActions>
+                </CardHeader>
+                <CardContent className="flex-1 space-y-4">
+                  <p className="text-[13px] text-muted-foreground">
+                    Próbáld ki a különbséget a köredzéses érkezés (0 levonás,
+                    diszkrét üdvözlés) és az alkalmas kezelés (Hypoxi -1
+                    alkalom, hátralévő egyenleg) között. Dupla leolvasás
+                    védelem: {DUPLICATE_SCAN_COOLDOWN_SECONDS} mp.
+                  </p>
+
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    <ScenarioButton
+                      name="Kovács Anna (Köredzés)"
+                      tag="#100001"
+                      title="2.3 Köredzés érkezés (0 levonás)"
+                      hint="Monitor: „Üdvözlünk, Kovács Anna! Jó edzést kívánunk!”"
+                      onClick={() =>
+                        handleSimulatedScan(
+                          '100001',
+                          false,
+                          VisitType.CIRCUIT_TRAINING,
+                        )
+                      }
+                    />
+                    <ScenarioButton
+                      name="Kovács Anna (Hypoxi -1)"
+                      tag="2.4 kezelés"
+                      title="Hypoxi kezelés (-1 alkalom levonás)"
+                      hint="Monitor: „Hypoxi Kezelés. Hátralévő alkalmak: X...”"
+                      onClick={() => {
+                        const anna = guests.find((g) => g.barcode === '100001');
+                        const hypoxiPass = anna?.passes?.find(
+                          (p) => p.isActive,
+                        );
+                        if (anna && hypoxiPass) {
+                          const res = mockStudioEngine.deductPassUsage({
+                            guestId: anna.id,
+                            passId: hypoxiPass.id,
+                            serviceId: 'srv-hypoxi',
+                            operationKey: `demo-hypoxi-${Date.now()}`,
+                          });
+                          showOnEmbeddedMonitor(res);
+                          notify.checkInResult(res, {
+                            onRevoke: (chkId) => handleRevokeCheckIn(chkId),
+                          });
                           forceRender();
-                        }}
-                        className="rounded-lg bg-rose-50 dark:bg-rose-500/20 border border-rose-200 dark:border-rose-500/40 px-2 py-1 text-[11px] font-semibold text-rose-700 dark:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-500/30"
-                      >
-                        Sztornó
-                      </button>
-                    ) : (
-                      <span className="text-[10px] font-bold text-rose-600 dark:text-rose-400">
-                        SZTORNÓZVA
-                      </span>
-                    )}
+                        }
+                      }}
+                    />
+                    <ScenarioButton
+                      name="Nagy Péter (Tartozás teszt)"
+                      tag="#100002"
+                      title="1–5 napos tagdíj késés (22 000 Ft)"
+                      hint="A recepció látja a tartozást, a Vendégmonitor nem."
+                      onClick={() =>
+                        handleSimulatedScan(
+                          '100002',
+                          false,
+                          VisitType.CIRCUIT_TRAINING,
+                        )
+                      }
+                    />
+                    <ScenarioButton
+                      name="Nagy Péter (Utolsó 1 alk.)"
+                      tag="1 alkalom"
+                      title="Utolsó 1 alkalom levonása (0 marad)"
+                      hint="Teszteli: bérlet kimerülés figyelmeztetés"
+                      onClick={() => {
+                        const peter = guests.find(
+                          (g) => g.barcode === '100002',
+                        );
+                        const pass = peter?.passes?.find((p) => p.isActive);
+                        if (peter && pass) {
+                          const res = mockStudioEngine.deductPassUsage({
+                            guestId: peter.id,
+                            passId: pass.id,
+                            serviceId: 'srv-hypoxi',
+                            operationKey: `demo-peter-${Date.now()}`,
+                          });
+                          showOnEmbeddedMonitor(res);
+                          notify.checkInResult(res, {
+                            onRevoke: (chkId) => handleRevokeCheckIn(chkId),
+                          });
+                          forceRender();
+                        }
+                      }}
+                    />
+                    <ScenarioButton
+                      name="Tóth Gábor (15+ nap késés)"
+                      tag="#100004"
+                      title="15+ nap tartozás és lejárt bérlet"
+                      hint="Teszteli: diszkrét monitor elutasítás"
+                      onClick={() => handleSimulatedScan('100004')}
+                    />
+                    <ScenarioButton
+                      name="Horváth Dóra"
+                      tag="#100006"
+                      title="Szüneteltetett tagság és fagyasztott bérlet"
+                      hint="Teszteli: szüneteltetés ellenőrzés"
+                      onClick={() => handleSimulatedScan('100006')}
+                    />
                   </div>
-                ))}
-              </div>
-            </div>
+                </CardContent>
 
-            <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-              <h3 className="text-sm font-extrabold text-slate-900 mb-3">
-                5. Érkezési & Kezelési Napló + Sztornó
-              </h3>
-              <div className="divide-y divide-slate-100 max-h-60 overflow-y-auto">
-                {todayCheckIns.map((log) => (
-                  <div
-                    key={log.id}
-                    className="flex items-center justify-between py-2.5 text-xs"
+                <CardFooter>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() =>
+                      setDeductModalState({ isOpen: true, guest: guests[0] })
+                    }
                   >
-                    <div className="flex items-center gap-2">
-                      {log.status === CheckInStatus.SUCCESS ? (
-                        <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
-                      ) : log.status === CheckInStatus.CANCELLED ? (
-                        <RotateCcw className="h-4 w-4 text-amber-600 shrink-0" />
-                      ) : (
-                        <XCircle className="h-4 w-4 text-rose-600 shrink-0" />
-                      )}
-                      <div>
-                        <span className="font-bold text-slate-900">
-                          {log.guestName}
-                        </span>
-                        <span className="block text-[11px] text-slate-500">
-                          {log.status === CheckInStatus.CANCELLED
-                            ? 'Sztornózva'
-                            : log.serviceName ?? log.passName ?? log.reason}
-                        </span>
-                      </div>
-                    </div>
+                    <Ticket aria-hidden strokeWidth={1.75} />
+                    Kezelés levonó modál
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() =>
+                      setPaymentModalState({ isOpen: true, guest: guests[1] })
+                    }
+                  >
+                    <Wallet aria-hidden strokeWidth={1.75} />
+                    Tagdíj befizetés modál
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => openGuestSheet(guests[0])}
+                  >
+                    <Users aria-hidden strokeWidth={1.75} />
+                    Adatlap
+                  </Button>
+                  {offlineQueue.length > 0 && (
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={handleSyncOffline}
+                    >
+                      <RefreshCw aria-hidden strokeWidth={1.75} />
+                      Offline puffer szinkronizálása ({offlineQueue.length} db)
+                    </Button>
+                  )}
+                </CardFooter>
+              </Card>
 
-                    {log.status === CheckInStatus.SUCCESS && (
-                      <button
-                        type="button"
-                        onClick={() => handleRevokeCheckIn(log.id)}
-                        className="inline-flex items-center gap-1 rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-1 font-bold text-amber-800 hover:bg-amber-100"
-                      >
-                        <RotateCcw className="h-3 w-3" />
-                        Sztornó
-                      </button>
-                    )}
+              <section
+                aria-labelledby="demo-monitor-title"
+                className="flex min-w-0 flex-col gap-2"
+              >
+                <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                  <h2
+                    id="demo-monitor-title"
+                    className="text-sm font-semibold text-foreground"
+                  >
+                    2. Élő adatvédett vendégmonitor-előnézet
+                  </h2>
+                  <p className="text-xs text-muted-foreground">
+                    Soha nem mutat tartozást vagy vonalkódot. Valós idejű
+                    szinkron (&lt;1 ms).
+                  </p>
+                </div>
+                <MonitorDisplayCard
+                  activeResult={monitorResult}
+                  revokedBanner={revokedBanner}
+                  compact={true}
+                />
+              </section>
+            </div>
+
+            {/* Vendégek, digitális kártyák, bérletkezelés (bal) + kassza és napló sztornóval (jobb) */}
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+              <Card>
+                <CardHeader>
+                  <div className="min-w-0">
+                    <CardTitle>
+                      3. Vendégek, kartoték, digitális kártyák és bérletkezelés
+                    </CardTitle>
+                    <CardDescription>
+                      Az Adatlap gomb a tagságokat, méréseket, fényképeket és
+                      dokumentumokat mutatja.
+                    </CardDescription>
                   </div>
-                ))}
+                  <CardActions>
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={() => openGuestSheet(null)}
+                    >
+                      <UserPlus aria-hidden strokeWidth={1.75} />
+                      Új Tesztvendég
+                    </Button>
+                  </CardActions>
+                </CardHeader>
+
+                <ul
+                  aria-label="Tesztvendégek"
+                  className="divide-y divide-border"
+                >
+                  {guests.map((g) => {
+                    const pass = (g.passes ?? [])[0];
+                    const isExpired =
+                      pass &&
+                      new Date(pass.expirationDate).getTime() < Date.now();
+                    const guestName = `${g.lastName} ${g.firstName}`;
+
+                    return (
+                      <li
+                        key={g.id}
+                        className="flex flex-wrap items-center justify-between gap-3 px-4 py-3"
+                      >
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Button
+                              variant="link"
+                              onClick={() => openGuestSheet(g)}
+                            >
+                              {guestName}
+                            </Button>
+                            <span className="font-mono text-xs text-muted-foreground">
+                              #{g.barcode}
+                            </span>
+                            {pass?.isFrozen && (
+                              <Badge variant="secondary">Fagyasztva</Badge>
+                            )}
+                            {isExpired && (
+                              <Badge variant="destructive">Lejárt</Badge>
+                            )}
+                          </div>
+                          <p className="mt-0.5 text-xs text-muted-foreground">
+                            {pass
+                              ? `${pass.passTemplateName} · Egyenleg: ${
+                                  pass.type === PassType.TIME_BASED
+                                    ? 'Korlátlan'
+                                    : `${pass.remainingPasses} / ${pass.totalPasses} alk.`
+                                } · Lejár: ${new Date(pass.expirationDate).toLocaleDateString('hu-HU')}`
+                              : 'Nincs bérlet'}
+                          </p>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() =>
+                              handleSimulatedScan(
+                                g.barcode,
+                                false,
+                                VisitType.CIRCUIT_TRAINING,
+                              )
+                            }
+                          >
+                            Köredzés
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() =>
+                              setDeductModalState({ isOpen: true, guest: g })
+                            }
+                          >
+                            Kezelés -1
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => openGuestSheet(g)}
+                          >
+                            Adatlap
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            size="icon"
+                            onClick={() => setDigitalCardGuest(g)}
+                            aria-label={`${guestName} digitális belépőkártyája`}
+                          >
+                            <QrCode aria-hidden strokeWidth={1.75} />
+                          </Button>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </Card>
+
+              <div className="min-w-0 space-y-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>4. Napi kassza és fizetés sztornó</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <p className="text-2xl font-semibold tabular-nums text-foreground">
+                      {financeSummary.totalRevenue.toLocaleString('hu-HU')} Ft
+                    </p>
+                    <dl className="grid grid-cols-3 gap-2 text-xs">
+                      {(
+                        [
+                          ['Készpénz', financeSummary.byMethod.CASH],
+                          ['Kártya', financeSummary.byMethod.POS_CARD],
+                          ['Átutalás', financeSummary.byMethod.BANK_TRANSFER],
+                        ] as const
+                      ).map(([label, amount]) => (
+                        <div
+                          key={label}
+                          className="rounded-md border border-border bg-muted px-2 py-1.5"
+                        >
+                          <dt className="text-muted-foreground">{label}</dt>
+                          <dd className="font-semibold tabular-nums text-foreground">
+                            {amount.toLocaleString('hu-HU')} Ft
+                          </dd>
+                        </div>
+                      ))}
+                    </dl>
+
+                    <ul
+                      aria-label="Mai befizetések"
+                      className="max-h-44 divide-y divide-border overflow-y-auto border-t border-border"
+                    >
+                      {financeSummary.payments.map((pay) => (
+                        <li
+                          key={pay.id}
+                          className="flex items-center justify-between gap-2 py-2 text-xs"
+                        >
+                          <div
+                            className={
+                              pay.isCancelled
+                                ? 'text-muted-foreground line-through'
+                                : undefined
+                            }
+                          >
+                            <span className="font-semibold">
+                              {pay.guestName}
+                            </span>
+                            <span className="block text-muted-foreground">
+                              {pay.amount.toLocaleString('hu-HU')} Ft (
+                              {pay.paymentMethod === PaymentMethod.CASH
+                                ? 'Készpénz'
+                                : pay.paymentMethod === PaymentMethod.POS_CARD
+                                  ? 'Kártya'
+                                  : 'Átutalás'}
+                              )
+                            </span>
+                          </div>
+                          {!pay.isCancelled ? (
+                            <Button
+                              variant="link"
+                              size="sm"
+                              aria-label={`${pay.guestName} fizetésének sztornózása`}
+                              onClick={() => {
+                                mockStudioEngine.cancelPayment(
+                                  pay.id,
+                                  'Demo kassza sztornó',
+                                );
+                                notify.warning(
+                                  `Fizetés sztornózva: ${pay.guestName}`,
+                                  `${pay.amount.toLocaleString('hu-HU')} Ft levonva a napi kasszából.`,
+                                );
+                                forceRender();
+                              }}
+                            >
+                              Sztornó
+                            </Button>
+                          ) : (
+                            <Badge variant="secondary">Sztornózva</Badge>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>
+                      5. Érkezési és kezelési napló, sztornó
+                    </CardTitle>
+                  </CardHeader>
+                  <ul
+                    aria-label="Mai érkezések és kezelések"
+                    className="max-h-60 divide-y divide-border overflow-y-auto"
+                  >
+                    {todayCheckIns.map((log) => (
+                      <li
+                        key={log.id}
+                        className="flex items-center justify-between gap-2 px-4 py-2.5 text-xs"
+                      >
+                        <div className="flex min-w-0 items-center gap-2">
+                          {log.status === CheckInStatus.SUCCESS ? (
+                            <CheckCircle2
+                              aria-hidden
+                              strokeWidth={1.75}
+                              className="size-4 shrink-0 text-success"
+                            />
+                          ) : log.status === CheckInStatus.CANCELLED ? (
+                            <RotateCcw
+                              aria-hidden
+                              strokeWidth={1.75}
+                              className="size-4 shrink-0 text-warning"
+                            />
+                          ) : (
+                            <XCircle
+                              aria-hidden
+                              strokeWidth={1.75}
+                              className="size-4 shrink-0 text-destructive"
+                            />
+                          )}
+                          <div className="min-w-0">
+                            <span className="font-semibold text-foreground">
+                              {log.guestName}
+                            </span>
+                            <span className="block text-muted-foreground">
+                              {log.status === CheckInStatus.CANCELLED
+                                ? 'Sztornózva'
+                                : (log.serviceName ??
+                                  log.passName ??
+                                  log.reason)}
+                            </span>
+                          </div>
+                        </div>
+
+                        {log.status === CheckInStatus.SUCCESS && (
+                          <Button
+                            variant="link"
+                            size="sm"
+                            aria-label={`${log.guestName} beléptetésének sztornózása`}
+                            onClick={() => handleRevokeCheckIn(log.id)}
+                          >
+                            Sztornó
+                          </Button>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </Card>
               </div>
             </div>
-          </div>
-        </div>
-        </>
+          </>
         )}
       </div>
 
@@ -914,9 +897,7 @@ export const DemoSandboxPage: React.FC = () => {
           });
           forceRender();
         }}
-        onOpenSellPass={(guest) =>
-          setSellModalState({ isOpen: true, guest })
-        }
+        onOpenSellPass={(guest) => setSellModalState({ isOpen: true, guest })}
       />
 
       <RecordPaymentModal

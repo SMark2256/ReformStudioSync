@@ -15,7 +15,6 @@ import {
   Radio,
   ShieldCheck,
   Smartphone,
-  Sparkles,
   Wifi,
   XCircle,
 } from 'lucide-react';
@@ -29,6 +28,22 @@ import { soundFeedback } from '@/shared/lib/sound';
 import { useAuthStore } from '@/shared/auth';
 import { useScannerChannelStore } from '@/entities/check-in';
 import { MonitorDisplayCard } from '@/entities/check-in';
+import { Button, Input } from '@/shared/ui';
+
+// A Vendégmonitor nem követi a témát és a kiemelő színt (theme-support.mdc kivétel): a közös
+// gombok és mezők itt a fix sötét/smaragd színeket kapják.
+const monitorPrimaryButtonClassName =
+  'border-emerald-600 bg-emerald-600 text-white hover:bg-emerald-500 focus-visible:ring-white focus-visible:ring-offset-slate-950';
+const monitorSecondaryButtonClassName =
+  'border-slate-700 bg-slate-900 text-slate-200 shadow-none hover:bg-slate-800 hover:text-white focus-visible:ring-emerald-400 focus-visible:ring-offset-slate-950';
+
+const chipBaseClassName =
+  'inline-flex items-center gap-1.5 rounded-sm border px-2 py-0.5 text-xs font-medium';
+const monitorChipClassName = {
+  on: `${chipBaseClassName} border-emerald-500/30 bg-emerald-500/15 text-emerald-300`,
+  off: `${chipBaseClassName} border-slate-700 bg-slate-800 text-slate-400`,
+  warn: `${chipBaseClassName} border-amber-500/30 bg-amber-500/15 text-amber-300`,
+};
 
 export const MonitorPage: React.FC = () => {
   const navigate = useNavigate();
@@ -231,119 +246,142 @@ export const MonitorPage: React.FC = () => {
   // Ha az eszközön nincs bejelentkezett recepciós/admin ÉS nincs párosítva sem -> Kötelező 6 jegyű kód bekérő képernyő
   if (!isAuthorized) {
     return (
-      <div className="monitor-invariant min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-emerald-950 text-white p-4 sm:p-8 flex flex-col justify-between">
-        <header className="flex items-center justify-between">
+      <div className="monitor-invariant flex min-h-screen flex-col justify-between bg-slate-950 p-4 text-white sm:p-8">
+        <header className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500/20 border border-emerald-500/30">
-              <Sparkles className="h-5 w-5 text-emerald-400" />
-            </div>
+            <span
+              aria-hidden
+              className="flex size-9 items-center justify-center rounded-md border border-emerald-500/30 bg-emerald-500/15 text-[13px] font-bold text-emerald-300"
+            >
+              RS
+            </span>
             <div>
-              <span className="text-sm font-extrabold tracking-tight text-white">
+              <span className="text-sm font-semibold text-white">
                 ReformStudioSync
               </span>
-              <span className="block text-[11px] text-slate-400">
+              <span className="block text-xs text-slate-400">
                 Önálló Vendégmonitor & Tablet Kijelző
               </span>
             </div>
           </div>
 
-          <button
-            type="button"
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={() => navigate('/login')}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-800 bg-slate-900/80 px-3.5 py-2 text-xs font-semibold text-slate-300 hover:bg-slate-800 hover:text-white"
+            className={monitorSecondaryButtonClassName}
           >
-            <ArrowLeft className="h-3.5 w-3.5" />
+            <ArrowLeft aria-hidden strokeWidth={1.75} />
             Megszakítás / Belépés
-          </button>
+          </Button>
         </header>
 
-        <main className="my-auto mx-auto w-full max-w-lg">
-          <div className="rounded-3xl border border-slate-800 bg-slate-900/90 p-6 sm:p-10 shadow-2xl backdrop-blur-md">
-            <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-500/15 border border-emerald-500/30">
-              <KeyRound className="h-8 w-8 text-emerald-400" />
+        <main className="mx-auto my-auto w-full max-w-lg">
+          <div className="rounded-lg border border-slate-800 bg-slate-900 p-6 sm:p-10">
+            <div className="mx-auto mb-5 flex size-14 items-center justify-center rounded-lg border border-emerald-500/30 bg-emerald-500/15">
+              <KeyRound
+                aria-hidden
+                strokeWidth={1.75}
+                className="size-7 text-emerald-400"
+              />
             </div>
 
             <div className="text-center">
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 border border-amber-500/30 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-amber-300">
-                <Smartphone className="h-3.5 w-3.5" />
-                Kijelző Párosítás Szükséges
+              <span className={monitorChipClassName.warn}>
+                <Smartphone
+                  aria-hidden
+                  strokeWidth={1.75}
+                  className="size-3.5"
+                />
+                Kijelző párosítás szükséges
               </span>
-              <h1 className="mt-3 text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
+              <h1 className="mt-3 text-2xl font-semibold text-white sm:text-3xl">
                 Írd be a 6 jegyű párosító kódot
               </h1>
-              <p className="mt-2 text-xs sm:text-sm text-slate-300 leading-relaxed">
-                Ezen az eszközön nem vagy bejelentkezve recepciósként. A Vendégmonitor
-                aktiválásához nyisd meg a Recepciós Pult{' '}
-                <strong className="text-emerald-300">
-                  „Sablonok & Monitorok”
+              <p className="mt-2 text-sm text-slate-300">
+                Ezen az eszközön nem vagy bejelentkezve recepciósként. A
+                Vendégmonitor aktiválásához nyisd meg a recepción a{' '}
+                <strong className="font-semibold text-emerald-300">
+                  Bérletek és termékek
                 </strong>{' '}
-                fülét, generálj egy kódot, és üsd be ide:
+                oldalt, generálj egy kódot, és írd be ide:
               </p>
             </div>
 
             <form onSubmit={handlePairSubmit} className="mt-6 space-y-4">
-              <div>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  autoFocus
-                  maxLength={6}
-                  value={pairingCodeInput}
-                  onChange={(e) => {
-                    const digits = e.target.value.replace(/\D/g, '').slice(0, 6);
-                    setPairingCodeInput(digits);
-                    if (pairingError) setPairingError(null);
-                  }}
-                  placeholder="000000"
-                  className="w-full rounded-2xl border-2 border-slate-700 bg-slate-950 px-4 py-4 text-center font-mono text-3xl sm:text-4xl font-black tracking-[0.35em] text-white placeholder:text-slate-700 focus:border-emerald-500 focus:outline-none"
-                />
-              </div>
+              <Input
+                type="text"
+                inputMode="numeric"
+                autoFocus
+                maxLength={6}
+                aria-label="6 jegyű párosító kód"
+                aria-invalid={Boolean(pairingError)}
+                value={pairingCodeInput}
+                onChange={(e) => {
+                  const digits = e.target.value.replace(/\D/g, '').slice(0, 6);
+                  setPairingCodeInput(digits);
+                  if (pairingError) setPairingError(null);
+                }}
+                placeholder="000000"
+                className="h-auto rounded-lg border-2 border-slate-700 bg-slate-950 px-4 py-4 text-center font-mono text-3xl font-semibold tracking-[0.35em] text-white placeholder:text-slate-700 focus-visible:border-emerald-500 focus-visible:ring-emerald-500/20 coarse:h-auto coarse:text-3xl sm:text-4xl"
+              />
 
               {pairingError && (
-                <div className="flex items-start gap-2 rounded-xl border border-rose-500/40 bg-rose-500/10 p-3 text-xs text-rose-200">
-                  <XCircle className="h-4 w-4 text-rose-400 shrink-0 mt-0.5" />
+                <div
+                  role="alert"
+                  className="flex items-start gap-2 rounded-md border border-rose-500/40 bg-rose-500/10 px-3 py-2.5 text-sm text-rose-200"
+                >
+                  <XCircle
+                    aria-hidden
+                    strokeWidth={1.75}
+                    className="mt-0.5 size-4 shrink-0 text-rose-400"
+                  />
                   <span>{pairingError}</span>
                 </div>
               )}
 
-              <div className="flex flex-col sm:flex-row gap-2.5 pt-1">
-                <button
-                  type="submit"
-                  disabled={
-                    isPairingSubmitting || pairingCodeInput.trim().length !== 6
-                  }
-                  className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-3.5 text-sm font-bold text-white shadow-lg hover:bg-emerald-500 disabled:opacity-50"
-                >
-                  <CheckCircle2 className="h-4 w-4" />
-                  {isPairingSubmitting
-                    ? 'Párosítás folyamatban...'
-                    : 'Kijelző Párosítása és Indítása'}
-                </button>
-
+              <div className="flex flex-col gap-2.5 pt-1 sm:flex-row">
                 {pairingCodeInput.length > 0 && (
-                  <button
-                    type="button"
+                  <Button
+                    variant="secondary"
                     onClick={() => {
                       setPairingCodeInput('');
                       setPairingError(null);
                     }}
-                    className="rounded-xl border border-slate-700 bg-slate-800 px-4 py-3.5 text-xs font-semibold text-slate-300 hover:bg-slate-700 hover:text-white"
+                    className={monitorSecondaryButtonClassName}
                   >
                     Törlés
-                  </button>
+                  </Button>
                 )}
+                <Button
+                  type="submit"
+                  variant="primary"
+                  disabled={
+                    isPairingSubmitting || pairingCodeInput.trim().length !== 6
+                  }
+                  className={`${monitorPrimaryButtonClassName} flex-1`}
+                >
+                  <CheckCircle2 aria-hidden strokeWidth={1.75} />
+                  {isPairingSubmitting
+                    ? 'Párosítás folyamatban...'
+                    : 'Kijelző párosítása és indítása'}
+                </Button>
               </div>
             </form>
 
-            <div className="mt-6 border-t border-slate-800 pt-4 text-[11px] text-slate-400 space-y-1.5">
+            <div className="mt-6 space-y-1.5 border-t border-slate-800 pt-4 text-xs text-slate-400">
               <p>
-                • <strong className="text-slate-200">Ugyanazon a PC-n használod?</strong>{' '}
-                Ha bejelentkezel a recepciós felületre ebben a böngészőben, a
-                Vendégmonitor kód megadása nélkül azonnal működik.
+                <strong className="font-semibold text-slate-200">
+                  Ugyanazon a gépen használod?
+                </strong>{' '}
+                Ha ebben a böngészőben bejelentkezel a recepciós felületre, a
+                Vendégmonitor kód nélkül azonnal működik.
               </p>
               <p>
-                • <strong className="text-slate-200">Biztonságos párosítás:</strong>{' '}
-                A generált 6 jegyű kód 10 percig érvényes, és a recepcióról bármikor
+                <strong className="font-semibold text-slate-200">
+                  Biztonságos párosítás:
+                </strong>{' '}
+                A kód 10 percig érvényes, és a recepcióról bármikor
                 megszakítható.
               </p>
             </div>
@@ -351,131 +389,148 @@ export const MonitorPage: React.FC = () => {
         </main>
 
         <footer className="text-center text-xs text-slate-500">
-          ReformStudioSync • Valós Idejű Ügyfélkijelző Modul
+          ReformStudioSync · valós idejű ügyfélkijelző
         </footer>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white p-4 sm:p-8 flex flex-col justify-between">
+    <div className="monitor-invariant flex min-h-screen flex-col justify-between bg-slate-950 p-4 text-white sm:p-8">
       {!isFullscreen && (
         <header className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-3">
             {isStaffAuthenticated && (
-              <Link
-                to="/reception"
-                className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 border border-slate-800 px-3 py-1.5 text-xs font-medium text-slate-300 hover:bg-slate-800 hover:text-white"
+              <Button
+                variant="secondary"
+                size="sm"
+                asChild
+                className={monitorSecondaryButtonClassName}
               >
-                <ArrowLeft className="h-3.5 w-3.5" />
-                Recepció
-              </Link>
+                <Link to="/reception">
+                  <ArrowLeft aria-hidden strokeWidth={1.75} />
+                  Recepció
+                </Link>
+              </Button>
             )}
             <div className="flex items-center gap-2 text-xs text-slate-400">
-              <Monitor className="h-4 w-4 text-emerald-400" />
+              <Monitor
+                aria-hidden
+                strokeWidth={1.75}
+                className="size-4 text-emerald-400"
+              />
               <span>
                 Üzemmód:{' '}
-                <strong className="text-slate-200">
+                <strong className="font-semibold text-slate-200">
                   {isStaffAuthenticated
                     ? `Recepciós PC Másodlagos Kijelző (${user?.name ?? 'Bejelentkezve'})`
                     : `Párosított Önálló Kijelző (${deviceName ?? 'Tablet'})`}
                 </strong>
               </span>
-              <span className="rounded-md bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold uppercase text-emerald-300 border border-emerald-500/30">
-                V0.2
-              </span>
+              <span className={monitorChipClassName.on}>v0.2</span>
             </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5">
             <span
-              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${
+              className={
                 isScannerListening
-                  ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
-                  : 'bg-slate-800 text-slate-400 border border-slate-700'
-              }`}
+                  ? monitorChipClassName.on
+                  : monitorChipClassName.off
+              }
               title="A kijelző folyamatosan figyeli a csatlakoztatott QR / vonalkód olvasót"
             >
-              <QrCode className="h-3.5 w-3.5" />
+              <QrCode aria-hidden strokeWidth={1.75} className="size-3.5" />
               {isScannerListening
                 ? `QR Szkenner Csatorna Aktív${lastScannedCode ? ` (#${lastScannedCode})` : ''}`
                 : 'QR Szkenner Szünetel'}
             </span>
 
             <span
-              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${
+              className={
                 isConnected
-                  ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
-                  : 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
-              }`}
+                  ? monitorChipClassName.on
+                  : monitorChipClassName.warn
+              }
             >
-              <Wifi className="h-3.5 w-3.5" />
+              <Wifi aria-hidden strokeWidth={1.75} className="size-3.5" />
               {isConnected
                 ? 'Élő Socket + Helyi Szinkron Aktív'
                 : 'Helyi Broadcast Szinkron Aktív'}
             </span>
 
             {wakeLockActive && (
-              <span className="hidden sm:inline-flex items-center gap-1 rounded-full bg-slate-900 border border-slate-800 px-2.5 py-1 text-[11px] text-slate-400">
-                <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
+              <span
+                className={`${monitorChipClassName.off} hidden sm:inline-flex`}
+              >
+                <ShieldCheck
+                  aria-hidden
+                  strokeWidth={1.75}
+                  className="size-3.5 text-emerald-400"
+                />
                 WakeLock Aktív
               </span>
             )}
 
-            {isDevicePaired && (
-              <>
-                {!confirmUnpair ? (
-                  <button
-                    type="button"
-                    onClick={() => setConfirmUnpair(true)}
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-1.5 text-xs font-semibold text-rose-300 hover:bg-rose-500/20"
+            {isDevicePaired &&
+              (!confirmUnpair ? (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setConfirmUnpair(true)}
+                  className={monitorSecondaryButtonClassName}
+                >
+                  <LogOut aria-hidden strokeWidth={1.75} />
+                  Párosítás megszakítása
+                </Button>
+              ) : (
+                <div className="inline-flex flex-wrap items-center gap-2 rounded-md border border-rose-500/50 bg-slate-900 px-2.5 py-1 text-xs">
+                  <span className="font-semibold text-rose-300">
+                    Leválasztod a kijelzőt?
+                  </span>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setConfirmUnpair(false)}
+                    className={monitorSecondaryButtonClassName}
                   >
-                    <LogOut className="h-3.5 w-3.5" />
-                    Párosítás megszakítása
-                  </button>
-                ) : (
-                  <div className="inline-flex items-center gap-1.5 rounded-xl border border-rose-500/50 bg-slate-900 px-2.5 py-1 text-xs">
-                    <span className="text-rose-300 font-semibold">
-                      Leválasztod?
-                    </span>
-                    <button
-                      type="button"
-                      onClick={handleUnpairDevice}
-                      className="rounded-lg bg-rose-600 px-2 py-0.5 font-bold text-white hover:bg-rose-500"
-                    >
-                      Igen, bontás
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setConfirmUnpair(false)}
-                      className="rounded-lg bg-slate-800 px-2 py-0.5 text-slate-300 hover:text-white"
-                    >
-                      Mégse
-                    </button>
-                  </div>
-                )}
-              </>
-            )}
+                    Mégse
+                  </Button>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={handleUnpairDevice}
+                    className={monitorPrimaryButtonClassName}
+                  >
+                    Párosítás bontása
+                  </Button>
+                </div>
+              ))}
 
-            <button
-              type="button"
+            <Button
+              variant="primary"
+              size="sm"
               onClick={toggleFullscreen}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500"
+              className={monitorPrimaryButtonClassName}
             >
-              <Maximize2 className="h-3.5 w-3.5" />
+              <Maximize2 aria-hidden strokeWidth={1.75} />
               Teljes Képernyő
-            </button>
+            </Button>
           </div>
         </header>
       )}
 
       {testPingBanner && (
-        <div className="mb-4 flex items-center justify-between gap-3 rounded-2xl border border-emerald-400/50 bg-emerald-500/20 px-5 py-3.5 text-white shadow-lg">
+        <div className="mb-4 flex items-center justify-between gap-3 rounded-lg border border-emerald-400/50 bg-emerald-500/20 px-5 py-3.5 text-white">
           <div className="flex items-center gap-3">
-            <Radio className="h-6 w-6 text-emerald-300 animate-pulse" />
+            <Radio
+              aria-hidden
+              strokeWidth={1.75}
+              className="size-6 text-emerald-300"
+            />
             <div>
-              <p className="text-sm font-extrabold text-emerald-200">
-                TESZT JEL SIKERESEN FOGADVA!
+              <p className="text-sm font-semibold text-emerald-200">
+                Teszt jel sikeresen fogadva
               </p>
               <p className="text-xs text-emerald-100">
                 {testPingBanner.message} (Küldte:{' '}
