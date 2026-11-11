@@ -97,6 +97,20 @@ export const getJiraIssueUrl = (jiraKey: string): string =>
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    id: 'v0.3-version-changelog-from-news',
+    version: '0.3',
+    date: '2026-11-11',
+    kind: 'IMPROVEMENT',
+    title: 'Verziónkénti változáslista',
+    summary:
+      'A verziószám és a verziónkénti változáslista egy helyről frissül. A bejelentkezésnél és a Vendégmonitoron mindig a futó verzió látszik, és a verziószámra kattintva verziónként láthatod, mi változott.',
+    details: [
+      'A változáslista az Újdonságok bejegyzéseiből épül: elöl a jelenlegi verzió nyitva, alatta a korábbi verziók egy kattintással lenyithatók.',
+      'Az Újdonságok közé a legelső (v0.1) verzió tételei is bekerültek.',
+    ],
+    jiraKey: 'TICKET-44',
+  },
+  {
     id: 'v0.3-fix-pass-freeze-calendar-days',
     version: '0.3',
     date: '2026-11-11',
@@ -486,7 +500,62 @@ export const RELEASE_NOTES: ReleaseNote[] = [
     summary: 'Kártyák, státusz-jelvények és gombok jobb olvashatósága sötét témában.',
     jiraKey: null,
   },
+  {
+    id: 'v0.1-reception-check-in',
+    version: '0.1',
+    date: '2026-10-20',
+    kind: 'NEW_PAGE',
+    title: 'Recepció (/reception)',
+    summary:
+      'Beléptetés vonalkóddal, automatikus bérletválasztással és dupla lehúzás elleni védelemmel.',
+    details: [
+      'A rendszer előbb az időalapú bérletet, utána a leghamarabb lejáró alkalmas bérletet választja.',
+      'Minden művelet visszaigazoló értesítést ad; a beléptetés és a fizetés egy kattintással sztornózható, a bérlet megújítható.',
+      'Kapcsolat nélkül a beolvasások helyi pufferbe kerülnek, és a kapcsolat visszatérésekor automatikusan szinkronizálódnak.',
+    ],
+    jiraKey: null,
+  },
+  {
+    id: 'v0.1-guest-file',
+    version: '0.1',
+    date: '2026-10-20',
+    kind: 'NEW_PAGE',
+    title: 'Vendégkartoték (/guests)',
+    summary:
+      'Vendégfelvétel, bérlettörténet és felhasználási napló egy helyen.',
+    details: [
+      'Digitális belépőkártya vonalkóddal és QR-kóddal, PNG letöltéssel és nyomtatással.',
+      'A bérlet hosszabbítható (+N nap), fagyasztható és feloldható.',
+    ],
+    jiraKey: null,
+  },
+  {
+    id: 'v0.1-guest-monitor',
+    version: '0.1',
+    date: '2026-10-20',
+    kind: 'NEW_PAGE',
+    title: 'Valós idejű Vendégmonitor (/monitor)',
+    summary:
+      'A recepciós gép második kijelzőjén vagy párosított tableten köszönti a belépő vendéget; a képernyő nem alszik el.',
+    jiraKey: null,
+  },
+  {
+    id: 'v0.1-demo-sandbox',
+    version: '0.1',
+    date: '2026-10-20',
+    kind: 'NEW_PAGE',
+    title: 'Demó mód (/demo)',
+    summary:
+      'Az élő adatbázistól független próbakörnyezet virtuális vonalkódolvasóval és beágyazott monitor-előnézettel.',
+    jiraKey: null,
+  },
+  {
+    id: 'v0.1-login-dark-theme',
+    version: '0.1',
+    date: '2026-10-20',
+    kind: 'NEW_FEATURE',
+    title: 'Bejelentkezés és sötét téma',
+    summary: 'Munkatársi bejelentkezés, és a felület sötét témában is használható.',
+    jiraKey: null,
+  },
 ];
-
-/** A futó verzió: a legújabb bejegyzésé (az oldalsáv alján látszik). */
-export const CURRENT_VERSION = RELEASE_NOTES[0].version;

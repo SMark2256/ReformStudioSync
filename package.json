@@ -1,6 +1,6 @@
 {
   "name": "reform-studio-sync",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "private": true,
   "description": "ReformStudioSync — Egystúdiós (SaaS-ready) Recepciós és Valós Idejű Vendégmonitor Rendszer",
   "workspaces": [

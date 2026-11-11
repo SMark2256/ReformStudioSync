@@ -1,6 +1,6 @@
 # ReformStudioSync — Kiadási jegyzék
 
-A verziók a legújabbtól a legrégebbiig. A `demo` ágon gyűlő változások a következő verzió alá kerülnek, és a `main`-re kerüléskor válnak kiadássá (Git tag + GitHub Release). Az alkalmazáson belüli Újdonságok menü forrása: `apps/web/src/pages/reception/model/releaseNotes.ts`.
+A verziók a legújabbtól a legrégebbiig. A `demo` ágon gyűlő változások a következő verzió alá kerülnek, és a `main`-re kerüléskor válnak kiadássá (Git tag + GitHub Release). Az alkalmazáson belüli Újdonságok menü (és a bejelentkezőoldal verzió-ablaka) forrása: `apps/web/src/entities/release-note/model/releaseNotes.ts`. A verziószám egyetlen forrása a gyökér `package.json`; a kiadás menete: `docs/WORKFLOW.md` → „Kiadás”. Egy verzió szakasza: `bash scripts/release-notes.sh <verzió>`.
 
 ## v0.3 — a `demo`-n, a következő `main` kiadással élesedik
 
@@ -19,6 +19,7 @@ A verziók a legújabbtól a legrégebbiig. A `demo` ágon gyűlő változások 
   - Pénzügy, Bérletek és termékek, Újdonságok, bejelentkezés és demó. (TICKET-24)
 - **Belépések a vendégadatlapon:** új „Belépések” fül (időpont, köredzés vagy kezelés, bérlet, rögzítő, állapot: sikeres / sztornózott / elutasított az okkal); a Bérletek fülön bérletenként is. (TICKET-40)
 - **Szűrhető Újdonságok:** típus szerinti szűrés, kártyánként nyitható részletek. (TICKET-37)
+- **Verziónkénti változáslista:** a bejelentkezésnél és a Vendégmonitoron mindig a futó verzió látszik; a verziószámra kattintva az Újdonságokból épülő, verziónként lenyitható lista nyílik (elöl a jelenlegi verzió). (TICKET-44)
 - **Egységes hibaüzenetek:** minden hiba egyformán jelenik meg; lejárt bejelentkezésnél automatikusan a belépőoldalra visz. (TICKET-9)
 
 ### Javítások

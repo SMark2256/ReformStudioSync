@@ -6,7 +6,7 @@ alwaysApply: true
 
 # Kötelező Újdonságok Bejegyzés (Release Notes)
 
-- Minden felhasználó számára érzékelhető változáshoz új bejegyzés kerül az `apps/web/src/pages/reception/model/releaseNotes.ts` `RELEASE_NOTES` tömbjének **elejére**.
+- Minden felhasználó számára érzékelhető változáshoz új bejegyzés kerül az `apps/web/src/entities/release-note/model/releaseNotes.ts` `RELEASE_NOTES` tömbjének **elejére**.
 - **Kötelező a `jiraKey`** (pl. `KAN-12`) a visszakövethetőséghez; ugyanez a kulcs szerepel a commit üzenetben is.
 - **`link` csak `NEW_PAGE` / `NEW_FEATURE` típusnál**, és csak akkor, ha az újdonság a felületen ténylegesen megtekinthető (`receptionTab` vagy `route`). `IMPROVEMENT` / `FIX` esetén csak szöveges leírás.
 - Az `id` stabil és egyedi; meglévő bejegyzés `id`-ját ne módosítsd.

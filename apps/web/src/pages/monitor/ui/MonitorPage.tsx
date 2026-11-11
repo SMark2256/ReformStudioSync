@@ -26,6 +26,7 @@ import {
   useMonitorChannel,
 } from '@/shared/lib/monitor-channel';
 import { api } from '@/shared/api';
+import { APP_VERSION_LABEL } from '@/shared/config';
 import { mockStudioEngine } from '@/shared/api';
 import { notify } from '@/shared/lib/notify';
 import { soundFeedback } from '@/shared/lib/sound';
@@ -477,7 +478,7 @@ export const MonitorPage: React.FC = () => {
                     : `Párosított Önálló Kijelző (${deviceName ?? 'Tablet'})`}
                 </strong>
               </span>
-              <span className={monitorChipClassName.on}>v0.2</span>
+              <span className={monitorChipClassName.on}>{APP_VERSION_LABEL}</span>
             </div>
           </div>
 

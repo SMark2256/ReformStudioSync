@@ -10,7 +10,7 @@ Monorepo: `apps/api` (NestJS + Prisma), `apps/web` (React + Vite + Tailwind, Fea
 
 ## Kötelező szabályok
 
-- Minden felhasználó számára érzékelhető változáshoz bejegyzés kell az `apps/web/src/pages/reception/model/releaseNotes.ts`-be (Újdonságok menü): kötelező `jiraKey` (KAN-NN); `link` csak `NEW_PAGE`/`NEW_FEATURE` esetén, és csak ha az újdonság ténylegesen megtekinthető.
+- Minden felhasználó számára érzékelhető változáshoz bejegyzés kell az `apps/web/src/entities/release-note/model/releaseNotes.ts`-be (Újdonságok menü): kötelező `jiraKey` (KAN-NN); `link` csak `NEW_PAGE`/`NEW_FEATURE` esetén, és csak ha az újdonság ténylegesen megtekinthető.
 - Minden `apps/web` felületi munkánál a **`reformstudio-ui-skill`** (`.claude/skills/reformstudio-ui-skill/SKILL.md`) az irányadó.
 - FSD rétegszabályok (`npm run lint:fsd`), sötét/világos téma (`.cursor/rules/theme-support.mdc`), magyar UI szöveg.
 - Jelentés előtt: `bash .claude/skills/reform-ticket/scripts/gate.sh`.
