@@ -68,6 +68,7 @@ import {
   ServiceDto,
   stopsBilling,
   TodayDashboardDto,
+  toGuestArrivals,
   VisitDto,
   VisitType,
 } from '@reform/shared';
@@ -136,6 +137,40 @@ function voidArrival(
     state.visits = state.visits.filter((v) => v.id !== checkIn.visitId);
   }
   return true;
+}
+
+/**
+ * A vendég belépései a beléptetési naplóból, a közös `toGuestArrivals`-szal (az API `mapGuest`
+ * párja, TICKET-40): a bérlet és a levonás szolgáltatása a vendég bérleteiből oldódik fel.
+ */
+function syncGuestArrivals(state: MockDatabaseState, guest: GuestDto) {
+  const passes = new Map((guest.passes ?? []).map((p) => [p.id, p]));
+  const usageServiceByCheckIn = new Map<string, string | null>();
+  for (const p of guest.passes ?? []) {
+    for (const u of p.usageLogs ?? []) {
+      if (u.checkInId) usageServiceByCheckIn.set(u.checkInId, u.serviceName ?? null);
+    }
+  }
+  guest.arrivals = toGuestArrivals(
+    state.checkIns
+      .filter((c) => c.guestId === guest.id)
+      .map((c) => {
+        const pass = c.guestPassId ? passes.get(c.guestPassId) : undefined;
+        return {
+          id: c.id,
+          createdAt: c.createdAt,
+          // Az adatbázis alapértéke, ha a napló nem jegyzi (elutasítás).
+          visitType: c.visitType ?? VisitType.CIRCUIT_TRAINING,
+          status: c.status,
+          reason: c.reason ?? null,
+          guestPassId: c.guestPassId ?? null,
+          passName: pass?.passTemplateName ?? null,
+          usageServiceName: usageServiceByCheckIn.get(c.id) ?? null,
+          passServiceName: pass?.serviceName ?? null,
+          staffName: c.staffName ?? null,
+        };
+      }),
+  );
 }
 
 /** Korrekciós napló (az API `logCorrection` párja). */
@@ -1195,6 +1230,7 @@ class MockStudioEngine {
       const now = new Date();
       for (const g of parsed.guests) {
         for (const p of g.passes ?? []) syncPassState(p, now);
+        syncGuestArrivals(parsed, g);
       }
       return parsed;
     } catch {
@@ -1223,6 +1259,7 @@ class MockStudioEngine {
           (a, b) => new Date(b.usedAt).getTime() - new Date(a.usedAt).getTime(),
         );
       g.payments = state.payments.filter((p) => p.guestId === g.id);
+      syncGuestArrivals(state, g);
     }
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }

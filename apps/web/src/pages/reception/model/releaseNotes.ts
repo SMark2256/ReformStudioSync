@@ -97,6 +97,20 @@ export const getJiraIssueUrl = (jiraKey: string): string =>
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    id: 'v0.3-guest-sheet-arrivals',
+    version: '0.3',
+    date: '2026-11-11',
+    kind: 'IMPROVEMENT',
+    title: 'Belépések a vendégadatlapon',
+    summary: 'A vendégadatlapon látszanak a belépések.',
+    details: [
+      'Az új „Belépések” fül minden belépést mutat, legújabb elöl: időpont, köredzés vagy kezelés (szolgáltatással), bérlet, rögzítő munkatárs és állapot (sikeres, sztornózott, elutasított, az okkal együtt).',
+      'A tagsággal vagy időalapú bérlettel történt, levonás nélküli köredzés is megjelenik.',
+      'A Bérletek fülön bérletenként lenyitható, melyik belépés kötődött az adott bérlethez.',
+    ],
+    jiraKey: 'TICKET-40',
+  },
+  {
     id: 'v0.3-fix-pass-freeze-calendar-days',
     version: '0.3',
     date: '2026-11-11',
