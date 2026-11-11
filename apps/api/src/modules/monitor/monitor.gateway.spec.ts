@@ -2,6 +2,7 @@ import {
   CheckInResultPayload,
   CheckInRevokedPayload,
   CheckInStatus,
+  MonitorStatePayload,
   SOCKET_EVENTS,
   toMonitorPayload,
 } from '@reform/shared';
@@ -211,6 +212,183 @@ describe('MonitorGateway — Vendégmonitor adatszűrés (TICKET-17)', () => {
       expect(client.disconnect).not.toHaveBeenCalled();
     },
   );
+});
+
+type ValidatedSocket = {
+  studioId: string;
+  type: 'STAFF' | 'DEVICE';
+  name: string;
+  deviceId?: string;
+};
+
+const DEVICE_AUTH: ValidatedSocket = {
+  studioId: STUDIO_ID,
+  type: 'DEVICE',
+  name: 'Kijelző',
+  deviceId: 'device-1',
+};
+const STAFF_AUTH: ValidatedSocket = {
+  studioId: STUDIO_ID,
+  type: 'STAFF',
+  name: 'Recepció',
+};
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((r) => {
+    resolve = r;
+  });
+  return { promise, resolve };
+}
+
+/** Socket minimális utánzata: a bontás a valódihoz hasonlóan kiüríti a szobákat. */
+function mockClient(id: string, displayOnly = false) {
+  const rooms = new Set<string>();
+  return {
+    id,
+    disconnected: false,
+    rooms,
+    handshake: { auth: { token: 'token', displayOnly }, headers: {} },
+    join: vi.fn(async (room: string) => {
+      rooms.add(room);
+    }),
+    leave: vi.fn(async (room: string) => {
+      rooms.delete(room);
+    }),
+    disconnect: vi.fn(),
+  };
+}
+
+describe('MonitorGateway — kapcsolatnyilvántartás és kijelzőszám (TICKET-30)', () => {
+  let gateway: MonitorGateway;
+  let states: { room: string; payload: MonitorStatePayload }[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let authServiceMock: any;
+
+  beforeEach(() => {
+    states = [];
+    authServiceMock = {
+      validateSocketToken: vi.fn(),
+      recordDeviceActivity: vi.fn().mockResolvedValue(undefined),
+    };
+    gateway = new MonitorGateway(authServiceMock);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (gateway as any).server = {
+      to: (room: string) => ({
+        emit: (event: string, payload: MonitorStatePayload) => {
+          if (event === SOCKET_EVENTS.MONITOR_STATE) states.push({ room, payload });
+        },
+      }),
+    };
+  });
+
+  type Client = ReturnType<typeof mockClient>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const connect = (client: Client) => gateway.handleConnection(client as any);
+  const disconnect = (client: Client) => {
+    client.disconnected = true;
+    client.rooms.clear();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    gateway.handleDisconnect(client as any);
+  };
+  const displays = () => gateway.getMonitorState(STUDIO_ID).connectedDisplays;
+
+  it('a hitelesítés alatt bontó kliens nem marad nyilvántartva és szobában', async () => {
+    const auth = deferred<ValidatedSocket>();
+    authServiceMock.validateSocketToken.mockReturnValue(auth.promise);
+    const client = mockClient('socket-1');
+
+    const connecting = connect(client);
+    disconnect(client);
+    auth.resolve(DEVICE_AUTH);
+    await connecting;
+
+    expect(gateway.isDeviceOnline('device-1')).toBe(false);
+    expect(gateway.getOnlineDeviceIds().size).toBe(0);
+    expect(displays()).toBe(0);
+    expect(client.rooms.size).toBe(0);
+    expect(client.join).not.toHaveBeenCalled();
+    expect(states).toEqual([]);
+  });
+
+  it('a szobába lépés közben bontó kliens szobatagsága megszűnik, nincs bejegyzés', async () => {
+    authServiceMock.validateSocketToken.mockResolvedValue(DEVICE_AUTH);
+    const client = mockClient('socket-1');
+    client.join.mockImplementation(async (room: string) => {
+      client.rooms.add(room);
+      disconnect(client);
+      // A valódi socket.io a bontás után is felveszi a szobába.
+      client.rooms.add(room);
+    });
+
+    await connect(client);
+
+    expect(client.rooms.size).toBe(0);
+    expect(gateway.isDeviceOnline('device-1')).toBe(false);
+    expect(displays()).toBe(0);
+    expect(states).toEqual([]);
+  });
+
+  it.each([
+    ['DEVICE', false, DEVICE_AUTH, 1],
+    ['STAFF', true, STAFF_AUTH, 1],
+    // Recepciós fül: nem kijelző.
+    ['STAFF', false, STAFF_AUTH, 0],
+  ] as const)(
+    '%s tokennel (displayOnly: %s) csatlakozó kliens után a kijelzőszám %i',
+    async (_type, displayOnly, validated, expected) => {
+      authServiceMock.validateSocketToken.mockResolvedValue(validated);
+
+      await connect(mockClient('socket-1', displayOnly));
+
+      expect(displays()).toBe(expected);
+      expect(states[states.length - 1]).toMatchObject({
+        room: MONITOR_ROOM,
+        payload: { connectedDisplays: expected },
+      });
+    },
+  );
+
+  it('egy kijelző és két recepciós fül mellett a kijelzőszám 1', async () => {
+    authServiceMock.validateSocketToken
+      .mockResolvedValueOnce(DEVICE_AUTH)
+      .mockResolvedValue(STAFF_AUTH);
+
+    await connect(mockClient('device-socket'));
+    await connect(mockClient('desk-1'));
+    await connect(mockClient('desk-2'));
+
+    expect(displays()).toBe(1);
+    expect(gateway.getOnlineDeviceIds()).toEqual(new Set(['device-1']));
+  });
+
+  it('bontás után a kijelzőszám visszamegy, az ismételt bontás nem hat', async () => {
+    authServiceMock.validateSocketToken.mockResolvedValue(DEVICE_AUTH);
+    const client = mockClient('socket-1');
+
+    await connect(client);
+    expect(displays()).toBe(1);
+    expect(gateway.isDeviceOnline('device-1')).toBe(true);
+
+    disconnect(client);
+    expect(displays()).toBe(0);
+    expect(gateway.isDeviceOnline('device-1')).toBe(false);
+    expect(states.map((s) => s.payload.connectedDisplays)).toEqual([1, 0]);
+
+    disconnect(client);
+    expect(states).toHaveLength(2);
+  });
+
+  it('elutasított token esetén bont, és nem regisztrál', async () => {
+    authServiceMock.validateSocketToken.mockRejectedValue(new Error('invalid'));
+    const client = mockClient('socket-1');
+
+    await connect(client);
+
+    expect(client.disconnect).toHaveBeenCalledWith(true);
+    expect(client.join).not.toHaveBeenCalled();
+    expect(displays()).toBe(0);
+  });
 });
 
 describe('toMonitorPayload', () => {

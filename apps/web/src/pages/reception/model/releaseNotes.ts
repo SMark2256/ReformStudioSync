@@ -63,6 +63,16 @@ export const getJiraIssueUrl = (jiraKey: string): string =>
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    id: 'v0.3-fix-monitor-display-count',
+    version: '0.3',
+    date: '2026-11-11',
+    kind: 'FIX',
+    title: 'Helyes kijelzőszám a recepción',
+    summary:
+      'Az eszközsor „Online (N kijelző)” felirata már csak a ténylegesen kapcsolódó Vendégmonitorokat számolja: a recepciós fülek nem számítanak bele, és a szám nem nő magától. Ha egy kijelző sem kapcsolódik, 0 látszik.',
+    jiraKey: 'TICKET-30',
+  },
+  {
     id: 'v0.3-fix-monitor-stable-connection',
     version: '0.3',
     date: '2026-11-11',
