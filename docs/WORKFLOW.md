@@ -80,18 +80,44 @@ A Koordinátor minden workernek önálló, teljes briefet ad:
 1. Koordinátor ellenőrzi a worker eredményeket (review, gate újrafuttatása).
 2. „Mehet” után PR-ok a `demo`-ra, Jira → *Ellenőrzés alatt*, tesztlista a Megrendelőnek.
 3. „Oké” után PR `demo` → `main`, merge után Jira → *Kész*.
-4. Ha kiadás készül: `docs/versions/<verzió>v.md`, `docs/DEVELOPMENT_LOG.md`, és a verziószám a `widgets/version-changelog`-ban.
+4. A `main` merge után **Kiadás** (2.5): tag, GitHub Release, utána új verzió nyitása a demón.
 5. Összegző jelentés a Megrendelőnek: mi készült el, mi maradt nyitva, melyik ticket milyen állapotban van.
+
+### 2.5. Kiadás (a `demo` → `main` PR összevonása után)
+
+A verziószám egyetlen forrása a gyökér `package.json` `version` mezője (a workspace-ek `package.json`-ja és a `package-lock.json` ugyanezt tükrözi). A web a buildben kapja meg (`__APP_VERSION__`, `apps/web/vite.config.ts`), és `shared/config` (`APP_VERSION_LABEL`, pl. „v0.3”) mutatja a bejelentkezőoldalon, a Vendégmonitor fejlécében és az oldalsáv alján. A `demo` mindig a **következő**, még ki nem adott verzión áll; a `main`-re kerüléskor ez lesz a kiadás.
+
+A Koordinátor a `main` merge után (a példa a v0.3):
+
+1. **CHANGELOG véglegesítése:** a `CHANGELOG.md` `## v0.3 — a demo-n …` címsora helyett `## v0.3 — <a main merge dátuma, ÉÉÉÉ-HH-NN>`; a szakasz tételeit vesd össze az Újdonságok 0.3-as bejegyzéseivel.
+2. **Tag a `main` merge commitjára:**
+   ```bash
+   git fetch origin
+   git tag -a v0.3.0 origin/main -m "v0.3"   # origin/main = a demo → main merge commit
+   git push origin v0.3.0
+   ```
+3. **GitHub Release** a CHANGELOG adott szakaszával (`scripts/release-notes.sh` csak kivágja, nem taggel és nem pushol):
+   ```bash
+   bash scripts/release-notes.sh 0.3 > <ideiglenes fájl>
+   gh release create v0.3.0 --title "v0.3" --notes-file <ideiglenes fájl>
+   ```
+4. **Új verzió nyitása a demón** (külön ág, PR a `demo`-ra, pl. `release/v0.4`):
+   - verzió minor emelése mindenhol: `npm version 0.4.0 --workspaces --include-workspace-root --no-git-tag-version` (a négy `package.json` és a `package-lock.json` saját `version` mezői; nézd át a diffet);
+   - a CHANGELOG 1. pont szerinti dátuma, és fölé új szakasz: `## v0.4 — a demo-n, a következő main kiadással élesedik`;
+   - innentől az Újdonságok új bejegyzései `version: '0.4'`-et kapnak.
+   Az Újdonságok-teszt (`entities/release-note/model/releaseNotes.test.ts`) elbukik, ha egy bejegyzés verziója nagyobb a `package.json`-énál, vagy ha egy 0.3-tól kezdődő bejegyzésnek nincs `jiraKey`-je.
+5. Jelentés a Megrendelőnek: a Release linkje és az új demós verzió.
 
 ---
 
-## 3. Újdonságok bejegyzés (`apps/web/src/pages/reception/model/releaseNotes.ts`)
+## 3. Újdonságok bejegyzés (`apps/web/src/entities/release-note/model/releaseNotes.ts`)
 
-A Recepció **„Újdonságok”** menüpontja (`pages/reception/ui/WhatsNewPanel.tsx`) a `RELEASE_NOTES` tömbből épül. Minden felhasználó számára érzékelhető változáshoz kell bejegyzés.
+A Recepció **„Újdonságok”** menüpontja (`pages/reception/ui/WhatsNewPanel.tsx`) és a bejelentkezőoldal verzió-ablaka (`widgets/version-changelog`) a `RELEASE_NOTES` tömbből épül. Minden felhasználó számára érzékelhető változáshoz kell bejegyzés.
 
 | Mező | Szabály |
 | --- | --- |
 | `id` | Stabil, egyedi (pl. `v0.3-guest-export`). Utólag nem módosítható — erre épül az olvasottság jelölése. |
+| `version` | A `demo` jelenlegi verziója major.minor alakban (a gyökér `package.json`-ból, pl. `0.3.0` → `'0.3'`); nagyobb nem lehet (unit teszt ellenőrzi). |
 | `kind` | `NEW_PAGE` (új oldal), `NEW_FEATURE` (új funkció), `IMPROVEMENT` (fejlesztés), `FIX` (javítás). |
 | `jiraKey` | **Kötelező** KAN kulcs (pl. `KAN-12`) a visszakövethetőséghez. `null` csak a Jira előtti (≤ v0.2) tételeknél megengedett. |
 | `link` | **Csak** `NEW_PAGE` / `NEW_FEATURE` esetén, és **csak ha az újdonság a felületen ténylegesen megtekinthető**. Recepciós fülre: `{ type: 'receptionTab', tab }`, külön oldalra: `{ type: 'route', path }`. `IMPROVEMENT` / `FIX` esetén csak leírás van — a típus ezt kikényszeríti. |
@@ -112,4 +138,4 @@ A Recepció **„Újdonságok”** menüpontja (`pages/reception/ui/WhatsNewPane
 - **Mock pár:** minden új vagy módosított API-végponthoz `shared/api/mock-engine.ts` pár.
 - **Tranzakciók:** bérlet-/pénzügyi módosítás csak atomi Prisma `$transaction`-ben.
 - **Gate jelentés előtt:** `bash .claude/skills/reform-ticket/scripts/gate.sh`. Sikertelen ellenőrzést kimenettel együtt kell jelenteni.
-- **Dokumentáció:** architektúra-változás → `docs/ARCHITECTURE.md`; kiadás → `docs/versions/`; minden felhasználói változás → Újdonságok bejegyzés.
+- **Dokumentáció:** architektúra-változás → `docs/ARCHITECTURE.md`; kiadás → `CHANGELOG.md` (2.5); minden felhasználói változás → Újdonságok bejegyzés.

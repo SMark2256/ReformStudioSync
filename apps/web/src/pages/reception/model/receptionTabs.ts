@@ -1,5 +1,5 @@
 import { APP_ROUTES, normalizePathname } from '@/shared/config';
-import type { ReceptionMainTab } from './releaseNotes';
+import type { ReceptionMainTab } from '@/entities/release-note';
 
 export type ReceptionTab = ReceptionMainTab | 'news';
 

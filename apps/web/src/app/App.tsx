@@ -12,7 +12,6 @@ import { DemoSandboxPage } from '@/pages/demo-sandbox';
 import { MonitorPage } from '@/pages/monitor';
 import { MonitorsPage } from '@/pages/monitors';
 import {
-  CURRENT_VERSION,
   RECEPTION_PATHS,
   ReceptionPage,
   useUnseenReleaseNotesCount,
@@ -20,7 +19,7 @@ import {
 import { SettingsPage } from '@/pages/settings';
 import { TabletDocumentPage } from '@/pages/tablet-document';
 import { AppShell } from '@/widgets/app-shell';
-import { APP_ROUTES } from '@/shared/config';
+import { APP_RELEASE_VERSION, APP_ROUTES } from '@/shared/config';
 
 // Fejlesztői UI-előnézet (`/dev/ui`): csak `npm run dev:web` alatt, a buildbe nem kerül be.
 const UiPreviewPage = import.meta.env.DEV
@@ -36,7 +35,7 @@ const UiPreviewPage = import.meta.env.DEV
 const AppLayout: React.FC = () => {
   const newsCount = useUnseenReleaseNotesCount();
   return (
-    <AppShell newsCount={newsCount} version={CURRENT_VERSION}>
+    <AppShell newsCount={newsCount} version={APP_RELEASE_VERSION}>
       <Outlet />
     </AppShell>
   );

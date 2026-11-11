@@ -340,8 +340,8 @@ verzió rövid alakja („v0.3”) látszik.
   oldalsáv csukódása zárja. Billentyűzettel nyitva a fókusz a panel első elemére
   kerül. Mobilon nyitott panelnél az Esc csak a panelt zárja.
 - **Verzió**: a sor alatt a futó verzió („Verzió 0.3”, ikonsávban „v0.3”), 12 px
-  `sidebar-muted` `tabular-nums`, link az Újdonságokra. Az értéke a legújabb
-  `releaseNotes.ts` bejegyzés verziója.
+  `sidebar-muted` `tabular-nums`, link az Újdonságokra. Az értéke a gyökér
+  `package.json` verziója major.minor alakban (`shared/config`: `APP_RELEASE_VERSION`).
 
 ### 4.3 Fejléc
 
@@ -823,7 +823,7 @@ kérdezd meg a felhasználót, ne találj ki negyediket.
   vonalkódolvasót a `/reception` és a `/demo` oldalon.
 - Az `references/accessibility.md` ellenőrzőlistája végigment.
 - Felhasználó számára látható változásnál bejegyzés a
-  `apps/web/src/pages/reception/model/releaseNotes.ts`-ben (`jiraKey` kötelező).
+  `apps/web/src/entities/release-note/model/releaseNotes.ts`-ben (`jiraKey` kötelező).
 
 ## 11. Beszámoló
 

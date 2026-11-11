@@ -32,7 +32,7 @@ A [`scripts/ci-wait.sh`](scripts/ci-wait.sh) az aktuális ág PR-ját figyeli (v
 
 ## Kötelező szabályok
 
-- **Újdonságok:** minden felhasználó számára érzékelhető változáshoz bejegyzés az `apps/web/src/pages/reception/model/releaseNotes.ts`-be, kötelező `jiraKey`-jel ([`docs/WORKFLOW.md`](docs/WORKFLOW.md), [`.cursor/rules/release-notes.mdc`](.cursor/rules/release-notes.mdc)).
+- **Újdonságok:** minden felhasználó számára érzékelhető változáshoz bejegyzés az `apps/web/src/entities/release-note/model/releaseNotes.ts`-be, kötelező `jiraKey`-jel ([`docs/WORKFLOW.md`](docs/WORKFLOW.md), [`.cursor/rules/release-notes.mdc`](.cursor/rules/release-notes.mdc)).
 - **UI:** `apps/web` felületi munkánál a [`reformstudio-ui-skill`](.claude/skills/reformstudio-ui-skill/SKILL.md) szerint ([`.cursor/rules/ui-design.mdc`](.cursor/rules/ui-design.mdc)).
 - **Téma:** világos és sötét téma mindenhol ([`.cursor/rules/theme-support.mdc`](.cursor/rules/theme-support.mdc)); a Vendégmonitor kivétel.
 - **FSD rétegek:** `npm run lint:fsd` ([`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) 1.2).

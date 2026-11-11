@@ -35,8 +35,10 @@ LAST=""
 while :; do
   CHECKS=$(gh pr checks "$PR" --json name,bucket,state --jq '.[] | "\(.bucket)\t\(.name)\t\(.state)"' 2>&1)
   CHECKS_RC=$?
-  RUNS=$(gh run list --commit "$SHA" --json databaseId,name,status,conclusion \
-    --jq '.[] | "\(.status)\t\(.conclusion)\t\(.name)\t\(.databaseId)"' 2>&1)
+  # Workflow-nként csak a legfrissebb futás számít: a beragadt régi futást az újraindított
+  # (PR újranyitás, workflow_dispatch) futás felülírja.
+  RUNS=$(gh run list --commit "$SHA" --json databaseId,name,status,conclusion,createdAt \
+    --jq 'group_by(.name) | map(max_by(.createdAt)) | .[] |"\(.status)\t\(.conclusion)\t\(.name)\t\(.databaseId)"' 2>&1)
   RUNS_RC=$?
 
   # A `gh pr checks` 8-as kóddal jelzi a függő checket; ez nem hiba.

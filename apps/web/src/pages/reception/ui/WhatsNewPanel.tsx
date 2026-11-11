@@ -10,7 +10,9 @@ import {
   ToggleGroupItem,
 } from '@/shared/ui';
 import {
+  formatReleaseNoteDate,
   getJiraIssueUrl,
+  groupReleaseNotesByVersion,
   isReleaseNoteFilter,
   matchesReleaseNoteFilter,
   RELEASE_NOTE_FILTERS,
@@ -19,15 +21,8 @@ import {
   type ReceptionMainTab,
   type ReleaseNote,
   type ReleaseNoteFilter,
-} from '../model/releaseNotes';
+} from '@/entities/release-note';
 import { useReleaseNotesStore } from '../model/releaseNotesStore';
-
-const formatNoteDate = (isoDate: string) =>
-  new Date(`${isoDate}T12:00:00`).toLocaleDateString('hu-HU', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  });
 
 const FILTER_COUNTS = Object.fromEntries(
   RELEASE_NOTE_FILTERS.map(({ value }) => [
@@ -63,14 +58,13 @@ export const WhatsNewPanel: React.FC<WhatsNewPanelProps> = ({
   );
 
   // Csak a szűrőnek megfelelő bejegyzések; üres verziócsoport nem keletkezik.
-  const byVersion = useMemo(() => {
-    const groups = new Map<string, ReleaseNote[]>();
-    for (const note of RELEASE_NOTES) {
-      if (!matchesReleaseNoteFilter(note, filter)) continue;
-      groups.set(note.version, [...(groups.get(note.version) ?? []), note]);
-    }
-    return Array.from(groups.entries());
-  }, [filter]);
+  const byVersion = useMemo(
+    () =>
+      groupReleaseNotesByVersion(
+        RELEASE_NOTES.filter((note) => matchesReleaseNoteFilter(note, filter)),
+      ),
+    [filter],
+  );
 
   const toggleDetails = (id: string) =>
     setExpandedIds((prev) => {
@@ -118,7 +112,7 @@ export const WhatsNewPanel: React.FC<WhatsNewPanelProps> = ({
       </div>
 
       <div className="space-y-6">
-        {byVersion.map(([version, notes]) => (
+        {byVersion.map(({ version, date, notes }) => (
           <section
             key={version}
             aria-labelledby={`release-${version}`}
@@ -132,7 +126,7 @@ export const WhatsNewPanel: React.FC<WhatsNewPanelProps> = ({
                 v{version}
               </h2>
               <span className="text-xs text-muted-foreground">
-                {formatNoteDate(notes[0].date)}
+                {formatReleaseNoteDate(date)}
               </span>
             </div>
 

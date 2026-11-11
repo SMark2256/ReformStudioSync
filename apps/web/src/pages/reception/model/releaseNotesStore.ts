@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { countUnseenReleaseNotes } from './releaseNotes';
+import { countUnseenReleaseNotes } from '@/entities/release-note';
 
 interface ReleaseNotesState {
   seenIds: string[];

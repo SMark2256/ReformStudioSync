@@ -192,14 +192,37 @@ Utána várj. A `main` felé csak kifejezett „oké” vagy „mehet a main” 
 ## 8. PR `demo` → `main`, és lezárás
 
 „Oké” után a `references/demo-es-main-pr.md` szerint nyiss PR-t a `demo`-ról a
-`main`-re. Ha a ticket felhasználó számára látható újdonság, kérdezd meg, kell-e
-verzióléptetés (`docs/versions/` és a `widgets/version-changelog`).
+`main`-re. A `demo` a következő verzión áll (gyökér `package.json`, pl. `0.3.0`),
+a `main`-re kerüléskor ez lesz a kiadás; a PR címébe írd bele a verziót
+(„demo → main: v0.3 (TICKET-NN, …)”).
 
 A `main` merge után:
 
 ```bash
 python .claude/skills/reform-ticket/scripts/reform_ticket.py transition TICKET-NN "Kész"
 ```
+
+### Kiadás
+
+Közvetlenül a `main` merge után, a `docs/WORKFLOW.md` 2.5 pontja szerint (a példa
+a v0.3):
+
+1. `CHANGELOG.md`: a `## v0.3 — a demo-n …` címsorba a merge dátuma
+   (`## v0.3 — ÉÉÉÉ-HH-NN`), a tételek egyeztetése az Újdonságok 0.3-as bejegyzéseivel.
+2. Tag a `main` merge commitjára:
+   `git fetch origin && git tag -a v0.3.0 origin/main -m "v0.3" && git push origin v0.3.0`
+3. GitHub Release a CHANGELOG szakaszával:
+   `bash scripts/release-notes.sh 0.3 > <ideiglenes fájl>`, majd
+   `gh release create v0.3.0 --title "v0.3" --notes-file <ideiglenes fájl>`.
+   A szkript csak kivágja a szakaszt, nem taggel és nem pushol.
+4. Új verzió nyitása a demón (külön ág, PR a `demo`-ra): `npm version 0.4.0
+   --workspaces --include-workspace-root --no-git-tag-version` (négy `package.json`
+   és a `package-lock.json`), a CHANGELOG-ban a dátum és fölé új
+   `## v0.4 — a demo-n, a következő main kiadással élesedik` szakasz. Innentől az
+   Újdonságok bejegyzései `version: '0.4'`-et kapnak.
+
+A tag, a push és a Release kifelé látszó lépés: a Megrendelő „mehet a main”-je
+erre is vonatkozik, de ha bármi eltér (pl. a `main`-en más is van), előbb szólj.
 
 ## 9. Beszámoló
 
