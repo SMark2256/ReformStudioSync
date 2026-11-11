@@ -33,9 +33,11 @@ describe('CheckInsService — Kritikus Beléptetési és Köredzés vs. Kezelés
           createdAt: new Date(),
         })),
         update: vi.fn().mockResolvedValue({}),
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
       },
       visit: {
         create: vi.fn().mockResolvedValue({ id: 'visit-1' }),
+        deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
       },
       guest: {
         findUnique: vi.fn(),
@@ -45,7 +47,11 @@ describe('CheckInsService — Kritikus Beléptetési és Köredzés vs. Kezelés
         update: vi.fn().mockResolvedValue({}),
       },
       passUsageLog: {
-        create: vi.fn().mockResolvedValue({}),
+        create: vi.fn().mockResolvedValue({ id: 'usage-1' }),
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+      },
+      auditLog: {
+        create: vi.fn().mockResolvedValue({ id: 'audit-1' }),
       },
     };
 
@@ -99,6 +105,7 @@ describe('CheckInsService — Kritikus Beléptetési és Köredzés vs. Kezelés
         id: 'pass-10',
         isActive: true,
         isFrozen: false,
+        cancelledAt: null,
         remainingPasses: { gt: 0 },
       },
       data: { remainingPasses: { decrement: 1 } },
@@ -377,11 +384,26 @@ describe('CheckInsService — Kritikus Beléptetési és Köredzés vs. Kezelés
       studioId: 'default-studio',
       guestId: 'guest-1',
       status: 'SUCCESS',
+      visitId: 'visit-1',
       guest: { firstName: 'Anna', lastName: 'Kovács' },
       guestPass: {
         id: 'pass-10',
         type: 'OCCASION_BASED',
         remainingPasses: 0,
+        isActive: false,
+        cancelledAt: null,
+      },
+      passUsage: {
+        id: 'usage-1',
+        delta: -1,
+        reversedAt: null,
+        guestPass: {
+          id: 'pass-10',
+          type: 'OCCASION_BASED',
+          remainingPasses: 0,
+          isActive: false,
+          cancelledAt: null,
+        },
       },
     });
     txMock.guestPass.update.mockResolvedValue({
@@ -390,11 +412,33 @@ describe('CheckInsService — Kritikus Beléptetési és Köredzés vs. Kezelés
       isActive: true,
     });
 
-    const revoked = await service.revokeCheckIn('checkin-to-revoke');
+    const revoked = await service.revokeCheckIn(
+      'checkin-to-revoke',
+      'staff-1',
+      'default-studio',
+      'Rossz vendég',
+    );
     expect(revoked.restoredRemainingPasses).toBe(1);
+    expect(txMock.passUsageLog.updateMany).toHaveBeenCalledWith({
+      where: { id: 'usage-1', delta: { lt: 0 }, reversedAt: null },
+      data: {
+        reversedAt: expect.any(Date),
+        reversalReason: 'Beléptetés sztornó: Rossz vendég',
+      },
+    });
     expect(txMock.guestPass.update).toHaveBeenCalledWith({
       where: { id: 'pass-10' },
       data: { remainingPasses: { increment: 1 }, isActive: true },
+    });
+    expect(txMock.visit.deleteMany).toHaveBeenCalledWith({
+      where: { id: 'visit-1' },
+    });
+    expect(txMock.auditLog.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        userId: 'staff-1',
+        action: 'CHECKIN_REVOKED',
+        entityId: 'checkin-to-revoke',
+      }),
     });
     expect(monitorGatewayMock.emitCheckInRevoked).toHaveBeenCalledTimes(1);
 

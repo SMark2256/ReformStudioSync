@@ -5,8 +5,14 @@ import {
   CheckInRevokedPayload,
   CheckInStatus,
   CheckInWarningCode,
+  computeRemainingPasses,
+  countActiveDeductions,
   DEFAULT_STUDIO_ID,
   EXPIRING_SOON_THRESHOLD_DAYS,
+  getPassStatus,
+  isPassOpen,
+  passCoversService,
+  passDeductionError,
   GuestPassDto,
   PassTemplateDto,
   PassType,
@@ -16,6 +22,13 @@ import {
 } from '@reform/shared';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MonitorGateway } from '../monitor/monitor.gateway';
+import {
+  logCorrection,
+  recordArrival,
+  recordDeduction,
+  reverseDeduction,
+  voidArrival,
+} from './pass-ledger';
 import {
   CreatePassTemplateDto,
   CreateServiceDto,
@@ -355,93 +368,54 @@ export class PassesService {
       const service = await tx.service.findFirst({
         where: { id: dto.serviceId, studioId },
       });
-      const serviceName = service?.name ?? pass.passTemplate.name;
-
-      if (pass.isFrozen) {
-        throw appError('PASS.FROZEN');
-      }
-
-      if (!pass.isActive || pass.expirationDate < now) {
-        throw appError('PASS.EXPIRED');
-      }
-
-      // Fennmaradó alkalmak ellenőrzése a nem visszavont felhasználásokból is
-      const activeDeductions = (pass.usageLogs ?? []).filter(
-        (u) => u.delta < 0 && !u.reversedAt,
-      ).length;
-      const computedRemaining =
-        pass.totalPasses !== null
-          ? Math.max(0, pass.totalPasses - activeDeductions)
-          : (pass.remainingPasses ?? 0);
-
-      let newRemaining: number | 'Korlátlan' = 'Korlátlan';
-
-      if (pass.type === 'OCCASION_BASED') {
-        if ((pass.remainingPasses ?? computedRemaining) <= 0) {
-          throw appError('PASS.NO_REMAINING');
-        }
-
-        const atomicUpdate = await tx.guestPass.updateMany({
-          where: {
-            id: pass.id,
-            isActive: true,
-            isFrozen: false,
-            remainingPasses: { gt: 0 },
-          },
-          data: {
-            remainingPasses: { decrement: 1 },
-          },
+      if (!service) {
+        throw appError('COMMON.NOT_FOUND', {
+          message: 'A kiválasztott kezelés nem található.',
         });
+      }
+      const serviceName = service.name;
 
-        if (atomicUpdate.count !== 1) {
-          throw appError('PASS.BALANCE_CHANGED');
-        }
-
-        const calcRem = (pass.remainingPasses ?? computedRemaining) - 1;
-        newRemaining = calcRem;
-
-        if (calcRem <= 0) {
-          await tx.guestPass.update({
-            where: { id: pass.id },
-            data: { isActive: false },
-          });
-        }
+      // Szolgáltatáshoz kötött bérletről csak az adott kezelés vonható le;
+      // a szolgáltatáshoz nem kötött (általános alkalmas) bérlet bármely kezelésre használható.
+      if (
+        !passCoversService(
+          pass.serviceId ?? pass.passTemplate.serviceId,
+          service.id,
+        )
+      ) {
+        throw appError('PASS.SERVICE_MISMATCH');
       }
 
-      const usageLog = await tx.passUsageLog.create({
-        data: {
-          guestPassId: pass.id,
+      const remaining = computeRemainingPasses(
+        pass.totalPasses,
+        pass.usageLogs ?? [],
+      );
+      const status = getPassStatus({ ...pass, remainingPasses: remaining }, now);
+      const deductionError = passDeductionError(status);
+      if (deductionError) throw appError(deductionError);
+
+      const checkInLog = await recordArrival(tx, {
+        studioId,
+        guestId: guest.id,
+        guestPassId: pass.id,
+        staffUserId,
+        visitType: 'TREATMENT',
+        reason: `Kezelés: ${serviceName}`,
+      });
+
+      const { usageId, remaining: newRemaining } = await recordDeduction(
+        tx,
+        { ...pass, remainingPasses: remaining },
+        {
           guestId: guest.id,
-          serviceId: service?.id ?? null,
-          employeeId: staffUserId,
-          delta: -1,
-          operationKey: dto.operationKey ?? null,
+          staffUserId,
+          checkInId: checkInLog.id,
+          serviceId: service.id,
+          operationKey: dto.operationKey,
           note: dto.note?.trim() || `Kezelés: ${serviceName}`,
+          balanceChangedError: 'PASS.BALANCE_CHANGED',
         },
-      });
-
-      await tx.visit
-        .create({
-          data: {
-            studioId,
-            guestId: guest.id,
-            visitType: 'TREATMENT',
-            employeeId: staffUserId,
-          },
-        })
-        .catch(() => null);
-
-      const checkInLog = await tx.loggedCheckIn.create({
-        data: {
-          studioId,
-          guestId: guest.id,
-          guestPassId: pass.id,
-          userId: staffUserId,
-          visitType: 'TREATMENT',
-          status: 'SUCCESS',
-          reason: `Kezelés: ${serviceName}`,
-        },
-      });
+      );
 
       const warnings: CheckInWarningCode[] = [];
       if (pass.type === 'OCCASION_BASED' && typeof newRemaining === 'number') {
@@ -464,7 +438,7 @@ export class PassesService {
 
       return {
         checkInId: checkInLog.id,
-        usageId: usageLog.id,
+        usageId,
         mode: 'TREATMENT_GREETING' as const,
         status: CheckInStatus.SUCCESS,
         guestId: guest.id,
@@ -487,8 +461,9 @@ export class PassesService {
   }
 
   /**
-   * Téves levonás visszavonása (POST /api/pass-usages/:id/reverse)
-   * Kötelező indoklással, audit naplózással és a fennmaradó alkalmak helyes újraszámításával.
+   * Téves levonás visszavonása (POST /api/pass-usages/:id/reverse), kötelező indoklással.
+   * Csak `delta < 0` levonás vonható vissza, egyszer. A kapcsolt beléptetés is sztornózódik
+   * (és a látogatás törlődik), így a beléptetés-sztornó már nem ír jóvá még egyszer.
    */
   async reversePassUsage(
     usageId: string,
@@ -502,6 +477,7 @@ export class PassesService {
         include: {
           guestPass: { include: { guest: true, passTemplate: true } },
           service: true,
+          checkIn: true,
         },
       });
 
@@ -518,43 +494,27 @@ export class PassesService {
       }
 
       const now = new Date();
-      await tx.passUsageLog.update({
-        where: { id: usage.id },
-        data: {
-          reversedAt: now,
-          reversalReason: dto.reversalReason.trim(),
-        },
+      const reason = dto.reversalReason.trim();
+      const restoredRemaining = await reverseDeduction(tx, usage, reason, now);
+
+      const checkInVoided = usage.checkIn
+        ? await voidArrival(tx, usage.checkIn, `Levonás visszavonva: ${reason}`)
+        : false;
+
+      const guestName = `${usage.guestPass.guest.lastName} ${usage.guestPass.guest.firstName}`;
+      await logCorrection(tx, {
+        studioId,
+        staffUserId,
+        action: 'PASS_USAGE_REVERSED',
+        entityType: 'PassUsageLog',
+        entityId: usage.id,
+        details: `Alkalomlevonás visszavonva (${guestName})${checkInVoided ? ', a beléptetés sztornózva' : ''}: ${reason}`,
       });
 
-      let restoredRemaining: number | 'Korlátlan' = 'Korlátlan';
-      if (usage.guestPass.type === 'OCCASION_BASED') {
-        const updatedPass = await tx.guestPass.update({
-          where: { id: usage.guestPassId },
-          data: {
-            remainingPasses: { increment: 1 },
-            isActive: usage.guestPass.expirationDate >= now,
-          },
-        });
-        restoredRemaining = updatedPass.remainingPasses ?? 1;
-      }
-
-      await tx.auditLog
-        .create({
-          data: {
-            studioId,
-            userId: staffUserId,
-            action: 'PASS_USAGE_REVERSED',
-            entityType: 'PassUsageLog',
-            entityId: usage.id,
-            details: `Alkalomlevonás visszavonva (${usage.guestPass.guest.lastName} ${usage.guestPass.guest.firstName}): ${dto.reversalReason.trim()}`,
-          },
-        })
-        .catch(() => null);
-
       return {
-        checkInId: usage.id,
+        checkInId: usage.checkInId ?? usage.id,
         guestId: usage.guestPass.guestId,
-        guestName: `${usage.guestPass.guest.lastName} ${usage.guestPass.guest.firstName}`,
+        guestName,
         serviceName: usage.service?.name ?? usage.guestPass.passTemplate.name,
         restoredRemainingPasses: restoredRemaining,
         timestamp: now.toISOString(),
@@ -588,8 +548,7 @@ export class PassesService {
         baseDate.getTime() + dto.additionalDays * 24 * 60 * 60 * 1000,
       );
 
-      const shouldActivate =
-        pass.type === 'TIME_BASED' || (pass.remainingPasses ?? 0) > 0;
+      const shouldActivate = isPassOpen(pass, pass.remainingPasses);
 
       const updated = await tx.guestPass.update({
         where: { id: pass.id },
@@ -701,17 +660,15 @@ export class PassesService {
         usedAt: l.usedAt.toISOString(),
         reversedAt: l.reversedAt ? l.reversedAt.toISOString() : null,
         reversalReason: l.reversalReason ?? null,
+        checkInId: l.checkInId ?? null,
         note: l.note,
       }),
     );
 
-    const usedPassesCount = usageLogs.filter(
-      (u) => u.delta < 0 && !u.reversedAt,
-    ).length;
-    const calculatedRemainingPasses =
-      p.totalPasses !== null && p.totalPasses !== undefined
-        ? Math.max(0, p.totalPasses - usedPassesCount)
-        : null;
+    const calculatedRemainingPasses = computeRemainingPasses(
+      p.totalPasses,
+      usageLogs,
+    );
 
     return {
       id: p.id,
@@ -725,12 +682,17 @@ export class PassesService {
       totalPasses: p.totalPasses,
       remainingPasses: p.remainingPasses,
       calculatedRemainingPasses,
-      usedPassesCount,
+      usedPassesCount: countActiveDeductions(usageLogs),
       startDate: p.startDate.toISOString(),
       expirationDate: p.expirationDate.toISOString(),
       isActive: p.isActive,
       isFrozen: p.isFrozen,
       frozenAt: p.frozenAt ? p.frozenAt.toISOString() : null,
+      cancelledAt: p.cancelledAt ? p.cancelledAt.toISOString() : null,
+      status: getPassStatus({
+        ...p,
+        remainingPasses: calculatedRemainingPasses,
+      }),
       createdAt: p.createdAt.toISOString(),
       usageLogs,
     };

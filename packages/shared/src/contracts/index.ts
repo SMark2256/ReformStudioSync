@@ -7,6 +7,7 @@ import {
   MembershipStatus,
   MessageStatus,
   OverdueBucket,
+  PassStatus,
   PassType,
   PaymentMethod,
   Role,
@@ -68,6 +69,8 @@ export interface PassUsageLogDto {
   usedAt: string;
   reversedAt?: string | null;
   reversalReason?: string | null;
+  /** A levonáshoz tartozó beléptetés (a visszavonás és a sztornó egymást is lezárja). */
+  checkInId?: string | null;
   note: string | null;
 }
 
@@ -82,6 +85,7 @@ export interface GuestPassDto {
   type: PassType;
   totalPasses: number | null;
   remainingPasses: number | null;
+  /** `computeRemainingPasses` eredménye: összes − nem visszavont levonások. */
   calculatedRemainingPasses?: number | null;
   usedPassesCount?: number;
   startDate: string;
@@ -89,6 +93,10 @@ export interface GuestPassDto {
   isActive: boolean;
   isFrozen: boolean;
   frozenAt: string | null;
+  /** Az eladás sztornójának időpontja (az eladási befizetés sztornója). */
+  cancelledAt?: string | null;
+  /** Számolt állapot (`getPassStatus`); a felület ezt mutassa, ne az `isActive` jelzőt. */
+  status: PassStatus;
   createdAt: string;
   usageLogs?: PassUsageLogDto[];
 }
@@ -289,6 +297,8 @@ export interface LoggedCheckInDto {
   status: CheckInStatus;
   reason: string | null;
   reversalReason?: string | null;
+  /** A beléptetéshez tartozó látogatás; sztornókor törlődik. */
+  visitId?: string | null;
   createdAt: string;
 }
 
@@ -387,6 +397,10 @@ export interface DeductPassUsageRequestDto {
 
 export interface ReversePassUsageRequestDto {
   reversalReason: string;
+}
+
+export interface RevokeCheckInRequestDto {
+  reason?: string;
 }
 
 export interface RecordPaymentRequestDto {

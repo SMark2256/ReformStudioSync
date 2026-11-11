@@ -225,6 +225,8 @@ model GuestPass {
   isActive        Boolean   @default(true) @map("is_active")
   isFrozen        Boolean   @default(false) @map("is_frozen")
   frozenAt        DateTime? @map("frozen_at")
+  /// A bérlet eladásának sztornója (az eladási befizetés sztornózásakor) — ettől kezdve nem használható.
+  cancelledAt     DateTime? @map("cancelled_at")
   createdAt       DateTime  @default(now()) @map("created_at")
 
   guest        Guest               @relation(fields: [guestId], references: [id], onDelete: Cascade)
@@ -247,8 +249,9 @@ model Visit {
   visitType   VisitType @default(CIRCUIT_TRAINING) @map("visit_type")
   employeeId  String    @map("employee_id")
 
-  guest    Guest @relation(fields: [guestId], references: [id], onDelete: Cascade)
-  employee User  @relation(fields: [employeeId], references: [id])
+  guest    Guest          @relation(fields: [guestId], references: [id], onDelete: Cascade)
+  employee User           @relation(fields: [employeeId], references: [id])
+  checkIn  LoggedCheckIn?
 
   @@index([guestId, checkedInAt])
   @@index([studioId, checkedInAt])
@@ -265,11 +268,15 @@ model LoggedCheckIn {
   status         CheckInStatus @default(SUCCESS)
   reason         String?
   idempotencyKey String?       @unique @map("idempotency_key")
+  /// A beléptetéshez tartozó látogatás; sztornókor a látogatás törlődik.
+  visitId        String?       @unique @map("visit_id")
   createdAt      DateTime      @default(now()) @map("created_at")
 
-  guest     Guest      @relation(fields: [guestId], references: [id])
-  guestPass GuestPass? @relation(fields: [guestPassId], references: [id])
-  user      User       @relation(fields: [userId], references: [id])
+  guest     Guest         @relation(fields: [guestId], references: [id])
+  guestPass GuestPass?    @relation(fields: [guestPassId], references: [id])
+  user      User          @relation(fields: [userId], references: [id])
+  visit     Visit?        @relation(fields: [visitId], references: [id], onDelete: SetNull)
+  passUsage PassUsageLog?
 
   @@index([guestId, createdAt])
   @@index([studioId, createdAt])
@@ -287,12 +294,15 @@ model PassUsageLog {
   reversedAt     DateTime? @map("reversed_at")
   reversalReason String?   @map("reversal_reason")
   operationKey   String?   @unique @map("operation_key")
+  /// A levonáshoz tartozó beléptetés: bármelyik oldal visszavonása a másikat is lezárja.
+  checkInId      String?   @unique @map("check_in_id")
   note           String?
 
-  guestPass GuestPass @relation(fields: [guestPassId], references: [id], onDelete: Cascade)
-  guest     Guest?    @relation(fields: [guestId], references: [id], onDelete: SetNull)
-  service   Service?  @relation(fields: [serviceId], references: [id], onDelete: SetNull)
-  employee  User?     @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+  guestPass GuestPass      @relation(fields: [guestPassId], references: [id], onDelete: Cascade)
+  guest     Guest?         @relation(fields: [guestId], references: [id], onDelete: SetNull)
+  service   Service?       @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+  employee  User?          @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+  checkIn   LoggedCheckIn? @relation(fields: [checkInId], references: [id], onDelete: SetNull)
 
   @@index([guestPassId, usedAt])
   @@map("pass_usage_logs")
@@ -316,6 +326,7 @@ model Payment {
   allocations PaymentAllocation[]
 
   @@index([studioId, createdAt, paymentMethod])
+  @@index([guestPassId, createdAt])
   @@map("payments")
 }
 

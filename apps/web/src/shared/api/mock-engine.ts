@@ -1,6 +1,12 @@
 import {
   appError,
   AuditLogDto,
+  computeRemainingPasses,
+  countActiveDeductions,
+  getPassStatus,
+  isPassOpen,
+  passCoversService,
+  passDeductionError,
   CheckInResultPayload,
   CheckInRevokedPayload,
   CheckInStatus,
@@ -45,6 +51,7 @@ import {
   OverdueReportDto,
   OverdueSummaryItemDto,
   PairDisplayResponseDto,
+  PassStatus,
   PassTemplateDto,
   PassType,
   PassUsageLogDto,
@@ -61,7 +68,8 @@ import {
 } from '@reform/shared';
 import { broadcastToLocalMonitors } from '@/shared/lib/monitor-channel';
 
-const STORAGE_KEY = 'reform-studio-mock-sandbox-v3';
+// v4: havi tagdíj-pótlás (TICKET-13) és naplóból számolt alkalom (TICKET-16); a régi tárolt állapot nem konzisztens vele.
+const STORAGE_KEY = 'reform-studio-mock-sandbox-v4';
 const MONITOR_CONFIG_KEY = 'reform-studio-monitor-greeting-seconds';
 
 export interface MockDatabaseState {
@@ -77,6 +85,67 @@ export interface MockDatabaseState {
 
 function addDays(base: Date, days: number): string {
   return new Date(base.getTime() + days * 24 * 60 * 60 * 1000).toISOString();
+}
+
+/**
+ * A bérlet számolt mezői a naplóból, ugyanazzal a szabállyal, mint az API-n (TICKET-16):
+ * hátralévő = összes − nem visszavont levonások; aktív = nincs sztornózva és van alkalom.
+ */
+function syncPassState(pass: GuestPassDto, now = new Date()): GuestPassDto {
+  const logs = pass.usageLogs ?? [];
+  const remaining = computeRemainingPasses(pass.totalPasses, logs);
+  pass.remainingPasses = remaining;
+  pass.calculatedRemainingPasses = remaining;
+  pass.usedPassesCount = countActiveDeductions(logs);
+  pass.isActive = isPassOpen(pass, remaining);
+  pass.status = getPassStatus(pass, now);
+  return pass;
+}
+
+/** Levonás visszavonása és jóváírás — pontosan egyszer (az API `reverseDeduction` párja). */
+function reverseDeduction(
+  pass: GuestPassDto,
+  usage: PassUsageLogDto,
+  reason: string,
+  now: Date,
+): number | 'Korlátlan' {
+  if (usage.reversedAt) throw appError('PASS.USAGE_ALREADY_REVERSED');
+  usage.reversedAt = now.toISOString();
+  usage.reversalReason = reason;
+  syncPassState(pass, now);
+  return pass.type === PassType.OCCASION_BASED
+    ? (pass.remainingPasses ?? 0)
+    : 'Korlátlan';
+}
+
+/** Sikeres beléptetés sztornója és a látogatás törlése (az API `voidArrival` párja). */
+function voidArrival(
+  state: MockDatabaseState,
+  checkIn: LoggedCheckInDto,
+  reason: string,
+): boolean {
+  if (checkIn.status !== CheckInStatus.SUCCESS) return false;
+  checkIn.status = CheckInStatus.CANCELLED;
+  checkIn.reason = reason;
+  if (checkIn.visitId) {
+    state.visits = state.visits.filter((v) => v.id !== checkIn.visitId);
+  }
+  return true;
+}
+
+/** Korrekciós napló (az API `logCorrection` párja). */
+function logCorrection(
+  state: MockDatabaseState,
+  entry: Pick<AuditLogDto, 'action' | 'entityType' | 'entityId' | 'details'>,
+  now: Date,
+) {
+  state.auditLogs.unshift({
+    id: `audit-${Date.now()}`,
+    userId: 'staff-default-1',
+    userName: 'Recepciós Munkatárs',
+    createdAt: now.toISOString(),
+    ...entry,
+  });
 }
 
 // Kisméretű SVG alapú optimalizált WebP/SVG előtte-utána mintaillusztráció
@@ -301,6 +370,7 @@ export function createInitialMockDatabase(): MockDatabaseState {
           isActive: true,
           isFrozen: false,
           frozenAt: null,
+          status: PassStatus.ACTIVE, // syncPassState számolja
           createdAt: addDays(now, -20),
           usageLogs: [
             {
@@ -374,6 +444,7 @@ export function createInitialMockDatabase(): MockDatabaseState {
           isActive: true,
           isFrozen: false,
           frozenAt: null,
+          status: PassStatus.ACTIVE, // syncPassState számolja
           createdAt: addDays(now, -10),
           usageLogs: [
             {
@@ -588,6 +659,7 @@ export function createInitialMockDatabase(): MockDatabaseState {
           isActive: true,
           isFrozen: false,
           frozenAt: null,
+          status: PassStatus.ACTIVE, // syncPassState számolja
           createdAt: addDays(now, -28),
           usageLogs: [
             {
@@ -682,6 +754,7 @@ export function createInitialMockDatabase(): MockDatabaseState {
           isActive: true,
           isFrozen: false,
           frozenAt: null,
+          status: PassStatus.ACTIVE, // syncPassState számolja
           createdAt: addDays(now, -40),
           usageLogs: [],
         },
@@ -758,6 +831,7 @@ export function createInitialMockDatabase(): MockDatabaseState {
           isActive: true,
           isFrozen: false,
           frozenAt: null,
+          status: PassStatus.ACTIVE, // syncPassState számolja
           createdAt: addDays(now, -65),
           usageLogs: [],
         },
@@ -803,6 +877,7 @@ export function createInitialMockDatabase(): MockDatabaseState {
           isActive: false,
           isFrozen: false,
           frozenAt: null,
+          status: PassStatus.ACTIVE, // syncPassState számolja
           createdAt: addDays(now, -20),
           usageLogs: [],
         },
@@ -879,6 +954,7 @@ export function createInitialMockDatabase(): MockDatabaseState {
           isActive: true,
           isFrozen: true,
           frozenAt: addDays(now, -4),
+          status: PassStatus.ACTIVE, // syncPassState számolja
           createdAt: addDays(now, -18),
           usageLogs: [
             {
@@ -975,6 +1051,38 @@ export function createInitialMockDatabase(): MockDatabaseState {
     g.payments = payments.filter((p) => p.guestId === g.id);
   }
 
+  // A minta bérletek korábbi (itt nem részletezett) levonásai is a naplóba kerülnek,
+  // mert a hátralévő alkalom a naplóból számolódik.
+  for (const g of guests) {
+    for (const p of g.passes ?? []) {
+      const logs = p.usageLogs ?? [];
+      const missing = (p.usedPassesCount ?? 0) - countActiveDeductions(logs);
+      const start = new Date(p.startDate).getTime();
+      const span = now.getTime() - start;
+      for (let i = 0; i < missing; i++) {
+        logs.push({
+          id: `ulog-${p.id}-seed-${i + 1}`,
+          guestPassId: p.id,
+          guestId: g.id,
+          guestName: `${g.lastName} ${g.firstName}`,
+          serviceId: p.serviceId ?? null,
+          serviceName: p.serviceName ?? null,
+          passName: p.passTemplateName ?? 'Bérlet',
+          employeeId: 'staff-default-1',
+          employeeName: 'Recepciós Munkatárs',
+          delta: -1,
+          usedAt: new Date(start + (span * (i + 1)) / (missing + 2)).toISOString(),
+          reversedAt: null,
+          reversalReason: null,
+          note: `Kezelés: ${p.serviceName ?? p.passTemplateName ?? 'korábbi alkalom'}`,
+        });
+      }
+      logs.sort((a, b) => new Date(b.usedAt).getTime() - new Date(a.usedAt).getTime());
+      p.usageLogs = logs;
+      syncPassState(p, now);
+    }
+  }
+
   const checkIns: LoggedCheckInDto[] = [
     {
       id: 'chk-initial-1',
@@ -990,6 +1098,7 @@ export function createInitialMockDatabase(): MockDatabaseState {
       staffName: 'Recepciós Munkatárs',
       status: CheckInStatus.SUCCESS,
       reason: null,
+      visitId: 'vis-1',
       createdAt: new Date(now.getTime() - 45 * 60 * 1000).toISOString(),
     },
   ];
@@ -1077,6 +1186,11 @@ class MockStudioEngine {
       parsed.devices = (parsed.devices ?? [])
         .filter((d) => !(d.id === 'dev-1' && d.name === 'Recepciós Pult Másodlagos Monitor'))
         .map((d) => normalizeDisplayDevice(d));
+      // A bérletállapot időfüggő (lejárat, kezdés), ezért olvasáskor is frissül.
+      const now = new Date();
+      for (const g of parsed.guests) {
+        for (const p of g.passes ?? []) syncPassState(p, now);
+      }
       return parsed;
     } catch {
       return createInitialMockDatabase();
@@ -1086,7 +1200,9 @@ class MockStudioEngine {
   private save(state: MockDatabaseState) {
     if (typeof window === 'undefined') return;
     // Szinkronban tartjuk a vendégek treatmentHistory és payments tömbjeit
+    const now = new Date();
     for (const g of state.guests) {
+      for (const p of g.passes ?? []) syncPassState(p, now);
       g.treatmentHistory = (g.passes ?? [])
         .flatMap((p) =>
           (p.usageLogs ?? []).map((u) => ({
@@ -1403,6 +1519,7 @@ class MockStudioEngine {
       isActive: true,
       isFrozen: false,
       frozenAt: null,
+      status: PassStatus.ACTIVE, // syncPassState számolja
       createdAt: now.toISOString(),
       usageLogs: [
         {
@@ -1478,61 +1595,28 @@ class MockStudioEngine {
     }
 
     const service = state.services.find((s) => s.id === input.serviceId);
-    const serviceName =
-      service?.name ?? pass.serviceName ?? pass.passTemplateName ?? 'Kezelés';
-
-    if (pass.isFrozen) {
-      throw appError('PASS.FROZEN', {
-        message: 'Ez a bérlet jelenleg fagyasztva van, nem vonható le belőle alkalom.',
+    if (!service) {
+      throw appError('COMMON.NOT_FOUND', {
+        message: 'A kiválasztott kezelés nem található.',
       });
     }
+    const serviceName = service.name;
 
-    if (!pass.isActive || new Date(pass.expirationDate) < now) {
-      throw appError('PASS.EXPIRED');
+    // Szolgáltatáshoz kötött bérletről csak az adott kezelés vonható le (mint az API-n).
+    if (!passCoversService(pass.serviceId, service.id)) {
+      throw appError('PASS.SERVICE_MISMATCH');
     }
 
-    let newRemaining: number | 'Korlátlan' = 'Korlátlan';
-    if (pass.type === PassType.OCCASION_BASED) {
-      const currentRem = pass.remainingPasses ?? 0;
-      if (currentRem <= 0) {
-        throw appError('PASS.NO_REMAINING');
-      }
-      const nextRem = currentRem - 1;
-      pass.remainingPasses = nextRem;
-      pass.calculatedRemainingPasses = nextRem;
-      pass.usedPassesCount = (pass.usedPassesCount ?? 0) + 1;
-      if (nextRem <= 0) {
-        pass.isActive = false;
-      }
-      newRemaining = nextRem;
-    }
+    const deductionError = passDeductionError(syncPassState(pass, now).status);
+    if (deductionError) throw appError(deductionError);
 
-    const usageId = `ulog-${Date.now()}`;
-    const newUsage: PassUsageLogDto = {
-      id: usageId,
-      guestPassId: pass.id,
-      guestId: guest.id,
-      guestName: `${guest.lastName} ${guest.firstName}`,
-      serviceId: service?.id ?? pass.serviceId ?? null,
-      serviceName,
-      passName: pass.passTemplateName ?? 'Bérlet',
-      employeeId: 'staff-default-1',
-      employeeName: 'Recepciós Munkatárs',
-      delta: -1,
-      remainingAfter: typeof newRemaining === 'number' ? newRemaining : null,
-      usedAt: now.toISOString(),
-      reversedAt: null,
-      reversalReason: null,
-      note: input.note?.trim() || `Kezelés: ${serviceName}`,
-    };
-
-    pass.usageLogs = [newUsage, ...(pass.usageLogs ?? [])];
-
+    const guestName = `${guest.lastName} ${guest.firstName}`;
+    const visitId = `vis-${Date.now()}`;
     const checkInLog: LoggedCheckInDto = {
       id: `chk-${Date.now()}`,
       studioId: DEFAULT_STUDIO_ID,
       guestId: guest.id,
-      guestName: `${guest.lastName} ${guest.firstName}`,
+      guestName,
       guestBarcode: guest.barcode,
       guestPassId: pass.id,
       passName: `${serviceName} (${pass.passTemplateName})`,
@@ -1542,15 +1626,44 @@ class MockStudioEngine {
       staffName: 'Recepciós Munkatárs',
       status: CheckInStatus.SUCCESS,
       reason: `Kezelés: ${serviceName}`,
+      visitId,
       createdAt: now.toISOString(),
     };
 
+    const usageId = `ulog-${Date.now()}`;
+    pass.usageLogs = [
+      {
+        id: usageId,
+        guestPassId: pass.id,
+        guestId: guest.id,
+        guestName,
+        serviceId: service.id,
+        serviceName,
+        passName: pass.passTemplateName ?? 'Bérlet',
+        employeeId: 'staff-default-1',
+        employeeName: 'Recepciós Munkatárs',
+        delta: -1,
+        usedAt: now.toISOString(),
+        reversedAt: null,
+        reversalReason: null,
+        checkInId: checkInLog.id,
+        note: input.note?.trim() || `Kezelés: ${serviceName}`,
+      },
+      ...(pass.usageLogs ?? []),
+    ];
+    syncPassState(pass, now);
+    const newRemaining: number | 'Korlátlan' =
+      pass.type === PassType.OCCASION_BASED
+        ? (pass.remainingPasses ?? 0)
+        : 'Korlátlan';
+    pass.usageLogs[0].remainingAfter = pass.remainingPasses;
+
     state.checkIns.unshift(checkInLog);
     state.visits.unshift({
-      id: `vis-${Date.now()}`,
+      id: visitId,
       studioId: DEFAULT_STUDIO_ID,
       guestId: guest.id,
-      guestName: `${guest.lastName} ${guest.firstName}`,
+      guestName,
       guestBarcode: guest.barcode,
       checkedInAt: now.toISOString(),
       visitType: VisitType.TREATMENT,
@@ -1610,6 +1723,10 @@ class MockStudioEngine {
     return payload;
   }
 
+  /**
+   * Téves levonás visszavonása: csak `delta < 0`, egyszer. A kapcsolt beléptetés is sztornózódik
+   * és a látogatás törlődik, így a beléptetés-sztornó már nem ír jóvá még egyszer.
+   */
   reversePassUsage(
     usageId: string,
     reversalReason: string,
@@ -1620,54 +1737,46 @@ class MockStudioEngine {
     for (const guest of state.guests) {
       for (const pass of guest.passes ?? []) {
         const usage = (pass.usageLogs ?? []).find((u) => u.id === usageId);
-        if (usage) {
-          if (usage.reversedAt) {
-            throw appError('PASS.USAGE_ALREADY_REVERSED', {
-              message: 'Ez a levonás már vissza lett vonva.',
-            });
-          }
-          usage.reversedAt = now.toISOString();
-          usage.reversalReason = reversalReason.trim();
+        if (!usage) continue;
+        if (usage.reversedAt) throw appError('PASS.USAGE_ALREADY_REVERSED');
+        if (usage.delta >= 0) throw appError('PASS.USAGE_NOT_REVERSIBLE');
 
-          let restoredRemaining: number | 'Korlátlan' = 'Korlátlan';
-          if (pass.type === PassType.OCCASION_BASED) {
-            pass.remainingPasses = (pass.remainingPasses ?? 0) + 1;
-            pass.calculatedRemainingPasses = pass.remainingPasses;
-            pass.usedPassesCount = Math.max(0, (pass.usedPassesCount ?? 1) - 1);
-            if (new Date(pass.expirationDate) >= now) {
-              pass.isActive = true;
-            }
-            restoredRemaining = pass.remainingPasses;
-          }
+        const reason = reversalReason.trim();
+        const restoredRemaining = reverseDeduction(pass, usage, reason, now);
+        const checkIn = usage.checkInId
+          ? state.checkIns.find((c) => c.id === usage.checkInId)
+          : undefined;
+        const checkInVoided = checkIn
+          ? voidArrival(state, checkIn, `Levonás visszavonva: ${reason}`)
+          : false;
 
-          state.auditLogs.unshift({
-            id: `audit-${Date.now()}`,
-            userId: 'staff-default-1',
-            userName: 'Recepciós Munkatárs',
+        const guestName = `${guest.lastName} ${guest.firstName}`;
+        logCorrection(
+          state,
+          {
             action: 'PASS_USAGE_REVERSED',
             entityType: 'PassUsageLog',
             entityId: usage.id,
-            createdAt: now.toISOString(),
-            details: `Alkalomlevonás visszavonva (${guest.lastName} ${guest.firstName} - ${usage.serviceName ?? pass.passTemplateName}): ${reversalReason.trim()}`,
-          });
+            details: `Alkalomlevonás visszavonva (${guestName})${checkInVoided ? ', a beléptetés sztornózva' : ''}: ${reason}`,
+          },
+          now,
+        );
+        this.save(state);
 
-          this.save(state);
+        const revokedPayload: CheckInRevokedPayload = {
+          checkInId: usage.checkInId ?? usage.id,
+          guestId: guest.id,
+          guestName,
+          serviceName: usage.serviceName ?? pass.passTemplateName,
+          restoredRemainingPasses: restoredRemaining,
+          timestamp: now.toISOString(),
+        };
 
-          const revokedPayload: CheckInRevokedPayload = {
-            checkInId: usage.id,
-            guestId: guest.id,
-            guestName: `${guest.lastName} ${guest.firstName}`,
-            serviceName: usage.serviceName ?? pass.passTemplateName,
-            restoredRemainingPasses: restoredRemaining,
-            timestamp: now.toISOString(),
-          };
-
-          broadcastToLocalMonitors({
-            type: 'CHECKIN_REVOKED',
-            payload: revokedPayload,
-          });
-          return revokedPayload;
-        }
+        broadcastToLocalMonitors({
+          type: 'CHECKIN_REVOKED',
+          payload: revokedPayload,
+        });
+        return revokedPayload;
       }
     }
 
@@ -1686,9 +1795,6 @@ class MockStudioEngine {
         pass.expirationDate = new Date(
           base.getTime() + additionalDays * 24 * 60 * 60 * 1000,
         ).toISOString();
-        if (pass.type === PassType.TIME_BASED || (pass.remainingPasses ?? 0) > 0) {
-          pass.isActive = true;
-        }
         pass.usageLogs = [
           {
             id: `ulog-${Date.now()}`,
@@ -1893,6 +1999,7 @@ class MockStudioEngine {
       activePass?.type === PassType.TIME_BASED;
 
     if (isCircuitArrival && (activeMembership || activePass)) {
+      const visitId = `vis-${Date.now()}`;
       const checkInLog: LoggedCheckInDto = {
         id: `chk-${Date.now()}`,
         studioId: DEFAULT_STUDIO_ID,
@@ -1909,12 +2016,13 @@ class MockStudioEngine {
         staffName: 'Recepciós Munkatárs',
         status: CheckInStatus.SUCCESS,
         reason: null,
+        visitId,
         createdAt: now.toISOString(),
       };
 
       state.checkIns.unshift(checkInLog);
       state.visits.unshift({
-        id: `vis-${Date.now()}`,
+        id: visitId,
         studioId: DEFAULT_STUDIO_ID,
         guestId: guest.id,
         guestName: guestFullName,
@@ -2018,51 +2126,57 @@ class MockStudioEngine {
     });
   }
 
-  revokeCheckIn(checkInId: string): CheckInRevokedPayload {
+  /**
+   * Téves beléptetés sztornója: a kapcsolt levonás visszavonása (egyszer), a látogatás törlése,
+   * naplózva — az API `revokeCheckIn` párja.
+   */
+  revokeCheckIn(checkInId: string, reason?: string): CheckInRevokedPayload {
     const state = this.load();
+    const now = new Date();
     const checkIn = state.checkIns.find((c) => c.id === checkInId);
     if (!checkIn) throw appError('CHECKIN.NOT_FOUND');
-    if (checkIn.status !== CheckInStatus.SUCCESS) {
-      throw appError('CHECKIN.NOT_REVOCABLE', {
-        message: 'Csak sikeres beléptetés sztornózható.',
-      });
+
+    const why = reason?.trim() || 'Téves beléptetés';
+    if (!voidArrival(state, checkIn, `Recepciós sztornó: ${why}`)) {
+      throw appError('CHECKIN.NOT_REVOCABLE');
     }
 
-    let restoredRemaining: number | 'Korlátlan' = 'Korlátlan';
     const guest = state.guests.find((g) => g.id === checkIn.guestId);
-    if (
-      guest &&
-      checkIn.guestPassId &&
-      checkIn.visitType !== VisitType.CIRCUIT_TRAINING
-    ) {
-      const pass = (guest.passes ?? []).find(
-        (p) => p.id === checkIn.guestPassId,
+    const checkInPass = (guest?.passes ?? []).find(
+      (p) => p.id === checkIn.guestPassId,
+    );
+    let restoredRemaining: number | 'Korlátlan' =
+      checkInPass?.type === PassType.OCCASION_BASED
+        ? (checkInPass.remainingPasses ?? 0)
+        : 'Korlátlan';
+
+    const usage = (checkInPass?.usageLogs ?? []).find(
+      (u) => u.checkInId === checkIn.id && u.delta < 0 && !u.reversedAt,
+    );
+    const reversesDeduction = !!usage;
+    if (checkInPass && usage) {
+      restoredRemaining = reverseDeduction(
+        checkInPass,
+        usage,
+        `Beléptetés sztornó: ${why}`,
+        now,
       );
-      if (pass && pass.type === PassType.OCCASION_BASED) {
-        pass.remainingPasses = (pass.remainingPasses ?? 0) + 1;
-        pass.calculatedRemainingPasses = pass.remainingPasses;
-        pass.isActive = true;
-        restoredRemaining = pass.remainingPasses;
-        pass.usageLogs = [
-          {
-            id: `ulog-${Date.now()}`,
-            guestPassId: pass.id,
-            guestId: guest.id,
-            guestName: checkIn.guestName,
-            delta: 1,
-            usedAt: new Date().toISOString(),
-            note: 'Recepciós sztornó (téves beléptetés visszavonva)',
-          },
-          ...(pass.usageLogs ?? []),
-        ];
-      }
     }
 
-    checkIn.status = CheckInStatus.CANCELLED;
-    checkIn.reason = 'Recepciós által sztornózva';
+    logCorrection(
+      state,
+      {
+        action: 'CHECKIN_REVOKED',
+        entityType: 'LoggedCheckIn',
+        entityId: checkIn.id,
+        details: `Beléptetés sztornózva (${checkIn.guestName})${reversesDeduction ? ', a levonás visszavonva' : ''}: ${why}`,
+      },
+      now,
+    );
+
     for (const dev of state.devices) {
       if (!dev.pairingCode && dev.isActive) {
-        dev.lastSeenAt = new Date().toISOString();
+        dev.lastSeenAt = now.toISOString();
         dev.lastActivityType = `Sztornó megjelenítve (${checkIn.guestName})`;
       }
     }
@@ -2073,7 +2187,7 @@ class MockStudioEngine {
       guestId: checkIn.guestId,
       guestName: checkIn.guestName,
       restoredRemainingPasses: restoredRemaining,
-      timestamp: new Date().toISOString(),
+      timestamp: now.toISOString(),
     };
 
     broadcastToLocalMonitors({
@@ -2532,19 +2646,32 @@ class MockStudioEngine {
       `${payment.note ?? ''} [SZTORNÓZVA${reason ? `: ${reason}` : ''}]`.trim();
 
     if (payment.guestPassId) {
+      // Csak a bérlet eladási (legkorábbi) befizetésének sztornója zárja le a bérletet;
+      // egy későbbi részlet sztornója nem (mint az API-n).
+      const salePayment = state.payments
+        .filter((p) => p.guestPassId === payment.guestPassId)
+        .reduce((first, p) =>
+          p.createdAt < first.createdAt ||
+          (p.createdAt === first.createdAt && p.id < first.id)
+            ? p
+            : first,
+        );
+      const isSalePayment = salePayment.id === payment.id;
       for (const g of state.guests) {
         const pass = (g.passes ?? []).find((p) => p.id === payment.guestPassId);
         if (pass) {
-          pass.isActive = false;
+          if (isSalePayment) pass.cancelledAt = new Date().toISOString();
           pass.usageLogs = [
             {
               id: `ulog-${Date.now()}`,
               guestPassId: pass.id,
               guestId: g.id,
               guestName: `${g.lastName} ${g.firstName}`,
+              employeeId: 'staff-default-1',
+              employeeName: 'Recepciós Munkatárs',
               delta: 0,
               usedAt: new Date().toISOString(),
-              note: `Fizetés és bérlet sztornózva${reason ? `: ${reason}` : ''}`,
+              note: `${isSalePayment ? 'Fizetés és bérlet sztornózva' : 'Részletfizetés sztornózva (a bérlet érvényes marad)'}${reason ? `: ${reason}` : ''}`,
             },
             ...(pass.usageLogs ?? []),
           ];
@@ -2570,16 +2697,16 @@ class MockStudioEngine {
       }
     }
 
-    state.auditLogs.unshift({
-      id: `audit-${Date.now()}`,
-      userId: 'staff-default-1',
-      userName: 'Recepciós Munkatárs',
-      action: 'PAYMENT_CANCELLED',
-      entityType: 'Payment',
-      entityId: payment.id,
-      createdAt: new Date().toISOString(),
-      details: `Fizetési tétel sztornózva (${payment.guestName}, ${payment.amount.toLocaleString('hu-HU')} Ft): ${reason ?? 'Recepciós korrekció'}`,
-    });
+    logCorrection(
+      state,
+      {
+        action: 'PAYMENT_CANCELLED',
+        entityType: 'Payment',
+        entityId: payment.id,
+        details: `Fizetési tétel sztornózva (${payment.guestName}, ${payment.amount.toLocaleString('hu-HU')} Ft): ${reason ?? 'Recepciós korrekció'}`,
+      },
+      new Date(),
+    );
 
     this.save(state);
     return payment;

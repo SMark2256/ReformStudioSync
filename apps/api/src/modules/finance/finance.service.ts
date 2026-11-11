@@ -287,18 +287,30 @@ export class FinanceService {
         },
       });
 
+      // Csak a bérlet eladásához tartozó (legkorábbi) befizetés sztornója zárja le a bérletet;
+      // egy későbbi részlet sztornója nem (a hátralékot a TICKET-14 kezeli).
       if (payment.guestPassId) {
-        await tx.guestPass.update({
-          where: { id: payment.guestPassId },
-          data: { isActive: false },
+        const salePayment = await tx.payment.findFirst({
+          where: { guestPassId: payment.guestPassId },
+          orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+          select: { id: true },
         });
+        const isSalePayment = salePayment?.id === payment.id;
+
+        if (isSalePayment) {
+          await tx.guestPass.update({
+            where: { id: payment.guestPassId },
+            data: { isActive: false, cancelledAt: new Date() },
+          });
+        }
 
         await tx.passUsageLog.create({
           data: {
             guestPassId: payment.guestPassId,
             guestId: payment.guestId,
+            employeeId: staffUserId ?? null,
             delta: 0,
-            note: `Fizetés és bérlet sztornózva${reason ? `: ${reason}` : ''}`,
+            note: `${isSalePayment ? 'Fizetés és bérlet sztornózva' : 'Részletfizetés sztornózva (a bérlet érvényes marad)'}${reason ? `: ${reason}` : ''}`,
           },
         });
       }

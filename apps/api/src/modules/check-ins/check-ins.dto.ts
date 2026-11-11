@@ -68,3 +68,13 @@ export class SyncOfflineScansDto {
   @Type(() => OfflineScanItemInputDto)
   items: OfflineScanItemInputDto[];
 }
+
+export class RevokeCheckInDto {
+  @ApiPropertyOptional({
+    example: 'Téves vendég lett beléptetve',
+    description: 'A sztornó oka (naplózva). Ha üres: „Téves beléptetés”.',
+  })
+  @IsOptional()
+  @IsString()
+  reason?: string;
+}
