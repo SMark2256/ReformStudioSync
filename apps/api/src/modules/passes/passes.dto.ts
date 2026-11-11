@@ -31,6 +31,14 @@ export class CreateServiceDto {
   @IsInt()
   @Min(0)
   priceHuf: number;
+
+  @ApiPropertyOptional({
+    default: false,
+    description: 'Csak nőknek szól (pl. női köredzés): férfi vendégnek nem adható el.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  womenOnly?: boolean;
 }
 
 export class CreatePassTemplateDto {

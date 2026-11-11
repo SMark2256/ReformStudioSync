@@ -70,6 +70,14 @@ export class CreateMembershipInputDto {
   @IsNotEmpty()
   guestId: string;
 
+  @ApiPropertyOptional({
+    description:
+      'A tagság szolgáltatása; ha hiányzik, a stúdió köredzés (CIRCUIT) szolgáltatása.',
+  })
+  @IsOptional()
+  @IsString()
+  serviceId?: string;
+
   @IsInt()
   @Min(1)
   monthlyFeeHuf: number;

@@ -19,6 +19,13 @@ enum GuestStatus {
   PAUSED
 }
 
+// TICKET-42: a csak nőknek szóló szolgáltatásokhoz (női köredzés).
+enum Gender {
+  FEMALE
+  MALE
+  UNSPECIFIED
+}
+
 enum ServiceCategory {
   CIRCUIT
   COSMETIC
@@ -113,6 +120,7 @@ model Guest {
   phone       String?
   birthDate   DateTime?   @map("birth_date")
   nameDay     String?     @map("name_day")
+  gender      Gender      @default(UNSPECIFIED)
   status      GuestStatus @default(ACTIVE)
   notes       String?
   isActive    Boolean     @default(true) @map("is_active")
@@ -143,6 +151,8 @@ model Service {
   category        ServiceCategory @default(BODY_SHAPING)
   durationMinutes Int             @default(30) @map("duration_minutes")
   priceHuf        Int             @default(0) @map("price_huf")
+  /// Csak nőknek szól: férfi vendégnek nem adható el, vele nem léptethető be (TICKET-42).
+  womenOnly       Boolean         @default(false) @map("women_only")
   isActive        Boolean         @default(true) @map("is_active")
   createdAt       DateTime        @default(now()) @map("created_at")
 
@@ -150,6 +160,7 @@ model Service {
   guestPasses   GuestPass[]
   passUsages    PassUsageLog[]
   photos        GuestPhoto[]
+  memberships   Membership[]
 
   @@index([studioId, isActive])
   @@map("services")
@@ -159,6 +170,8 @@ model Membership {
   id            String           @id @default(uuid())
   studioId      String           @default("default-studio") @map("studio_id")
   guestId       String           @map("guest_id")
+  /// A tagság szolgáltatása (a stúdió köredzése); a csak nőknek szóló korlátozás innen jön.
+  serviceId     String?          @map("service_id")
   monthlyFeeHuf Int              @map("monthly_fee_huf")
   startDate     DateTime         @map("start_date")
   dueDay        Int              @default(10) @map("due_day")
@@ -168,8 +181,9 @@ model Membership {
   resumedAt     DateTime?        @map("resumed_at")
   createdAt     DateTime         @default(now()) @map("created_at")
 
-  guest Guest           @relation(fields: [guestId], references: [id], onDelete: Cascade)
-  dues  MembershipDue[]
+  guest   Guest           @relation(fields: [guestId], references: [id], onDelete: Cascade)
+  service Service?        @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+  dues    MembershipDue[]
 
   @@index([guestId, status])
   @@map("memberships")

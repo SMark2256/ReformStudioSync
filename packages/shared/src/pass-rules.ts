@@ -1,5 +1,6 @@
-import { MembershipStatus, PassStatus, PassType, ServiceCategory } from './enums';
-import type { AppErrorCode } from './errors/catalog';
+import { Gender, MembershipStatus, PassStatus, PassType, ServiceCategory } from './enums';
+import { APP_ERROR_CATALOG, type AppErrorCode } from './errors/catalog';
+import { womenOnlyAccess } from './gender';
 import { STUDIO_TIME_ZONE } from './membership-dues';
 
 
@@ -105,6 +106,15 @@ export interface ArrivalPassInput extends PassStatusInput {
   serviceId?: string | null;
   /** A bérlet szolgáltatásának kategóriája (szolgáltatáshoz kötött bérletnél). */
   serviceCategory?: ServiceCategory | string | null;
+  /** A bérlet szolgáltatása csak nőknek szól (TICKET-42). */
+  womenOnly?: boolean | null;
+}
+
+/** A beolvasáskori döntéshez szükséges tagságadatok. */
+export interface ArrivalMembershipInput {
+  status: MembershipStatus | string;
+  /** A tagság szolgáltatása (a köredzés) csak nőknek szól (TICKET-42). */
+  womenOnly?: boolean | null;
 }
 
 /**
@@ -122,10 +132,15 @@ export function passGrantsCircuitEntry(pass: {
   );
 }
 
-export type ArrivalDeniedReason = 'PASS_FROZEN' | 'MEMBERSHIP_PAUSED' | 'NO_VALID_PASS';
+export type ArrivalDeniedReason =
+  | 'WOMEN_ONLY'
+  | 'PASS_FROZEN'
+  | 'MEMBERSHIP_PAUSED'
+  | 'NO_VALID_PASS';
 
 /** Az elutasított beolvasás oka a recepciónak (a monitorra nem kerül). */
 export const ARRIVAL_DENIED_MESSAGES: Record<ArrivalDeniedReason, string> = {
+  WOMEN_ONLY: APP_ERROR_CATALOG['CHECKIN.WOMEN_ONLY'].message,
   PASS_FROZEN: 'A vendég bérlete jelenleg fagyasztva van (szünetel).',
   MEMBERSHIP_PAUSED: 'A vendég havi tagsága jelenleg szüneteltetve van.',
   NO_VALID_PASS:
@@ -143,6 +158,8 @@ export type ArrivalEntitlement<P, M> =
 
 /**
  * Vonalkódos beolvasás döntése (TICKET-39), egyetlen forrás az API-n és a mockban:
+ * 0. férfi vendégnél a csak nőknek szóló tagság és bérlet nem számít (`womenOnlyAccess`, TICKET-42);
+ *    ha emiatt nem marad semmi, az elutasítás oka `WOMEN_ONLY`;
  * 1. aktív havi tagság → köredzés belépés;
  * 2. különben a leghamarabb lejáró, köredzésre érvényes időalapú bérlet → köredzés belépés;
  * 3. különben ha van érvényes (aktív) bérlet → kezelésválasztás, a leghamarabb lejáró elöl;
@@ -151,17 +168,26 @@ export type ArrivalEntitlement<P, M> =
  */
 export function resolveArrivalEntitlement<
   P extends ArrivalPassInput,
-  M extends { status: MembershipStatus | string },
+  M extends ArrivalMembershipInput,
 >(
-  input: { memberships: readonly M[]; passes: readonly P[] },
+  input: {
+    memberships: readonly M[];
+    passes: readonly P[];
+    guestGender?: Gender | string | null;
+  },
   now: Date = new Date(),
 ): ArrivalEntitlement<P, M> {
-  const membership = input.memberships.find(
+  const blocked = (item: { womenOnly?: boolean | null }) =>
+    womenOnlyAccess(input.guestGender, item.womenOnly) === 'DENIED';
+  const memberships = input.memberships.filter((m) => !blocked(m));
+  const passes = input.passes.filter((p) => !blocked(p));
+
+  const membership = memberships.find(
     (m) => m.status === MembershipStatus.ACTIVE,
   );
   if (membership) return { kind: 'CIRCUIT_MEMBERSHIP', membership };
 
-  const usable = input.passes
+  const usable = passes
     .filter((p) => getPassStatus(p, now) === PassStatus.ACTIVE)
     .sort(
       (a, b) =>
@@ -173,15 +199,24 @@ export function resolveArrivalEntitlement<
 
   if (usable.length > 0) return { kind: 'TREATMENT_SELECTION', passes: usable };
 
+  const blockedButValid =
+    input.memberships.some(
+      (m) => blocked(m) && m.status === MembershipStatus.ACTIVE,
+    ) ||
+    input.passes.some(
+      (p) => blocked(p) && getPassStatus(p, now) === PassStatus.ACTIVE,
+    );
+  if (blockedButValid) return { kind: 'DENIED', reason: 'WOMEN_ONLY' };
+
   const today = toStudioDayKey(now);
-  const hasFrozenPass = input.passes.some(
+  const hasFrozenPass = passes.some(
     (p) =>
       p.isFrozen &&
       isPassOpen(p, p.remainingPasses) &&
       today <= toStudioDayKey(p.expirationDate),
   );
   if (hasFrozenPass) return { kind: 'DENIED', reason: 'PASS_FROZEN' };
-  if (input.memberships.some((m) => m.status === MembershipStatus.PAUSED)) {
+  if (memberships.some((m) => m.status === MembershipStatus.PAUSED)) {
     return { kind: 'DENIED', reason: 'MEMBERSHIP_PAUSED' };
   }
   return { kind: 'DENIED', reason: 'NO_VALID_PASS' };

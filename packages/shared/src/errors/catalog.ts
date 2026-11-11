@@ -63,11 +63,13 @@ export const APP_ERROR_CATALOG = {
   'PASS.USAGE_NOT_FOUND': { status: 404, message: 'A kezelési levonás nem található.', action: 'notify' },
   'PASS.USAGE_ALREADY_REVERSED': { status: 400, message: 'Ez a levonás már korábban vissza lett vonva.', action: 'notify' },
   'PASS.USAGE_NOT_REVERSIBLE': { status: 400, message: 'Csak alkalomlevonási tétel vonható vissza.', action: 'notify' },
+  'PASS.WOMEN_ONLY': { status: 400, message: 'Ez a bérlet vagy tagság csak nőknek szól, férfi vendégnek nem adható el.', action: 'notify' },
 
   // Beléptetés
   'CHECKIN.GUEST_NOT_FOUND': { status: 400, message: 'Nem található aktív vendég a megadott vonalkóddal.', action: 'notify' },
   'CHECKIN.BALANCE_CHANGED': { status: 409, message: 'A bérlet egyenlege időközben módosult. Kérjük, próbáld újra!', action: 'reload' },
   'CHECKIN.NOT_FOUND': { status: 404, message: 'A beléptetési naplóbejegyzés nem található.', action: 'notify' },
+  'CHECKIN.WOMEN_ONLY': { status: 400, message: 'Ez a szolgáltatás csak nőknek szól, férfi vendég nem léptethető be vele.', action: 'notify' },
   'CHECKIN.NOT_REVOCABLE': { status: 400, message: 'Ez a beléptetés már sztornózva van, vagy nem sikeres beléptetés, ezért nem sztornózható.', action: 'notify' },
 
   // Havi tagság

@@ -10,6 +10,7 @@ import {
   DEFAULT_STUDIO_ID,
   EXPIRING_SOON_THRESHOLD_DAYS,
   frozenDaysBetween,
+  greetingFields,
   isBirthdayToday,
   getPassStatus,
   isPassFreezable,
@@ -22,6 +23,7 @@ import {
   PassUsageLogDto,
   ServiceCategory,
   ServiceDto,
+  womenOnlyAccess,
 } from '@reform/shared';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MonitorGateway } from '../monitor/monitor.gateway';
@@ -69,6 +71,7 @@ export class PassesService {
       category: s.category as unknown as ServiceCategory,
       durationMinutes: s.durationMinutes,
       priceHuf: s.priceHuf,
+      womenOnly: s.womenOnly,
       isActive: s.isActive,
       createdAt: s.createdAt.toISOString(),
     }));
@@ -85,6 +88,7 @@ export class PassesService {
         category: dto.category,
         durationMinutes: dto.durationMinutes,
         priceHuf: dto.priceHuf,
+        womenOnly: dto.womenOnly ?? false,
       },
     });
 
@@ -95,6 +99,7 @@ export class PassesService {
       category: created.category as unknown as ServiceCategory,
       durationMinutes: created.durationMinutes,
       priceHuf: created.priceHuf,
+      womenOnly: created.womenOnly,
       isActive: created.isActive,
       createdAt: created.createdAt.toISOString(),
     };
@@ -118,6 +123,7 @@ export class PassesService {
       studioId: t.studioId,
       serviceId: t.serviceId,
       serviceName: t.service?.name ?? null,
+      womenOnly: t.service?.womenOnly ?? false,
       name: t.name,
       type: t.type as unknown as PassType,
       totalPasses: t.totalPasses,
@@ -155,6 +161,7 @@ export class PassesService {
       studioId: created.studioId,
       serviceId: created.serviceId,
       serviceName: created.service?.name ?? null,
+      womenOnly: created.service?.womenOnly ?? false,
       name: created.name,
       type: created.type as unknown as PassType,
       totalPasses: created.totalPasses,
@@ -195,6 +202,7 @@ export class PassesService {
       studioId: updated.studioId,
       serviceId: updated.serviceId,
       serviceName: updated.service?.name ?? null,
+      womenOnly: updated.service?.womenOnly ?? false,
       name: updated.name,
       type: updated.type as unknown as PassType,
       totalPasses: updated.totalPasses,
@@ -228,6 +236,12 @@ export class PassesService {
         throw appError('PASS.TEMPLATE_NOT_FOUND', {
           message: 'A kiválasztott bérletsablon nem található vagy inaktív.',
         });
+      }
+      // Csak nőknek szóló bérlet férfi vendégnek nem adható el (TICKET-42).
+      if (
+        womenOnlyAccess(guest.gender, template.service?.womenOnly) === 'DENIED'
+      ) {
+        throw appError('PASS.WOMEN_ONLY');
       }
 
       const startDate = dto.startDate ? new Date(dto.startDate) : new Date();
@@ -334,6 +348,8 @@ export class PassesService {
             serviceName:
               existingOp.service?.name ??
               existingOp.guestPass.passTemplate.name,
+            // A korábbi levonás szolgáltatásának üdvözlése (TICKET-43).
+            ...greetingFields(existingOp.service),
             passName: existingOp.guestPass.passTemplate.name,
             passType: existingOp.guestPass.type as unknown as PassType,
             remainingPasses:
@@ -361,7 +377,11 @@ export class PassesService {
 
       const pass = await tx.guestPass.findFirst({
         where: { id: dto.passId, guestId: guest.id, studioId },
-        include: { passTemplate: true, usageLogs: true },
+        include: {
+          passTemplate: { include: { service: true } },
+          service: true,
+          usageLogs: true,
+        },
       });
       if (!pass) {
         throw appError('PASS.NOT_FOUND', {
@@ -389,6 +409,14 @@ export class PassesService {
       ) {
         throw appError('PASS.SERVICE_MISMATCH');
       }
+
+      // Csak nőknek szóló kezelés vagy bérlet: férfi vendég nem léptethető be vele (TICKET-42).
+      const womenOnly = womenOnlyAccess(
+        guest.gender,
+        service.womenOnly ||
+          !!(pass.service ?? pass.passTemplate.service)?.womenOnly,
+      );
+      if (womenOnly === 'DENIED') throw appError('CHECKIN.WOMEN_ONLY');
 
       const remaining = computeRemainingPasses(
         pass.totalPasses,
@@ -422,6 +450,7 @@ export class PassesService {
       );
 
       const warnings: CheckInWarningCode[] = [];
+      if (womenOnly === 'GENDER_MISSING') warnings.push('GENDER_MISSING');
       if (pass.type === 'OCCASION_BASED' && typeof newRemaining === 'number') {
         if (newRemaining === 0) {
           warnings.push('DEPLETED_PASS');
@@ -449,6 +478,8 @@ export class PassesService {
         barcode: guest.barcode,
         guestName: `${guest.lastName} ${guest.firstName}`,
         serviceName,
+        // A monitor a kezelés kategóriájához illő szöveggel köszön (TICKET-43).
+        ...greetingFields(service),
         passName: pass.passTemplate.name,
         passType: pass.type as unknown as PassType,
         remainingPasses: newRemaining,

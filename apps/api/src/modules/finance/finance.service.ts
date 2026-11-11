@@ -20,9 +20,11 @@ import {
   OverdueSummaryItemDto,
   PaymentDto,
   PaymentMethod,
+  pickCircuitMembershipService,
   RecordPaymentRequestDto,
   stopsBilling,
   TodayDashboardDto,
+  womenOnlyAccess,
 } from '@reform/shared';
 import { PrismaService } from '../../prisma/prisma.service';
 
@@ -375,12 +377,41 @@ export class FinanceService {
   async createMembership(
     dto: {
       guestId: string;
+      serviceId?: string;
       monthlyFeeHuf: number;
       startDate?: string;
       dueDay?: number;
     },
     studioId = DEFAULT_STUDIO_ID,
   ): Promise<MembershipDto> {
+    const guest = await this.prisma.guest.findFirst({
+      where: { id: dto.guestId, studioId },
+    });
+    if (!guest) throw appError('GUEST.NOT_FOUND');
+
+    // A havi tagság a köredzés szolgáltatáshoz kötődik (TICKET-42), így a csak nőknek szóló
+    // korlátozás rá is vonatkozik: férfi vendégnek nem adható el.
+    const service = dto.serviceId
+      ? await this.prisma.service.findFirst({
+          where: { id: dto.serviceId, studioId },
+        })
+      : pickCircuitMembershipService(
+          await this.prisma.service.findMany({
+            where: { studioId, category: 'CIRCUIT' },
+          }),
+        );
+    if (dto.serviceId && !service) {
+      throw appError('COMMON.NOT_FOUND', {
+        message: 'A tagsághoz kiválasztott szolgáltatás nem található.',
+      });
+    }
+    if (womenOnlyAccess(guest.gender, service?.womenOnly) === 'DENIED') {
+      throw appError('PASS.WOMEN_ONLY', {
+        message:
+          'A köredzés tagság csak nőknek szól, férfi vendégnek nem adható el.',
+      });
+    }
+
     const start = dto.startDate ? new Date(dto.startDate) : new Date();
     const dueDay = dto.dueDay ?? 10;
     const schedule = getMembershipDueSchedule(
@@ -393,6 +424,7 @@ export class FinanceService {
       data: {
         studioId,
         guestId: dto.guestId,
+        serviceId: service?.id ?? null,
         monthlyFeeHuf: dto.monthlyFeeHuf,
         startDate: start,
         dueDay,
@@ -407,7 +439,7 @@ export class FinanceService {
           })),
         },
       },
-      include: { dues: true, guest: true },
+      include: { dues: true, guest: true, service: true },
     });
 
     return this.mapMembership(created);
@@ -465,7 +497,7 @@ export class FinanceService {
 
       return tx.membership.findUniqueOrThrow({
         where: { id: membershipId },
-        include: { dues: true, guest: true },
+        include: { dues: true, guest: true, service: true },
       });
     });
 
@@ -829,6 +861,8 @@ export class FinanceService {
       studioId: m.studioId,
       guestId: m.guestId,
       guestName: m.guest ? `${m.guest.lastName} ${m.guest.firstName}` : undefined,
+      serviceId: m.serviceId ?? null,
+      serviceName: m.service?.name ?? null,
       monthlyFeeHuf: m.monthlyFeeHuf,
       startDate: m.startDate.toISOString(),
       dueDay: m.dueDay,

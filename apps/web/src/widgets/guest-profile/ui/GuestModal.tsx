@@ -1,12 +1,17 @@
 import {
   DocumentStatus,
   DocumentType,
+  Gender,
+  GENDER_LABELS,
   GuestDto,
+  inferGenderFromFirstName,
   isPassFreezable,
   MembershipDueStatus,
   MembershipStatus,
   PaymentMethod,
+  pickCircuitMembershipService,
   ServiceDto,
+  womenOnlyAccess,
 } from '@reform/shared';
 import {
   ArrowLeft,
@@ -32,6 +37,8 @@ import { handleAppError } from '@/shared/lib/errors';
 import { notify } from '@/shared/lib/notify';
 import { cn } from '@/shared/lib/utils';
 import {
+  Alert,
+  AlertDescription,
   AlertDialog,
   AlertDialogAction,
   AlertDialogBody,
@@ -61,6 +68,8 @@ import {
   ToggleGroup,
   ToggleGroupItem,
 } from '@/shared/ui';
+import { arrivalsForPass } from '../model/arrivals';
+import { GuestArrivalsSection, PassArrivals } from './GuestArrivals';
 
 const DUE_STATUS_LABEL: Record<MembershipDueStatus, string> = {
   [MembershipDueStatus.PENDING]: 'függőben',
@@ -91,10 +100,13 @@ const DOCUMENT_TYPE_OPTIONS: { value: DocumentType; label: string }[] = [
 const formatDateTime = (iso: string) => new Date(iso).toLocaleString('hu-HU');
 const formatDate = (iso: string) => new Date(iso).toLocaleDateString('hu-HU');
 
+const GENDER_OPTIONS = [Gender.FEMALE, Gender.MALE, Gender.UNSPECIFIED];
+
 type GuestSheetTab =
   | 'overview'
   | 'memberships'
   | 'passes'
+  | 'arrivals'
   | 'treatments'
   | 'payments'
   | 'measurements'
@@ -244,6 +256,7 @@ interface GuestModalProps {
     phone?: string;
     birthDate?: string | null;
     nameDay?: string | null;
+    gender: Gender;
     notes?: string;
   }) => void;
   onExtendPass?: (passId: string, additionalDays: number, note: string) => void;
@@ -280,6 +293,10 @@ export const GuestModal: React.FC<GuestModalProps> = ({
   const [email, setEmail] = useState('');
   const [birthDate, setBirthDate] = useState('');
   const [nameDay, setNameDay] = useState('');
+  // Új vendégnél kötelező; a keresztnévből előtöltjük, amíg a recepciós kézzel nem választ.
+  const [gender, setGender] = useState<Gender | ''>('');
+  const [genderPicked, setGenderPicked] = useState(false);
+  const [showGenderError, setShowGenderError] = useState(false);
   const [notes, setNotes] = useState('');
 
   // Internal Note state
@@ -355,6 +372,7 @@ export const GuestModal: React.FC<GuestModalProps> = ({
       setEmail(guest.email ?? '');
       setBirthDate(guest.birthDate ?? '');
       setNameDay(guest.nameDay ?? '');
+      setGender(guest.gender);
       setNotes(guest.notes ?? '');
       setPhotoServiceId(services[0]?.id ?? '');
     } else {
@@ -365,8 +383,11 @@ export const GuestModal: React.FC<GuestModalProps> = ({
       setEmail('');
       setBirthDate('');
       setNameDay('');
+      setGender('');
       setNotes('');
     }
+    setGenderPicked(false);
+    setShowGenderError(false);
   }, [isOpen, guest?.id]);
 
   if (!isOpen) return null;
@@ -374,6 +395,10 @@ export const GuestModal: React.FC<GuestModalProps> = ({
   const handleSubmitBasic = (e: React.FormEvent) => {
     e.preventDefault();
     if (!lastName.trim() || !firstName.trim()) return;
+    if (!gender) {
+      setShowGenderError(true);
+      return;
+    }
     onSaveGuest({
       id: guest?.id,
       lastName: lastName.trim(),
@@ -383,9 +408,25 @@ export const GuestModal: React.FC<GuestModalProps> = ({
       email: email.trim() || undefined,
       birthDate: birthDate.trim() || null,
       nameDay: nameDay.trim() || null,
+      gender,
       notes: notes.trim() || undefined,
     });
   };
+
+  const handleFirstNameChange = (value: string) => {
+    setFirstName(value);
+    if (guest || genderPicked) return;
+    const inferred = inferGenderFromFirstName(value);
+    setGender(inferred === Gender.UNSPECIFIED ? '' : inferred);
+  };
+
+  // A havi tagság a stúdió köredzés szolgáltatásához kötődik; ha az csak nőknek szól,
+  // férfi vendégnek nem adható el (TICKET-42, a szerver is ellenőrzi).
+  const membershipService = pickCircuitMembershipService(services);
+  const membershipAccess = womenOnlyAccess(
+    guest?.gender,
+    membershipService?.womenOnly,
+  );
 
   const handleAddInternalNote = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -398,12 +439,18 @@ export const GuestModal: React.FC<GuestModalProps> = ({
 
   const handleCreateMembership = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!guest) return;
-    await api.createMembership({
-      guestId: guest.id,
-      monthlyFeeHuf: newMembFee,
-      dueDay: newMembDueDay,
-    });
+    if (!guest || membershipAccess === 'DENIED') return;
+    try {
+      await api.createMembership({
+        guestId: guest.id,
+        serviceId: membershipService?.id,
+        monthlyFeeHuf: newMembFee,
+        dueDay: newMembDueDay,
+      });
+    } catch (err) {
+      handleAppError(err, { title: 'A tagság nem jött létre' });
+      return;
+    }
     notify.success(
       'Új havi tagság és aktuális havi esedékesség létrehozva.',
       `${newMembTitle} (${newMembFee.toLocaleString('hu-HU')} Ft/hó)`,
@@ -556,6 +603,11 @@ export const GuestModal: React.FC<GuestModalProps> = ({
       count: guest?.memberships?.length ?? 0,
     },
     { id: 'passes', label: 'Bérletek', count: guest?.passes?.length ?? 0 },
+    {
+      id: 'arrivals',
+      label: 'Belépések',
+      count: guest?.arrivals?.length ?? 0,
+    },
     {
       id: 'treatments',
       label: 'Kezelések',
@@ -736,7 +788,15 @@ export const GuestModal: React.FC<GuestModalProps> = ({
         {activeTab === 'overview' && (
           <div className="space-y-6">
             <form onSubmit={handleSubmitBasic} className="space-y-3.5">
-              <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-3">
+              {guest?.gender === Gender.UNSPECIFIED && (
+                <Alert>
+                  <AlertDescription>
+                    A vendég neme nincs megadva. Pótold, mert a csak nőknek
+                    szóló szolgáltatásokhoz (női köredzés) szükséges.
+                  </AlertDescription>
+                </Alert>
+              )}
+              <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
                 <Field id={id('lastName')} label="Vezetéknév *">
                   <Input
                     id={id('lastName')}
@@ -752,10 +812,61 @@ export const GuestModal: React.FC<GuestModalProps> = ({
                     id={id('firstName')}
                     required
                     value={firstName}
-                    onChange={(e) => setFirstName(e.target.value)}
+                    onChange={(e) => handleFirstNameChange(e.target.value)}
                     placeholder="Pl. Anna"
                     autoComplete="given-name"
                   />
+                </Field>
+                <Field id={id('gender')} label={guest ? 'Nem' : 'Nem *'}>
+                  <Select
+                    value={gender}
+                    onValueChange={(value) => {
+                      setGender(value as Gender);
+                      setGenderPicked(true);
+                      setShowGenderError(false);
+                    }}
+                  >
+                    <SelectTrigger
+                      id={id('gender')}
+                      aria-invalid={showGenderError && !gender}
+                      aria-describedby={
+                        showGenderError && !gender
+                          ? id('gender-error')
+                          : !guest && gender && !genderPicked
+                            ? id('gender-hint')
+                            : undefined
+                      }
+                    >
+                      <SelectValue placeholder="Válassz" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {GENDER_OPTIONS.map((value) => (
+                        <SelectItem key={value} value={value}>
+                          {GENDER_LABELS[value]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {showGenderError && !gender ? (
+                    <p
+                      id={id('gender-error')}
+                      role="alert"
+                      className="text-xs text-destructive"
+                    >
+                      Add meg a vendég nemét.
+                    </p>
+                  ) : (
+                    !guest &&
+                    gender &&
+                    !genderPicked && (
+                      <p
+                        id={id('gender-hint')}
+                        className="text-xs text-muted-foreground"
+                      >
+                        A keresztnév alapján előtöltve.
+                      </p>
+                    )
+                  )}
                 </Field>
                 <Field id={id('barcode')} label="Vonalkód / kártyaszám">
                   <Input
@@ -887,6 +998,22 @@ export const GuestModal: React.FC<GuestModalProps> = ({
               className="space-y-3.5 rounded-lg border border-border p-4"
             >
               <SectionTitle>Új havi tagság</SectionTitle>
+              {membershipAccess === 'DENIED' && (
+                <Alert variant="destructive">
+                  <AlertDescription>
+                    A köredzés tagság csak nőknek szól, férfi vendégnek nem
+                    adható el.
+                  </AlertDescription>
+                </Alert>
+              )}
+              {membershipAccess === 'GENDER_MISSING' && (
+                <Alert>
+                  <AlertDescription>
+                    A köredzés csak nőknek szól, de a vendég neme nincs
+                    megadva. Pótold az Áttekintés fülön.
+                  </AlertDescription>
+                </Alert>
+              )}
               <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-4">
                 <Field
                   id={id('membTitle')}
@@ -921,7 +1048,11 @@ export const GuestModal: React.FC<GuestModalProps> = ({
                 </Field>
               </div>
               <div className="flex justify-end">
-                <Button type="submit" variant="primary">
+                <Button
+                  type="submit"
+                  variant="primary"
+                  disabled={membershipAccess === 'DENIED'}
+                >
                   Tagság létrehozása
                 </Button>
               </div>
@@ -1104,6 +1235,13 @@ export const GuestModal: React.FC<GuestModalProps> = ({
                       </Button>
                     )}
                   </div>
+
+                  <div className="basis-full">
+                    <PassArrivals
+                      arrivals={arrivalsForPass(guest.arrivals, pass.id)}
+                      passName={passName}
+                    />
+                  </div>
                 </div>
               );
             })}
@@ -1142,6 +1280,11 @@ export const GuestModal: React.FC<GuestModalProps> = ({
               </section>
             )}
           </div>
+        )}
+
+        {/* BELÉPÉSEK (TICKET-40) */}
+        {guest && activeTab === 'arrivals' && (
+          <GuestArrivalsSection arrivals={guest.arrivals ?? []} />
         )}
 
         {/* KEZELÉSI ELŐZMÉNYEK ÉS VISSZAVONÁS */}

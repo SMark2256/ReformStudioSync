@@ -6,6 +6,7 @@ import {
   DEFAULT_STUDIO_ID,
   DocumentStatus,
   DocumentType,
+  Gender,
   GuestDocumentDto,
   getPassStatus,
   GuestDto,
@@ -13,6 +14,7 @@ import {
   GuestPassDto,
   GuestPhotoDto,
   GuestStatus,
+  GUEST_ARRIVALS_LIMIT,
   getOverdueBucket,
   getOverdueDays,
   MeasurementDto,
@@ -23,6 +25,7 @@ import {
   PassType,
   PaymentMethod,
   Role,
+  toGuestArrivals,
 } from '@reform/shared';
 import { randomInt } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -71,6 +74,7 @@ export class GuestsService {
       },
       memberships: {
         include: {
+          service: true,
           dues: { orderBy: { dueDate: 'desc' as const } },
         },
         orderBy: { createdAt: 'desc' as const },
@@ -105,6 +109,19 @@ export class GuestsService {
       },
       messageLogs: {
         orderBy: { sentAt: 'desc' as const },
+      },
+      // Belépések (TICKET-40): a dupla beolvasás nem belépés.
+      checkIns: {
+        where: { status: { not: 'DUPLICATE_SCAN' as const } },
+        include: {
+          user: true,
+          guestPass: {
+            include: { passTemplate: { include: { service: true } }, service: true },
+          },
+          passUsage: { include: { service: true } },
+        },
+        orderBy: { createdAt: 'desc' as const },
+        take: GUEST_ARRIVALS_LIMIT,
       },
     };
   }
@@ -190,6 +207,7 @@ export class GuestsService {
         phone: dto.phone?.trim() || null,
         birthDate: dto.birthDate ? new Date(dto.birthDate) : null,
         nameDay: dto.nameDay?.trim() || null,
+        gender: dto.gender,
         status: dto.status ?? GuestStatus.ACTIVE,
         notes: dto.notes?.trim() || null,
       },
@@ -243,6 +261,7 @@ export class GuestsService {
         ...(dto.nameDay !== undefined
           ? { nameDay: dto.nameDay?.trim() || null }
           : {}),
+        ...(dto.gender !== undefined ? { gender: dto.gender } : {}),
         ...(dto.status !== undefined ? { status: dto.status } : {}),
         ...(dto.notes !== undefined ? { notes: dto.notes?.trim() || null } : {}),
       },
@@ -585,6 +604,7 @@ export class GuestsService {
       phone: g.phone,
       birthDate: g.birthDate ? g.birthDate.toISOString().slice(0, 10) : null,
       nameDay: g.nameDay ?? null,
+      gender: (g.gender as Gender) ?? Gender.UNSPECIFIED,
       status: (g.status as GuestStatus) ?? GuestStatus.ACTIVE,
       notes: g.notes,
       isActive: g.isActive,
@@ -592,6 +612,24 @@ export class GuestsService {
       updatedAt: g.updatedAt.toISOString(),
       passes,
       treatmentHistory,
+      arrivals: toGuestArrivals(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (g.checkIns ?? []).map((c: any) => ({
+          id: c.id,
+          createdAt: c.createdAt,
+          visitType: c.visitType,
+          status: c.status,
+          reason: c.reason ?? null,
+          guestPassId: c.guestPassId ?? null,
+          passName: c.guestPass?.passTemplate?.name ?? null,
+          usageServiceName: c.passUsage?.service?.name ?? null,
+          passServiceName:
+            c.guestPass?.service?.name ??
+            c.guestPass?.passTemplate?.service?.name ??
+            null,
+          staffName: c.user?.name ?? null,
+        })),
+      ),
       memberships: (g.memberships ?? []).map(
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (m: any) => ({
@@ -599,6 +637,8 @@ export class GuestsService {
           studioId: m.studioId,
           guestId: m.guestId,
           guestName: guestFullName,
+          serviceId: m.serviceId ?? null,
+          serviceName: m.service?.name ?? null,
           monthlyFeeHuf: m.monthlyFeeHuf,
           startDate: m.startDate.toISOString(),
           dueDay: m.dueDay,

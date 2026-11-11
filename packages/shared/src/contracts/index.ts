@@ -2,6 +2,7 @@ import {
   CheckInStatus,
   DocumentStatus,
   DocumentType,
+  Gender,
   GuestStatus,
   MembershipDueStatus,
   MembershipStatus,
@@ -58,6 +59,8 @@ export interface ServiceDto {
   category: ServiceCategory;
   durationMinutes: number;
   priceHuf: number;
+  /** Csak nőknek szól (pl. női köredzés): férfi vendégnek nem adható el, vele nem léptethető be. */
+  womenOnly: boolean;
   isActive: boolean;
   createdAt: string;
 }
@@ -67,6 +70,8 @@ export interface PassTemplateDto {
   studioId: string;
   serviceId?: string | null;
   serviceName?: string | null;
+  /** A sablon szolgáltatása csak nőknek szól (`ServiceDto.womenOnly`). */
+  womenOnly?: boolean;
   name: string;
   type: PassType;
   totalPasses: number | null;
@@ -144,6 +149,9 @@ export interface MembershipDto {
   studioId: string;
   guestId: string;
   guestName?: string;
+  /** A tagság szolgáltatása (a stúdió köredzése); a csak nőknek szóló korlátozás innen jön. */
+  serviceId?: string | null;
+  serviceName?: string | null;
   monthlyFeeHuf: number;
   startDate: string;
   dueDay: number;
@@ -277,6 +285,33 @@ export interface AuditLogDto {
   details: string;
 }
 
+/** A vendégadatlapon megjelenő belépés állapota: sikeres, sztornózott vagy elutasított. */
+export type GuestArrivalStatus =
+  | CheckInStatus.SUCCESS
+  | CheckInStatus.CANCELLED
+  | CheckInStatus.DENIED;
+
+/**
+ * Egy belépés a vendégadatlapon (TICKET-40): a beléptetési napló (`logged_check_ins`) sora.
+ * A sztornózott belépés látogatása törlődik, a napló sora `CANCELLED` állapotban, a sztornó
+ * okával megmarad; az elutasított beolvasás `DENIED` sor az elutasítás okával.
+ */
+export interface GuestArrivalDto {
+  /** A beléptetés (napló) azonosítója. */
+  id: string;
+  occurredAt: string;
+  visitType: VisitType;
+  /** Kezelésnél a levont szolgáltatás, köredzésnél a bérlet szolgáltatása (ha van). */
+  serviceName: string | null;
+  guestPassId: string | null;
+  /** A bérlet neve; havi tagsággal történt köredzésnél „Havi köredzés tagság”. */
+  passName: string | null;
+  staffName: string;
+  status: GuestArrivalStatus;
+  /** Sztornónál és elutasításnál az ok; sikeres belépésnél nincs. */
+  reason: string | null;
+}
+
 export interface GuestDto {
   id: string;
   studioId: string;
@@ -287,6 +322,7 @@ export interface GuestDto {
   phone: string | null;
   birthDate: string | null;
   nameDay: string | null; // MM-DD format e.g. "07-26"
+  gender: Gender;
   status: GuestStatus;
   notes: string | null;
   isActive: boolean;
@@ -296,6 +332,8 @@ export interface GuestDto {
   memberships?: MembershipDto[];
   treatmentHistory?: PassUsageLogDto[];
   visits?: VisitDto[];
+  /** Belépések (beléptetési napló), legújabb elöl, legfeljebb `GUEST_ARRIVALS_LIMIT` (TICKET-40). */
+  arrivals?: GuestArrivalDto[];
   payments?: PaymentDto[];
   measurements?: MeasurementDto[];
   photos?: GuestPhotoDto[];

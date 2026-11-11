@@ -1,4 +1,5 @@
 import {
+  ARRIVAL_DENIED_MESSAGES,
   CheckInStatus,
   DUPLICATE_SCAN_COOLDOWN_SECONDS,
   PassType,
@@ -808,6 +809,307 @@ describe('CheckInsService — Kritikus Beléptetési és Köredzés vs. Kezelés
       expect(txMock.loggedCheckIn.create).not.toHaveBeenCalled();
       expect(txMock.visit.create).not.toHaveBeenCalled();
       expect(monitorGatewayMock.emitCheckInResult).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('TICKET-42 — csak nőknek szóló köredzés a beolvasásnál', () => {
+    const circuitService = {
+      id: 'srv-circuit',
+      name: 'Női Köredzés (Havi Tagság)',
+      category: 'CIRCUIT',
+      womenOnly: true,
+    };
+    const membership = (over: Record<string, unknown> = {}) => ({
+      id: 'mem-1',
+      status: 'ACTIVE',
+      monthlyFeeHuf: 22000,
+      serviceId: 'srv-circuit',
+      service: circuitService,
+      dues: [],
+      ...over,
+    });
+    const circuitPass = (over: Record<string, unknown> = {}) => ({
+      id: 'pass-circuit',
+      passTemplateId: 'tpl-unlimited',
+      serviceId: 'srv-circuit',
+      service: circuitService,
+      type: 'TIME_BASED',
+      totalPasses: null,
+      remainingPasses: null,
+      startDate: pastDate(5),
+      expirationDate: futureDate(25),
+      isActive: true,
+      isFrozen: false,
+      frozenAt: null,
+      cancelledAt: null,
+      passTemplate: { name: 'Havi Korlátlan Köredzés Bérlet' },
+      ...over,
+    });
+    const reformerPass = {
+      ...circuitPass(),
+      id: 'pass-reformer',
+      passTemplateId: 'tpl-10',
+      serviceId: 'srv-reformer',
+      service: {
+        id: 'srv-reformer',
+        name: 'Reformer Pilates',
+        category: 'BODY_SHAPING',
+        womenOnly: false,
+      },
+      type: 'OCCASION_BASED',
+      totalPasses: 10,
+      remainingPasses: 4,
+      passTemplate: { name: '10 Alkalmas Reformer Bérlet' },
+    };
+    const guestWith = (
+      gender: string,
+      memberships: unknown[],
+      passes: unknown[] = [],
+    ) => ({
+      id: 'guest-x',
+      firstName: gender === 'MALE' ? 'Péter' : 'Anna',
+      lastName: 'Teszt',
+      barcode: '100099',
+      gender,
+      isActive: true,
+      memberships,
+      passes,
+    });
+
+    it('női vendég köredzés tagsággal: belép, figyelmeztetés nélkül', async () => {
+      txMock.guest.findUnique.mockResolvedValue(guestWith('FEMALE', [membership()]));
+
+      const res = await service.processBarcodeCheckIn({ barcode: '100099' }, 'staff-1');
+
+      expect(res.status).toBe(CheckInStatus.SUCCESS);
+      expect(res.mode).toBe('CIRCUIT_GREETING');
+      expect(res.warnings).not.toContain('GENDER_MISSING');
+    });
+
+    it('férfi vendég csak nőknek szóló tagsággal: elutasítás WOMEN_ONLY okkal, nincs belépés', async () => {
+      txMock.guest.findUnique.mockResolvedValue(guestWith('MALE', [membership()]));
+
+      const res = await service.processBarcodeCheckIn({ barcode: '100099' }, 'staff-1');
+
+      expect(res.status).toBe(CheckInStatus.DENIED);
+      expect(res.reason).toBe(ARRIVAL_DENIED_MESSAGES.WOMEN_ONLY);
+      expect(txMock.visit.create).not.toHaveBeenCalled();
+      expect(txMock.loggedCheckIn.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ status: 'DENIED' }) }),
+      );
+    });
+
+    it('férfi vendég köredzés bérlettel: elutasítás WOMEN_ONLY okkal', async () => {
+      txMock.guest.findUnique.mockResolvedValue(guestWith('MALE', [], [circuitPass()]));
+
+      const res = await service.processBarcodeCheckIn({ barcode: '100099' }, 'staff-1');
+
+      expect(res.status).toBe(CheckInStatus.DENIED);
+      expect(res.reason).toBe(ARRIVAL_DENIED_MESSAGES.WOMEN_ONLY);
+    });
+
+    it('férfi vendég köredzés tagsággal és Reformer bérlettel: a kezelésválasztó csak a Reformer bérletet kínálja', async () => {
+      txMock.guest.findUnique.mockResolvedValue(
+        guestWith('MALE', [membership()], [circuitPass(), reformerPass]),
+      );
+
+      const res = await service.processBarcodeCheckIn({ barcode: '100099' }, 'staff-1');
+
+      expect(res.status).toBe(CheckInStatus.TREATMENT_SELECTION_REQUIRED);
+      expect(res.treatmentOptions?.map((o) => o.passId)).toEqual(['pass-reformer']);
+    });
+
+    it('nincs megadva nemnél belép, de a recepció GENDER_MISSING figyelmeztetést kap', async () => {
+      txMock.guest.findUnique.mockResolvedValue(guestWith('UNSPECIFIED', [membership()]));
+
+      const res = await service.processBarcodeCheckIn({ barcode: '100099' }, 'staff-1');
+
+      expect(res.status).toBe(CheckInStatus.SUCCESS);
+      expect(res.warnings).toContain('GENDER_MISSING');
+    });
+  });
+  describe('TICKET-43 — a szolgáltatáshoz illő üdvözlés', () => {
+    const circuitService = {
+      id: 'srv-circuit',
+      name: 'Női Köredzés (Havi Tagság)',
+      category: 'CIRCUIT',
+      womenOnly: true,
+    };
+    const facialService = {
+      id: 'srv-facial',
+      name: 'Hialuronos Arckezelés',
+      category: 'COSMETIC',
+      womenOnly: false,
+    };
+    const membership = {
+      id: 'mem-1',
+      status: 'ACTIVE',
+      monthlyFeeHuf: 22000,
+      serviceId: 'srv-circuit',
+      service: circuitService,
+      dues: [],
+    };
+    const circuitPass = {
+      id: 'pass-circuit',
+      passTemplateId: 'tpl-unlimited',
+      serviceId: 'srv-circuit',
+      service: circuitService,
+      type: 'TIME_BASED',
+      totalPasses: null,
+      remainingPasses: null,
+      startDate: pastDate(5),
+      expirationDate: futureDate(25),
+      isActive: true,
+      isFrozen: false,
+      frozenAt: null,
+      cancelledAt: null,
+      passTemplate: { name: 'Havi Korlátlan Köredzés Bérlet' },
+    };
+    const facialPass = {
+      ...circuitPass,
+      id: 'pass-facial',
+      passTemplateId: 'tpl-facial-5',
+      serviceId: 'srv-facial',
+      service: facialService,
+      type: 'OCCASION_BASED',
+      totalPasses: 5,
+      remainingPasses: 3,
+      passTemplate: { name: '5 Alkalmas Prémium Kozmetikai Bérlet' },
+    };
+    const guestWith = (memberships: unknown[], passes: unknown[] = []) => ({
+      id: 'guest-anna',
+      firstName: 'Anna',
+      lastName: 'Kovács',
+      barcode: '100001',
+      gender: 'FEMALE',
+      isActive: true,
+      memberships,
+      passes,
+    });
+
+    it('tagsággal: a tagság szolgáltatásának kategóriája, neve és womenOnly jelzése megy a monitorra', async () => {
+      txMock.guest.findUnique.mockResolvedValue(guestWith([membership]));
+
+      const res = await service.processBarcodeCheckIn({ barcode: '100001' }, 'staff-1');
+
+      expect(res).toMatchObject({
+        status: CheckInStatus.SUCCESS,
+        mode: 'CIRCUIT_GREETING',
+        serviceName: 'Női Köredzés (Havi Tagság)',
+        serviceCategory: 'CIRCUIT',
+        womenOnly: true,
+      });
+      expect(monitorGatewayMock.emitCheckInResult).toHaveBeenCalledWith(
+        expect.objectContaining({ serviceCategory: 'CIRCUIT', womenOnly: true }),
+        'default-studio',
+      );
+    });
+
+    it('időalapú bérlettel: a bérlet valódi szolgáltatásneve, nem égetett „Köredzés”', async () => {
+      txMock.guest.findUnique.mockResolvedValue(guestWith([], [circuitPass]));
+
+      const res = await service.processBarcodeCheckIn({ barcode: '100001' }, 'staff-1');
+
+      expect(res).toMatchObject({
+        status: CheckInStatus.SUCCESS,
+        mode: 'CIRCUIT_GREETING',
+        serviceName: 'Női Köredzés (Havi Tagság)',
+        serviceCategory: 'CIRCUIT',
+        womenOnly: true,
+      });
+    });
+
+    it('szolgáltatás nélküli időalapú bérlettel: köredzés, „Női” jelzés nélkül', async () => {
+      txMock.guest.findUnique.mockResolvedValue(
+        guestWith([], [{ ...circuitPass, serviceId: null, service: null }]),
+      );
+
+      const res = await service.processBarcodeCheckIn({ barcode: '100001' }, 'staff-1');
+
+      expect(res).toMatchObject({
+        serviceName: 'Köredzés',
+        serviceCategory: 'CIRCUIT',
+        womenOnly: false,
+      });
+    });
+
+    it('dupla beolvasás kozmetikai kezelés után: a korábbi belépés kategóriája és szövege, nem CIRCUIT_GREETING', async () => {
+      txMock.guest.findUnique.mockResolvedValue(guestWith([membership], [facialPass]));
+      txMock.loggedCheckIn.findFirst.mockResolvedValue({
+        id: 'recent-treatment',
+        guestId: 'guest-anna',
+        visitType: 'TREATMENT',
+        status: 'SUCCESS',
+        createdAt: new Date(Date.now() - 3 * 1000),
+        guestPass: facialPass,
+        passUsage: { service: facialService },
+      });
+
+      const res = await service.processBarcodeCheckIn({ barcode: '100001' }, 'staff-1');
+
+      expect(res).toMatchObject({
+        status: CheckInStatus.DUPLICATE_SCAN,
+        mode: 'TREATMENT_GREETING',
+        serviceName: 'Hialuronos Arckezelés',
+        serviceCategory: 'COSMETIC',
+        womenOnly: false,
+        remainingPasses: 3,
+      });
+      expect(txMock.loggedCheckIn.create).not.toHaveBeenCalled();
+      expect(monitorGatewayMock.emitCheckInResult).toHaveBeenCalledWith(
+        expect.objectContaining({ mode: 'TREATMENT_GREETING', serviceCategory: 'COSMETIC' }),
+        'default-studio',
+      );
+    });
+
+    it('dupla beolvasás tagsággal történt köredzés után: köredzés a tagság szolgáltatásával', async () => {
+      txMock.guest.findUnique.mockResolvedValue(guestWith([membership], [facialPass]));
+      txMock.loggedCheckIn.findFirst.mockResolvedValue({
+        id: 'recent-circuit',
+        guestId: 'guest-anna',
+        visitType: 'CIRCUIT_TRAINING',
+        status: 'SUCCESS',
+        createdAt: new Date(Date.now() - 3 * 1000),
+        guestPass: null,
+        passUsage: null,
+      });
+
+      const res = await service.processBarcodeCheckIn({ barcode: '100001' }, 'staff-1');
+
+      expect(res).toMatchObject({
+        status: CheckInStatus.DUPLICATE_SCAN,
+        mode: 'CIRCUIT_GREETING',
+        serviceName: 'Női Köredzés (Havi Tagság)',
+        serviceCategory: 'CIRCUIT',
+        womenOnly: true,
+      });
+    });
+
+    it('idempotens visszajátszás: a korábbi belépés kategóriája', async () => {
+      txMock.loggedCheckIn.findUnique.mockResolvedValue({
+        id: 'offline-circuit',
+        visitType: 'CIRCUIT_TRAINING',
+        status: 'SUCCESS',
+        guestId: 'guest-anna',
+        createdAt: new Date(),
+        guest: { ...guestWith([membership]) },
+        guestPass: circuitPass,
+        passUsage: null,
+      });
+
+      const res = await service.processBarcodeCheckIn(
+        { barcode: '100001', idempotencyKey: 'offline-key-43' },
+        'staff-1',
+      );
+
+      expect(res).toMatchObject({
+        checkInId: 'offline-circuit',
+        mode: 'CIRCUIT_GREETING',
+        serviceName: 'Női Köredzés (Havi Tagság)',
+        serviceCategory: 'CIRCUIT',
+        womenOnly: true,
+      });
+      expect(txMock.guest.findUnique).not.toHaveBeenCalled();
     });
   });
 });

@@ -11,8 +11,10 @@ import { api } from '@/shared/api';
 import { notify } from '@/shared/lib/notify';
 import { cn } from '@/shared/lib/utils';
 import {
+  Badge,
   Button,
   Card,
+  Checkbox,
   CardContent,
   CardDescription,
   CardHeader,
@@ -94,7 +96,16 @@ const serviceColumns: ResponsiveTableColumn<ServiceDto>[] = [
   {
     key: 'category',
     header: 'Kategória',
-    cell: (s) => SERVICE_CATEGORY_LABELS[s.category],
+    cell: (s) => (
+      <span className="flex flex-wrap items-center gap-2">
+        {SERVICE_CATEGORY_LABELS[s.category]}
+        {s.womenOnly && (
+          <Badge variant="secondary" dot={false}>
+            Csak nőknek
+          </Badge>
+        )}
+      </span>
+    ),
   },
   {
     key: 'duration',
@@ -281,6 +292,8 @@ const ServicesCard: React.FC<{
   );
   const [duration, setDuration] = useState<number>(30);
   const [price, setPrice] = useState<number>(7500);
+  const [womenOnly, setWomenOnly] = useState(false);
+  const womenOnlyId = useId();
 
   const createServiceMutation = useMutation({
     mutationFn: api.createService,
@@ -290,6 +303,7 @@ const ServicesCard: React.FC<{
         `${srv.name} (${srv.durationMinutes} perc)`,
       );
       setName('');
+      setWomenOnly(false);
       onRefreshAll();
     },
   });
@@ -320,6 +334,7 @@ const ServicesCard: React.FC<{
               category,
               durationMinutes: duration,
               priceHuf: price,
+              womenOnly,
             });
           }}
           className="grid grid-cols-1 gap-3.5 sm:grid-cols-2"
@@ -379,6 +394,29 @@ const ServicesCard: React.FC<{
               />
             )}
           </Field>
+          <div className="flex flex-col gap-1 sm:col-span-2">
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id={womenOnlyId}
+                checked={womenOnly}
+                onCheckedChange={(checked) => setWomenOnly(checked === true)}
+                aria-describedby={`${womenOnlyId}-hint`}
+              />
+              <Label
+                htmlFor={womenOnlyId}
+                className="text-[13px] font-normal text-foreground"
+              >
+                Csak nőknek
+              </Label>
+            </div>
+            <p
+              id={`${womenOnlyId}-hint`}
+              className="text-xs text-muted-foreground"
+            >
+              Férfi vendégnek nem adható el ilyen bérlet vagy tagság, és vele
+              nem léptethető be (pl. női köredzés).
+            </p>
+          </div>
           <div className="flex justify-end sm:col-span-2">
             <Button
               type="submit"

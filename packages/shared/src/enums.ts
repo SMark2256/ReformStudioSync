@@ -42,6 +42,13 @@ export enum GuestStatus {
   PAUSED = 'PAUSED',
 }
 
+/** A vendég neme (TICKET-42); a csak nőknek szóló szolgáltatásokhoz kell. */
+export enum Gender {
+  FEMALE = 'FEMALE',
+  MALE = 'MALE',
+  UNSPECIFIED = 'UNSPECIFIED',
+}
+
 export enum ServiceCategory {
   CIRCUIT = 'CIRCUIT',
   COSMETIC = 'COSMETIC',
@@ -98,7 +105,9 @@ export type CheckInWarningCode =
   | 'OVERDUE_DUES'
   | 'MEMBERSHIP_PAUSED'
   | 'EXPIRED_PASS'
-  | 'DEPLETED_PASS';
+  | 'DEPLETED_PASS'
+  /** Csak nőknek szóló szolgáltatás, de a vendég neme nincs megadva: a recepció pótolja (TICKET-42). */
+  | 'GENDER_MISSING';
 
 export type MonitorEventMode = 'CIRCUIT_GREETING' | 'TREATMENT_GREETING';
 
