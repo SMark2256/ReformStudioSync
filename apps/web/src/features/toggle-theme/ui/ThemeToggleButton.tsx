@@ -1,7 +1,6 @@
 import { Moon, Sun } from 'lucide-react';
 import React from 'react';
-import { notify } from '@/shared/lib/notify';
-import { useThemeStore } from '@/shared/theme';
+import { saveTheme, useThemeStore } from '@/shared/theme';
 import { Button } from '@/shared/ui';
 
 interface ThemeToggleButtonProps {
@@ -11,23 +10,13 @@ interface ThemeToggleButtonProps {
 export const ThemeToggleButton: React.FC<ThemeToggleButtonProps> = ({
   className = '',
 }) => {
-  const { theme, toggleTheme } = useThemeStore();
-
-  const handleToggle = () => {
-    const next = toggleTheme();
-    notify.info(
-      next === 'dark'
-        ? 'Recepciós Sötét mód bekapcsolva'
-        : 'Recepciós Világos mód bekapcsolva',
-      'A Vendégmonitor (/monitor) megjelenése változatlan maradt.',
-    );
-  };
+  const theme = useThemeStore((state) => state.theme);
 
   return (
     <Button
       variant="secondary"
       size="sm"
-      onClick={handleToggle}
+      onClick={() => saveTheme(theme === 'dark' ? 'light' : 'dark')}
       aria-pressed={theme === 'dark'}
       className={className}
     >
