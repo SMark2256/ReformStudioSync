@@ -60,6 +60,11 @@ A szabályokat a [Steiger](https://github.com/feature-sliced/steiger) linter ell
 ### ADR-06: Mock fallback csak demó módban (TICKET-17)
 - A `shared/api/client.ts` `request()` hálózati hibánál csak demó módban (`isDemoMode()`: `VITE_DEMO_MODE=true` build, vagy a `/demo` útvonal) vált a `mock-engine.ts`-re. Élesben `COMMON.NETWORK` hiba és toast jön, így beléptetés, levonás vagy fizetés nem dőlhet el kitalált adaton. Az E2E build `VITE_DEMO_MODE=true`-val fut.
 
+### ADR-07: Havi Tagdíj-Esedékességek Idempotens Pótlása (TICKET-13)
+- **Közös szabály:** `packages/shared/src/membership-dues.ts` tiszta függvényei (`getMembershipDueSchedule`, `getMissingDues`, `getOverdueDays`, `getOverdueBucket`) számolnak a stúdió naptára (`Europe/Budapest`) szerint; az API és a kliensoldali mock motor ugyanezt használja.
+- **Ütemezés:** a folyó hónapig minden hónapnak van esedékessége (hónap elejétől befizethető). Ha a kezdés (vagy az utolsó újraaktiválás, `memberships.resumed_at`) napja későbbi a `dueDay`-nél, az első esedékesség a következő hónapé. Szünet / megszűnés alatt nincs új esedékesség; a leállás napja után esedékes, érintetlen díj törlődik.
+- **Pótlás:** `FinanceService.ensureDuesUpTo(now)` (stúdiószinten) és `ensureDuesForGuest(guestId, now?, tx?)` (vendégszinten, hívó tranzakciójában is). Futás: `MembershipDuesScheduler` indításkor és óránként, az elmaradás-lekérdezéskor, a vendég adatlapján és státuszváltás előtt. Csak a legutóbbi meglévő időszak utáni hónapok jönnek létre, a `@@unique([membershipId, period])` + `skipDuplicates` miatt ismételt futás sem duplikál.
+
 ---
 
 ## 3. REST API Végpontok Összefoglalója
