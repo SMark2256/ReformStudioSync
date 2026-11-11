@@ -63,6 +63,22 @@ export const getJiraIssueUrl = (jiraKey: string): string =>
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    id: 'v0.3-guests-new-ui',
+    version: '0.3',
+    date: '2026-11-11',
+    kind: 'IMPROVEMENT',
+    title: 'Megújult Vendégek oldal és vendégadatlap',
+    summary:
+      'A Vendégek oldal áttekinthető táblázatot kapott: kártyaszám, név, telefon, bérlet, fennmaradó alkalmak, lejárat és állapot egy sorban. Egy sorra kattintva megnyílik a vendég adatlapja.',
+    details: [
+      'Szűrő a lista fölött: Mind, Érvényes, Hamarosan lejár, Lejárt / elfogyott; mellette a találatok száma.',
+      'A kártya, a kezelés levonása és a bérlet eladása a sor végi menüből érhető el.',
+      'A vendégadatlap az új felületi stílust követi, világos és sötét témában is; a levonás visszavonása megerősítést kér.',
+      'Telefonon a táblázat helyett soronként egy kártya látszik.',
+    ],
+    jiraKey: 'TICKET-23',
+  },
+  {
     id: 'v0.3-reception-desk-new-ui',
     version: '0.3',
     date: '2026-11-11',

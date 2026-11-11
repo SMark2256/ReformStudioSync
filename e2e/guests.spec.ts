@@ -4,14 +4,14 @@ import { expect, loginToReception, quickSearchRow, scanBarcode, test, toasts } f
 const NEW_GUEST = { lastName: 'Teszt', firstName: 'Elek', barcode: '200001' };
 const NEW_GUEST_NAME = `${NEW_GUEST.lastName} ${NEW_GUEST.firstName}`;
 
-/** Az „Új Vendég Regisztrálása” űrlap kitöltése és mentése (a recepción és a /demo oldalon azonos). */
+/** Az „Új vendég felvétele” űrlap kitöltése és mentése (a recepción és a /demo oldalon azonos). */
 async function createGuest(page: Page) {
-  await expect(page.getByRole('heading', { name: 'Új Vendég Regisztrálása' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Új vendég felvétele' })).toBeVisible();
   await page.getByPlaceholder('Pl. Kovács').fill(NEW_GUEST.lastName);
   await page.getByPlaceholder('Pl. Anna').fill(NEW_GUEST.firstName);
-  await page.getByPlaceholder('Üres = Automatikus').fill(NEW_GUEST.barcode);
-  await page.getByRole('button', { name: 'Vendég Létrehozása' }).click();
-  await expect(page.getByRole('heading', { name: 'Új Vendég Regisztrálása' })).toBeHidden();
+  await page.getByPlaceholder('Üresen hagyva automatikus').fill(NEW_GUEST.barcode);
+  await page.getByRole('button', { name: 'Vendég létrehozása' }).click();
+  await expect(page.getByRole('heading', { name: 'Új vendég felvétele' })).toBeHidden();
 }
 
 /** A /demo szimulátor panelje („1. Köredzés … Szimulátor”). */
