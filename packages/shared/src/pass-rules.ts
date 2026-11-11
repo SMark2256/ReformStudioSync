@@ -15,6 +15,23 @@ export function toStudioDayKey(date: Date | string): string {
   return studioDayFormatter.format(new Date(date));
 }
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Fagyasztás feloldásakor jóváírt napok: naptári napok a fagyasztás és a feloldás napja között
+ * a stúdió időzónájában (11.07 12:46 → 11.11 18:39 = 4 nap), legalább 1.
+ */
+export function frozenDaysBetween(frozenAt: Date | string, unfrozenAt: Date | string): number {
+  const from = Date.parse(`${toStudioDayKey(frozenAt)}T00:00:00Z`);
+  const to = Date.parse(`${toStudioDayKey(unfrozenAt)}T00:00:00Z`);
+  return Math.max(1, Math.round((to - from) / DAY_MS));
+}
+
+/** Fagyasztható-e a bérlet: csak az érvényes (aktív vagy még nem kezdődött) bérlet. A feloldás mindig mehet. */
+export function isPassFreezable(status: PassStatus): boolean {
+  return status === PassStatus.ACTIVE || status === PassStatus.NOT_STARTED;
+}
+
 /** A felhasználási napló egy sora, amennyi az alkalomszámításhoz kell. */
 export interface PassLedgerEntry {
   delta: number;

@@ -97,6 +97,21 @@ export const getJiraIssueUrl = (jiraKey: string): string =>
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    id: 'v0.3-fix-pass-freeze-calendar-days',
+    version: '0.3',
+    date: '2026-11-11',
+    kind: 'FIX',
+    title: 'Pontosabb bérletfagyasztás',
+    summary:
+      'Fagyasztás feloldásakor naptári napok szerint hosszabbodik a lejárat, és csak érvényes bérlet fagyasztható.',
+    details: [
+      'A lejárat annyi nappal tolódik, ahány naptári nap telt el a fagyasztás és a feloldás napja között (legalább 1 nappal).',
+      'Lejárt, elfogyott vagy sztornózott bérletnél nem jelenik meg a „Fagyasztás” gomb; a fagyasztott bérlet „Feloldás” gombja mindig elérhető.',
+      'A bérlet-előzményekben látszik, melyik munkatárs fagyasztotta vagy oldotta fel a bérletet.',
+    ],
+    jiraKey: 'TICKET-41',
+  },
+  {
     id: 'v0.3-fix-scan-treatment-selection',
     version: '0.3',
     date: '2026-11-11',

@@ -9,8 +9,10 @@ import {
   countActiveDeductions,
   DEFAULT_STUDIO_ID,
   EXPIRING_SOON_THRESHOLD_DAYS,
+  frozenDaysBetween,
   isBirthdayToday,
   getPassStatus,
+  isPassFreezable,
   isPassOpen,
   passCoversService,
   passDeductionError,
@@ -578,12 +580,13 @@ export class PassesService {
   async toggleFreezePass(
     passId: string,
     dto: ToggleFreezePassDto,
+    staffUserId: string,
     studioId = DEFAULT_STUDIO_ID,
   ): Promise<GuestPassDto> {
     return this.prisma.$transaction(async (tx) => {
       const pass = await tx.guestPass.findFirst({
         where: { id: passId, studioId },
-        include: { passTemplate: true },
+        include: { passTemplate: true, usageLogs: true },
       });
 
       if (!pass) {
@@ -593,6 +596,21 @@ export class PassesService {
       const now = new Date();
 
       if (!pass.isFrozen) {
+        // Csak érvényes bérlet fagyasztható; a feloldás mindig mehet.
+        const status = getPassStatus(
+          {
+            ...pass,
+            remainingPasses: computeRemainingPasses(
+              pass.totalPasses,
+              pass.usageLogs,
+            ),
+          },
+          now,
+        );
+        if (!isPassFreezable(status)) {
+          throw appError('PASS.NOT_FREEZABLE');
+        }
+
         const updated = await tx.guestPass.update({
           where: { id: pass.id },
           data: {
@@ -606,6 +624,7 @@ export class PassesService {
           data: {
             guestPassId: pass.id,
             guestId: pass.guestId,
+            employeeId: staffUserId,
             delta: 0,
             note: `Bérlet fagyasztva${dto.note ? `: ${dto.note.trim()}` : ''}`,
           },
@@ -613,12 +632,7 @@ export class PassesService {
 
         return this.mapPass(updated);
       } else {
-        const frozenSince = pass.frozenAt ?? now;
-        const diffMs = Math.max(0, now.getTime() - frozenSince.getTime());
-        const frozenDays = Math.max(
-          1,
-          Math.ceil(diffMs / (24 * 60 * 60 * 1000)),
-        );
+        const frozenDays = frozenDaysBetween(pass.frozenAt ?? now, now);
         const newExpiration = new Date(
           pass.expirationDate.getTime() + frozenDays * 24 * 60 * 60 * 1000,
         );
@@ -637,6 +651,7 @@ export class PassesService {
           data: {
             guestPassId: pass.id,
             guestId: pass.guestId,
+            employeeId: staffUserId,
             delta: 0,
             note: `Fagyasztás feloldva (+${frozenDays} nap jóváírva a lejáratra)`,
           },

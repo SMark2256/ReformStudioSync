@@ -145,6 +145,6 @@ export class PassesController {
     @Body() dto: ToggleFreezePassDto,
     @CurrentUser() user: AuthUserDto,
   ) {
-    return this.passesService.toggleFreezePass(id, dto, user.studioId);
+    return this.passesService.toggleFreezePass(id, dto, user.id, user.studioId);
   }
 }

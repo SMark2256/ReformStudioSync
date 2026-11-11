@@ -2,6 +2,7 @@ import {
   DocumentStatus,
   DocumentType,
   GuestDto,
+  isPassFreezable,
   MembershipDueStatus,
   MembershipStatus,
   PaymentMethod,
@@ -1085,20 +1086,23 @@ export const GuestModal: React.FC<GuestModalProps> = ({
                         nap
                       </Button>
                     ))}
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() =>
-                        onToggleFreezePass?.(pass.id, extendReason)
-                      }
-                    >
-                      {pass.isFrozen ? (
-                        <Sun aria-hidden strokeWidth={1.75} />
-                      ) : (
-                        <Snowflake aria-hidden strokeWidth={1.75} />
-                      )}
-                      {pass.isFrozen ? 'Feloldás' : 'Fagyasztás'}
-                    </Button>
+                    {/* Fagyasztani csak érvényes bérletet lehet; a feloldás mindig elérhető. */}
+                    {(pass.isFrozen || isPassFreezable(pass.status)) && (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() =>
+                          onToggleFreezePass?.(pass.id, extendReason)
+                        }
+                      >
+                        {pass.isFrozen ? (
+                          <Sun aria-hidden strokeWidth={1.75} />
+                        ) : (
+                          <Snowflake aria-hidden strokeWidth={1.75} />
+                        )}
+                        {pass.isFrozen ? 'Feloldás' : 'Fagyasztás'}
+                      </Button>
+                    )}
                   </div>
                 </div>
               );

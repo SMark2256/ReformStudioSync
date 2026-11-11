@@ -431,9 +431,13 @@ export const DemoSandboxPage: React.FC = () => {
               forceRender();
             }}
             onToggleFreezePass={(passId, note) => {
-              mockStudioEngine.toggleFreezePass(passId, note);
-              notify.success('Bérlet fagyasztási státusza frissítve');
-              forceRender();
+              try {
+                mockStudioEngine.toggleFreezePass(passId, note);
+                notify.success('Bérlet fagyasztási státusza frissítve');
+                forceRender();
+              } catch (err) {
+                handleAppError(err, { title: 'Fagyasztási hiba' });
+              }
             }}
             onOpenDigitalCard={(g) => setDigitalCardGuest(g)}
             onRefreshAll={forceRender}
