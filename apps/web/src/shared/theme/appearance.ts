@@ -1,5 +1,4 @@
-import { notify } from '@/shared/lib/notify';
-import { getSurfaceName, type SurfaceColor } from './surface';
+import type { SurfaceColor } from './surface';
 import { useSurfaceStore } from './surfaceStore';
 import { useThemeStore, type ReceptionTheme } from './themeStore';
 
@@ -8,22 +7,14 @@ export const THEME_LABELS: Record<ReceptionTheme, string> = {
   dark: 'Sötét',
 };
 
-// Egy közös „Megjelenés mentve” toast a témához és a felületszínhez: gyors egymás utáni
-// váltásnál ugyanaz frissül, nem halmozódik.
-const APPEARANCE_TOAST_ID = 'appearance-saved';
+// A téma és a felületszín váltása azonnal látszik, ezért nincs hozzá toast.
 
-function notifyAppearanceSaved(detail: string) {
-  notify.success('Megjelenés mentve', detail, { id: APPEARANCE_TOAST_ID });
-}
-
-/** Téma váltása a felületről (fiókpanel, fejléc, Beállítások), visszajelzéssel. */
+/** Téma váltása a felületről (fiókpanel, fejléc, Beállítások). */
 export function saveTheme(theme: ReceptionTheme) {
   useThemeStore.getState().setTheme(theme);
-  notifyAppearanceSaved(`Téma: ${THEME_LABELS[theme]}`);
 }
 
-/** Felületszín váltása a Beállításokban, visszajelzéssel. */
+/** Felületszín váltása a Beállításokban. */
 export function saveSurface(surface: SurfaceColor) {
   useSurfaceStore.getState().setSurface(surface);
-  notifyAppearanceSaved(`Felületszín: ${getSurfaceName(surface)}`);
 }

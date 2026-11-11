@@ -132,8 +132,7 @@ export const SURFACE_COLORS = [
   localStorage kulcsból: `reform_studio_reception_theme`, `reform_studio_surface`,
   és a régi `reform_studio_accent` hexa átfordítása), így nincs villanás.
 - Felületről váltani a `saveTheme(theme)` / `saveSurface(surface)` hívással kell
-  (`@/shared/theme`): beállítja és egy közös „Megjelenés mentve” toastot ad (azonos
-  `id`, gyors váltásnál ugyanaz frissül).
+  (`@/shared/theme`): beállítja és menti, toast nélkül (a változás azonnal látszik).
 - A Beállítások színmintái `ToggleGroupItem`-ek saját `data-surface`-szel és
   `bg-primary`-val, így mindegyik a saját palettáját mutatja, a sötét témában is;
   `aria-label` a szín nevével. Egyedi színválasztó nincs.
