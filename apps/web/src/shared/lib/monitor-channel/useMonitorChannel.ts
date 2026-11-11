@@ -106,7 +106,7 @@ export function useMonitorChannel(options: UseMonitorChannelOptions = {}) {
   const channelEnabled = (options.enabled ?? true) && isAuthorized;
 
   const [isConnected, setIsConnected] = useState<boolean>(false);
-  const [connectedDisplays, setConnectedDisplays] = useState<number>(1);
+  const [connectedDisplays, setConnectedDisplays] = useState<number>(0);
   const [wakeLockActive, setWakeLockActive] = useState<boolean>(false);
 
   // A hívók renderenként új opció-objektumot (inline callbackeket) adnak át. Ha a
@@ -220,7 +220,7 @@ export function useMonitorChannel(options: UseMonitorChannelOptions = {}) {
     });
 
     socket.on(SOCKET_EVENTS.MONITOR_STATE, (state: MonitorStatePayload) => {
-      setConnectedDisplays(Math.max(1, state.connectedDisplays));
+      setConnectedDisplays(state.connectedDisplays);
     });
 
     // Kijelzőként csak a szűkített, recepcióként csak a teljes eseményekre figyelünk.

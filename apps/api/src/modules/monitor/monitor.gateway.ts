@@ -23,6 +23,18 @@ import {
 import { Server, Socket } from 'socket.io';
 import { AuthService } from '../auth/auth.service';
 
+/** Egy hitelesített, regisztrált socket-kliens. */
+interface MonitorClient {
+  studioId: string;
+  /** Párosított kijelző eszköze (csak DEVICE tokennél). */
+  deviceId?: string;
+  /**
+   * Kijelző: DEVICE token, vagy munkatársi tokennel megnyitott Vendégmonitor
+   * (`displayOnly`). A recepciós fül nem kijelző.
+   */
+  isDisplay: boolean;
+}
+
 @WebSocketGateway({
   namespace: SOCKET_NAMESPACE,
   cors: {
@@ -38,8 +50,8 @@ export class MonitorGateway
   @WebSocketServer()
   server: Server;
 
-  private clientStudios = new Map<string, string>();
-  private clientDevices = new Map<string, string>();
+  /** Socket-azonosító → kliens. Csak a csatlakozás végén, még élő kliens kerül ide. */
+  private clients = new Map<string, MonitorClient>();
 
   constructor(
     @Inject(forwardRef(() => AuthService))
@@ -60,14 +72,18 @@ export class MonitorGateway
   }
 
   isDeviceOnline(deviceId: string): boolean {
-    for (const dId of this.clientDevices.values()) {
-      if (dId === deviceId) return true;
+    for (const entry of this.clients.values()) {
+      if (entry.deviceId === deviceId) return true;
     }
     return false;
   }
 
   getOnlineDeviceIds(): Set<string> {
-    return new Set(this.clientDevices.values());
+    const ids = new Set<string>();
+    for (const { deviceId } of this.clients.values()) {
+      if (deviceId) ids.add(deviceId);
+    }
+    return ids;
   }
 
   async handleConnection(client: Socket) {
@@ -85,20 +101,33 @@ export class MonitorGateway
       }
 
       const validated = await this.authService.validateSocketToken(token);
-      const studioId = validated.studioId;
+      // A hitelesítés alatt a kliens bonthatott: a `handleDisconnect` ilyenkor már
+      // lefutott, így a most beírt bejegyzés soha nem törlődne.
+      if (client.disconnected) return;
 
-      const room = this.getRoomName(studioId);
-      await client.join(room);
+      const studioId = validated.studioId;
       // A munkatársi tokennel megnyitott Vendégmonitor (`displayOnly`) sem kap
       // teljes eredményt. A jelző csak szűkíthet, jogosultságot nem ad.
       const displayOnly = client.handshake.auth?.displayOnly === true;
-      if (validated.type === 'STAFF' && !displayOnly) {
-        await client.join(this.getStaffRoomName(studioId));
+      const isStaffDesk = validated.type === 'STAFF' && !displayOnly;
+      const rooms = [this.getRoomName(studioId)];
+      if (isStaffDesk) rooms.push(this.getStaffRoomName(studioId));
+      for (const room of rooms) {
+        await client.join(room);
       }
-      this.clientStudios.set(client.id, studioId);
-      if (validated.type === 'DEVICE' && validated.deviceId) {
-        this.clientDevices.set(client.id, validated.deviceId);
+      if (client.disconnected) {
+        // A bontáskori takarítás már lefutott, a szobatagságot mi bontjuk.
+        for (const room of rooms) {
+          await client.leave(room);
+        }
+        return;
       }
+
+      this.clients.set(client.id, {
+        studioId,
+        deviceId: validated.type === 'DEVICE' ? validated.deviceId : undefined,
+        isDisplay: !isStaffDesk,
+      });
       this.broadcastMonitorState(studioId);
     } catch (err) {
       const error = toAppError(err);
@@ -109,17 +138,19 @@ export class MonitorGateway
     }
   }
 
+  /** Idempotens: nem regisztrált (pl. elutasított) kliensnél nincs teendő. */
   handleDisconnect(client: Socket) {
-    const studioId = this.clientStudios.get(client.id) ?? DEFAULT_STUDIO_ID;
-    this.clientStudios.delete(client.id);
-    this.clientDevices.delete(client.id);
-    this.broadcastMonitorState(studioId);
+    const entry = this.clients.get(client.id);
+    if (!entry) return;
+    this.clients.delete(client.id);
+    this.broadcastMonitorState(entry.studioId);
   }
 
   @SubscribeMessage(SOCKET_EVENTS.MONITOR_PING)
   async handlePing(@ConnectedSocket() client: Socket): Promise<MonitorStatePayload> {
-    const studioId = this.clientStudios.get(client.id) ?? DEFAULT_STUDIO_ID;
-    const deviceId = this.clientDevices.get(client.id);
+    const entry = this.clients.get(client.id);
+    const studioId = entry?.studioId ?? DEFAULT_STUDIO_ID;
+    const deviceId = entry?.deviceId;
     if (deviceId) {
       await this.authService
         .recordDeviceActivity(deviceId, 'Élő kapcsolat (Heartbeat)')
@@ -128,10 +159,11 @@ export class MonitorGateway
     return this.getMonitorState(studioId);
   }
 
+  /** `connectedDisplays`: a stúdió kapcsolódó kijelzői, recepciós fülek nélkül. */
   getMonitorState(studioId = DEFAULT_STUDIO_ID): MonitorStatePayload {
     let connectedDisplays = 0;
-    for (const sId of this.clientStudios.values()) {
-      if (sId === studioId) connectedDisplays++;
+    for (const entry of this.clients.values()) {
+      if (entry.studioId === studioId && entry.isDisplay) connectedDisplays++;
     }
 
     return {
@@ -164,16 +196,10 @@ export class MonitorGateway
       .emit(SOCKET_EVENTS.MONITOR_CHECKIN_RESULT, toMonitorPayload(payload));
 
     // Frissítjük az aktív online kijelzők utolsó aktivitását
-    for (const [clientId, deviceId] of this.clientDevices.entries()) {
-      if (this.clientStudios.get(clientId) === studioId) {
-        this.authService
-          .recordDeviceActivity(
-            deviceId,
-            `Beléptetés megjelenítve (${payload.guestName})`,
-          )
-          .catch(() => {});
-      }
-    }
+    this.recordStudioDeviceActivity(
+      studioId,
+      `Beléptetés megjelenítve (${payload.guestName})`,
+    );
   }
 
   emitCheckInRevoked(
@@ -192,13 +218,17 @@ export class MonitorGateway
         toMonitorRevokedPayload(payload),
       );
 
-    for (const [clientId, deviceId] of this.clientDevices.entries()) {
-      if (this.clientStudios.get(clientId) === studioId) {
+    this.recordStudioDeviceActivity(
+      studioId,
+      `Sztornó megjelenítve (${payload.guestName})`,
+    );
+  }
+
+  private recordStudioDeviceActivity(studioId: string, activity: string) {
+    for (const entry of this.clients.values()) {
+      if (entry.deviceId && entry.studioId === studioId) {
         this.authService
-          .recordDeviceActivity(
-            deviceId,
-            `Sztornó megjelenítve (${payload.guestName})`,
-          )
+          .recordDeviceActivity(entry.deviceId, activity)
           .catch(() => {});
       }
     }
