@@ -69,6 +69,7 @@ export const DeductTreatmentModal: React.FC<DeductTreatmentModalProps> = ({
   const [selectedServiceId, setSelectedServiceId] = useState<string>('');
   const [selectedPassId, setSelectedPassId] = useState<string>('');
   const [note, setNote] = useState<string>('');
+  const [showErrors, setShowErrors] = useState(false);
 
   const treatmentServices = services.filter((s) => s.isActive);
 
@@ -78,6 +79,7 @@ export const DeductTreatmentModal: React.FC<DeductTreatmentModalProps> = ({
     setSelectedGuestId(g?.id ?? '');
     setGuestSearch('');
     setNote('');
+    setShowErrors(false);
 
     const defaultService =
       treatmentServices.find((s) => s.name.toLowerCase().includes('hypoxi')) ??
@@ -123,7 +125,11 @@ export const DeductTreatmentModal: React.FC<DeductTreatmentModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedGuest || !selectedPass || !selectedServiceId) return;
+    // A gomb nem tiltott: hiányzó adatnál a mezők alatt jelenik meg, mi hiányzik.
+    if (!selectedGuest || !selectedPass || !selectedService) {
+      setShowErrors(true);
+      return;
+    }
     onConfirmDeduct({
       guestId: selectedGuest.id,
       passId: selectedPass.id,
@@ -132,6 +138,10 @@ export const DeductTreatmentModal: React.FC<DeductTreatmentModalProps> = ({
       note: note.trim() || undefined,
     });
   };
+
+  const guestError = showErrors && !selectedGuest;
+  const serviceError = showErrors && !selectedService;
+  const passError = showErrors && !!selectedGuest && !selectedPass;
 
   const remainingAfterDeduction =
     selectedPass?.type === PassType.OCCASION_BASED
@@ -172,7 +182,13 @@ export const DeductTreatmentModal: React.FC<DeductTreatmentModalProps> = ({
                 value={selectedGuestId}
                 onValueChange={setSelectedGuestId}
               >
-                <SelectTrigger id={`${fieldId}-guest`}>
+                <SelectTrigger
+                  id={`${fieldId}-guest`}
+                  aria-invalid={guestError}
+                  aria-describedby={
+                    guestError ? `${fieldId}-guest-error` : undefined
+                  }
+                >
                   <SelectValue placeholder="Válassz vendéget" />
                 </SelectTrigger>
                 <SelectContent>
@@ -189,31 +205,68 @@ export const DeductTreatmentModal: React.FC<DeductTreatmentModalProps> = ({
                   ))}
                 </SelectContent>
               </Select>
+              {guestError && (
+                <p
+                  id={`${fieldId}-guest-error`}
+                  role="alert"
+                  className="text-xs text-destructive"
+                >
+                  Nincs kiválasztott vendég. Válaszd ki, kinek a bérletéből
+                  vonod le az alkalmat.
+                </p>
+              )}
             </div>
 
-            <div role="group" aria-labelledby={`${fieldId}-services`}>
+            <div
+              role="group"
+              aria-labelledby={`${fieldId}-services`}
+              aria-describedby={
+                serviceError ? `${fieldId}-services-error` : undefined
+              }
+            >
               <h3 id={`${fieldId}-services`} className={blockTitleClassName}>
                 Kezelés (a vendégmonitoron is megjelenik)
               </h3>
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                {treatmentServices.map((srv) => (
-                  <Button
-                    key={srv.id}
-                    variant="secondary"
-                    aria-pressed={srv.id === selectedServiceId}
-                    onClick={() => setSelectedServiceId(srv.id)}
-                    className={`${optionClassName} flex-col items-start gap-0.5 p-3 text-left`}
-                  >
-                    <span className="text-[13px] font-semibold text-foreground">
-                      {srv.name}
-                    </span>
-                    <span className="text-xs font-normal text-muted-foreground">
-                      {srv.durationMinutes} perc,{' '}
-                      {srv.priceHuf.toLocaleString('hu-HU')} Ft
-                    </span>
-                  </Button>
-                ))}
-              </div>
+              {treatmentServices.length === 0 ? (
+                <Alert>
+                  <AlertDescription>
+                    <AlertTitle>Még nincs kezelés felvéve.</AlertTitle>
+                    Alkalom levonásához előbb egy admin vegyen fel kezelést a
+                    Bérletek és termékek oldalon.
+                  </AlertDescription>
+                </Alert>
+              ) : (
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  {treatmentServices.map((srv) => (
+                    <Button
+                      key={srv.id}
+                      variant="secondary"
+                      aria-pressed={srv.id === selectedServiceId}
+                      onClick={() => setSelectedServiceId(srv.id)}
+                      className={`${optionClassName} flex-col items-start gap-0.5 p-3 text-left`}
+                    >
+                      <span className="text-[13px] font-semibold text-foreground">
+                        {srv.name}
+                      </span>
+                      <span className="text-xs font-normal text-muted-foreground">
+                        {srv.durationMinutes} perc,{' '}
+                        {srv.priceHuf.toLocaleString('hu-HU')} Ft
+                      </span>
+                    </Button>
+                  ))}
+                </div>
+              )}
+              {serviceError && (
+                <p
+                  id={`${fieldId}-services-error`}
+                  role="alert"
+                  className="mt-2 text-xs text-destructive"
+                >
+                  {treatmentServices.length === 0
+                    ? 'Kezelés nélkül nem vonható le alkalom. Előbb vegyél fel kezelést.'
+                    : 'Nincs kiválasztott kezelés. Válaszd ki, melyik kezelésre vonod le az alkalmat.'}
+                </p>
+              )}
             </div>
 
             <div role="group" aria-labelledby={`${fieldId}-passes`}>
@@ -290,6 +343,12 @@ export const DeductTreatmentModal: React.FC<DeductTreatmentModalProps> = ({
                   })}
                 </div>
               )}
+              {passError && activePasses.length > 0 && (
+                <p role="alert" className="mt-2 text-xs text-destructive">
+                  Nincs kiválasztott bérlet. Válaszd ki, melyik bérletből vonod
+                  le az alkalmat.
+                </p>
+              )}
             </div>
 
             <div className="flex flex-col gap-1.5">
@@ -322,11 +381,7 @@ export const DeductTreatmentModal: React.FC<DeductTreatmentModalProps> = ({
             <Button variant="secondary" onClick={onClose}>
               Mégse
             </Button>
-            <Button
-              type="submit"
-              variant="primary"
-              disabled={isSubmitting || !selectedPass || !selectedServiceId}
-            >
+            <Button type="submit" variant="primary" disabled={isSubmitting}>
               {isSubmitting ? 'Levonás...' : '1 Alkalom Levonása & Üdvözlés'}
             </Button>
           </DialogFooter>
