@@ -32,6 +32,11 @@ export interface MonitorCheckInPayload {
   /** Kezelés-üdvözlésen kívül mindig üres. */
   warnings: MonitorSafeWarning[];
   greetingSeconds?: number;
+  /**
+   * Csak sikeres belépésnél (SUCCESS), és csak ha igaz: születésnapi köszöntés.
+   * A születési dátum soha nem kerül a monitorra.
+   */
+  isBirthday?: boolean;
   timestamp: string;
 }
 
@@ -64,6 +69,7 @@ export function toMonitorPayload(
   if (status === 'DENIED') return base;
 
   base.displayName = result.guestName;
+  if (status === 'SUCCESS' && result.isBirthday) base.isBirthday = true;
   if (result.mode === 'TREATMENT_GREETING') {
     base.serviceName = result.serviceName ?? result.passName;
     base.remainingPasses = result.remainingPasses;

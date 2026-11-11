@@ -9,6 +9,7 @@ import {
   countActiveDeductions,
   DEFAULT_STUDIO_ID,
   EXPIRING_SOON_THRESHOLD_DAYS,
+  isBirthdayToday,
   getPassStatus,
   isPassOpen,
   passCoversService,
@@ -341,6 +342,7 @@ export class PassesService {
             expirationDate: existingOp.guestPass.expirationDate.toISOString(),
             warnings: [],
             suggestedRenewalTemplateId: existingOp.guestPass.passTemplateId,
+            isBirthday: isBirthdayToday(existingOp.guest.birthDate, now),
             timestamp: existingOp.usedAt.toISOString(),
           } satisfies CheckInResultPayload;
         }
@@ -452,6 +454,7 @@ export class PassesService {
         expirationDate: pass.expirationDate.toISOString(),
         warnings,
         suggestedRenewalTemplateId: pass.passTemplateId,
+        isBirthday: isBirthdayToday(guest.birthDate, now),
         timestamp: now.toISOString(),
       } satisfies CheckInResultPayload;
     });

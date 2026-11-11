@@ -34,6 +34,7 @@ import {
   GuestPassDto,
   GuestPhotoDto,
   GuestStatus,
+  isBirthdayToday,
   isDueRemovableOnStop,
   LoggedCheckInDto,
   MeasurementDto,
@@ -1716,6 +1717,7 @@ class MockStudioEngine {
       expirationDate: pass.expirationDate,
       warnings,
       suggestedRenewalTemplateId: pass.passTemplateId,
+      isBirthday: isBirthdayToday(guest.birthDate, now),
       timestamp: now.toISOString(),
     };
 
@@ -2056,6 +2058,7 @@ class MockStudioEngine {
         overdueAmountHuf: overdueAmountHuf > 0 ? overdueAmountHuf : undefined,
         overdueDays: maxOverdueDays > 0 ? maxOverdueDays : undefined,
         suggestedRenewalTemplateId: activePass?.passTemplateId ?? 'tpl-unlimited',
+        isBirthday: isBirthdayToday(guest.birthDate, now),
         timestamp: now.toISOString(),
       };
 

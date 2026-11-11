@@ -63,6 +63,20 @@ export const getJiraIssueUrl = (jiraKey: string): string =>
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    id: 'v0.3-feat-monitor-birthday-confetti',
+    version: '0.3',
+    date: '2026-11-11',
+    kind: 'NEW_FEATURE',
+    title: 'Születésnapi köszöntés a Vendégmonitoron',
+    summary:
+      'Születésnapos vendégeinket konfetti köszönti a Vendégmonitoron.',
+    details: [
+      'Ha a vendég a születésnapján sikeresen belép (köredzésre vagy kezelésre), a Vendégmonitoron 2 másodpercig konfetti hullik, és a neve alatt megjelenik a „Boldog születésnapot!” felirat.',
+      'Elutasításnál és ismételt beolvasásnál nincs konfetti és felirat. A születési dátum nem jelenik meg a monitoron.',
+    ],
+    jiraKey: 'TICKET-36',
+  },
+  {
     id: 'v0.3-fix-monitor-live-status',
     version: '0.3',
     date: '2026-11-11',

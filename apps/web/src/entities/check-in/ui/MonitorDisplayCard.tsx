@@ -4,12 +4,14 @@ import {
 } from '@reform/shared';
 import {
   AlertTriangle,
+  Cake,
   CheckCircle2,
   Clock,
   RotateCcw,
   Ticket,
 } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
+import { BirthdayConfetti } from './BirthdayConfetti';
 
 interface MonitorDisplayCardProps {
   activeResult: MonitorCheckInPayload | null;
@@ -127,6 +129,8 @@ export const MonitorDisplayCard: React.FC<MonitorDisplayCardProps> = ({
   const isDuplicate = activeResult.status === 'DUPLICATE';
   const isTreatment = activeResult.mode === 'TREATMENT_GREETING';
   const hasSafeWarnings = activeResult.warnings.length > 0;
+  // Csak sikeres belépésnél (toMonitorPayload is csak ekkor adja át).
+  const isBirthday = isSuccess && activeResult.isBirthday === true;
 
   const bgClass = !isSuccess
     ? isDuplicate
@@ -138,7 +142,7 @@ export const MonitorDisplayCard: React.FC<MonitorDisplayCardProps> = ({
 
   return (
     <div
-      className={`monitor-invariant flex flex-col items-center justify-between rounded-lg ${bgClass} text-white ${
+      className={`monitor-invariant relative flex flex-col items-center justify-between overflow-hidden rounded-lg ${bgClass} text-white ${
         compact ? 'min-h-[340px] p-6' : 'min-h-[78vh] p-12'
       }`}
     >
@@ -189,6 +193,20 @@ export const MonitorDisplayCard: React.FC<MonitorDisplayCardProps> = ({
             >
               {activeResult.displayName}!
             </h1>
+            {isBirthday && (
+              <p
+                className={`mt-2 inline-flex items-center gap-2 font-semibold text-amber-200 ${
+                  compact ? 'text-lg' : 'text-4xl'
+                }`}
+              >
+                <Cake
+                  aria-hidden
+                  strokeWidth={1.75}
+                  className={compact ? 'h-5 w-5' : 'h-10 w-10'}
+                />
+                Boldog születésnapot!
+              </p>
+            )}
           </>
         )}
 
@@ -275,6 +293,11 @@ export const MonitorDisplayCard: React.FC<MonitorDisplayCardProps> = ({
       <div className="w-full text-center text-xs text-white/75">
         A képernyő néhány másodperc múlva automatikusan alaphelyzetbe áll.
       </div>
+
+      {/* Új belépés (új timestamp) = új key, így a konfetti újra lefut. */}
+      {isBirthday && (
+        <BirthdayConfetti key={activeResult.timestamp} compact={compact} />
+      )}
     </div>
   );
 };
