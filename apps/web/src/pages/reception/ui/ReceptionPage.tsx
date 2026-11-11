@@ -12,6 +12,7 @@ import { handleAppError } from '@/shared/lib/errors';
 import { notify } from '@/shared/lib/notify';
 import { useOfflineQueueStore } from '@/entities/check-in';
 import { useScannerChannelStore } from '@/entities/check-in';
+import { DISPLAY_DEVICES_QUERY_KEY } from '@/entities/display-device';
 import { DigitalPassCardModal } from '@/entities/guest';
 import { GuestModal } from '@/widgets/guest-profile';
 import { DeductTreatmentModal } from '@/features/deduct-treatment';
@@ -127,7 +128,7 @@ export const ReceptionPage: React.FC = () => {
     queryClient.invalidateQueries({ queryKey: ['overdue-memberships'] });
     queryClient.invalidateQueries({ queryKey: ['daily-finance'] });
     queryClient.invalidateQueries({ queryKey: ['pass-templates'] });
-    queryClient.invalidateQueries({ queryKey: ['display-devices'] });
+    queryClient.invalidateQueries({ queryKey: DISPLAY_DEVICES_QUERY_KEY });
   }, [queryClient]);
 
   // Keep open guest modal fresh when queries refresh

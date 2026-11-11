@@ -18,10 +18,10 @@ Az `apps/web/src` könyvtár rétegei felülről lefelé. Egy réteg csak az ala
 | Réteg | Slice-ok | Tartalom |
 | :--- | :--- | :--- |
 | `app/` | — | Belépési pont (`index.tsx`), QueryClient + Toaster providerek, router (`App.tsx`), globális stílusok |
-| `pages/` | `login`, `reception`, `monitor`, `tablet-document`, `demo-sandbox` | Útvonalanként egy oldal |
+| `pages/` | `login`, `reception`, `monitor`, `monitors`, `settings`, `tablet-document`, `demo-sandbox` | Útvonalanként egy oldal |
 | `widgets/` | `guest-profile`, `version-changelog` | Önálló, összetett UI blokkok |
 | `features/` | `scanner-channel`, `sell-pass`, `deduct-treatment`, `record-payment`, `toggle-theme` | Felhasználói műveletek |
-| `entities/` | `guest`, `check-in` | Üzleti entitások UI-ja és állapota (offline puffer, szkenner csatorna store) |
+| `entities/` | `guest`, `check-in`, `display-device` | Üzleti entitások UI-ja és állapota (offline puffer, szkenner csatorna store, kijelzőlista lekérdezése) |
 | `shared/` | `api`, `auth`, `theme`, `lib/*` | REST kliens + mock motor, session store, téma store, notify/sound/szkenner/monitor csatorna segédek |
 
 A szabályokat a [Steiger](https://github.com/feature-sliced/steiger) linter ellenőrzi: `npm run lint:fsd`. A TypeScript- és React-szabályokat az ESLint (`eslint.config.mjs`) a teljes monorepón: `npm run lint` / `npm run lint:fix`.

@@ -111,6 +111,21 @@ export const RELEASE_NOTES: ReleaseNote[] = [
     jiraKey: 'TICKET-37',
   },
   {
+    id: 'v0.3-page-monitors',
+    version: '0.3',
+    date: '2026-11-11',
+    kind: 'NEW_PAGE',
+    title: 'Monitorok: külön oldal a vendégmonitoroknak',
+    summary:
+      'A vendégmonitorok és tabletek kezelése saját oldalt kapott, amelyet a nevedre kattintva felnyíló panelből érsz el.',
+    details: [
+      'A panelben a Beállítások fölött van a Monitorok menüpont; jobb szélén látod, hány monitor kapcsolódik éppen.',
+      'Itt párosíthatsz új tabletet 6 jegyű kóddal, küldhetsz teszt jelet, és nyithatod meg a Vendégmonitort új ablakban. A Bérletek és termékek oldalról ez a rész kikerült.',
+    ],
+    jiraKey: 'TICKET-38',
+    link: { type: 'route', path: '/monitors', label: 'Monitorok megnyitása' },
+  },
+  {
     id: 'v0.3-feat-monitor-birthday-confetti',
     version: '0.3',
     date: '2026-11-11',

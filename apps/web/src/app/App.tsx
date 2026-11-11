@@ -10,6 +10,7 @@ import { GlobalScannerChannel } from '@/features/scanner-channel';
 import { LoginPage } from '@/pages/login';
 import { DemoSandboxPage } from '@/pages/demo-sandbox';
 import { MonitorPage } from '@/pages/monitor';
+import { MonitorsPage } from '@/pages/monitors';
 import {
   CURRENT_VERSION,
   RECEPTION_PATHS,
@@ -54,6 +55,7 @@ export const App: React.FC = () => {
             <Route key={path} path={path} element={<ReceptionPage />} />
           ))}
           <Route path={APP_ROUTES.demo.path} element={<DemoSandboxPage />} />
+          <Route path={APP_ROUTES.monitors.path} element={<MonitorsPage />} />
           <Route
             path={APP_ROUTES.settings.path}
             element={<SettingsPage />}

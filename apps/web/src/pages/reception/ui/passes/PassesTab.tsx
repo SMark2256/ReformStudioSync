@@ -29,7 +29,6 @@ import {
   type ResponsiveTableColumn,
 } from '@/shared/ui';
 import { formatHuf } from '../desk/format';
-import { MonitorDevicesCard } from './MonitorDevicesCard';
 
 const SERVICE_CATEGORY_LABELS: Record<ServiceCategory, string> = {
   [ServiceCategory.BODY_SHAPING]: 'Alakformáló kezelés',
@@ -117,7 +116,8 @@ interface PassesTabProps {
   onRefreshAll: () => void;
 }
 
-// Bérletek és termékek (`/passes`): bérletsablonok, szolgáltatások és a vendégmonitorok.
+// Bérletek és termékek (`/passes`): bérletsablonok és szolgáltatások. A vendégmonitorok a
+// fiókpanel Monitorok oldalán (`/monitors`) vannak.
 export const PassesTab: React.FC<PassesTabProps> = ({
   templates,
   services,
@@ -126,14 +126,11 @@ export const PassesTab: React.FC<PassesTabProps> = ({
   <>
     <PageHeader
       title="Bérletek és termékek"
-      description="Bérletsablonok, szolgáltatások és a vendégmonitorok beállítása."
+      description="Bérletsablonok és szolgáltatások beállítása."
     />
-    <div className="space-y-4">
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-        <PassTemplatesCard templates={templates} onRefreshAll={onRefreshAll} />
-        <ServicesCard services={services} onRefreshAll={onRefreshAll} />
-      </div>
-      <MonitorDevicesCard />
+    <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+      <PassTemplatesCard templates={templates} onRefreshAll={onRefreshAll} />
+      <ServicesCard services={services} onRefreshAll={onRefreshAll} />
     </div>
   </>
 );

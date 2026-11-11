@@ -296,7 +296,8 @@ a néven hozd létre; a még nem létező oldal nem kerül a menübe.
 | Adminisztráció | Felhasználókezelés | `UserCog` | `/admin/users` | `users` |
 | Adminisztráció | Szerepkörök és jogok | `ShieldCheck` | `/admin/roles` | `roles` |
 
-A **Beállítások** (`/settings`) nem a menüben, hanem a fiókpanelben van.
+A **Monitorok** (`/monitors`) és a **Beállítások** (`/settings`) nem a menüben, hanem a
+fiókpanelben van.
 
 A menü alján, a munkatárs fölött:
 
@@ -329,7 +330,9 @@ verzió rövid alakja („v0.3”) látszik.
   a név 13 px 600 és a szerepkör 12 px `sidebar-muted`, jobbra `ChevronUp`.
 - **Fiókpanel**: kattintásra a sor mögül felcsúszik (3.9), `bg-sidebar-raised`,
   `rounded-t-lg`, felső és oldalsó `sidebar-border` szegély. Tartalma: felül az
-  e-mail (12 px `sidebar-muted`), **Beállítások** (`Settings`, `/settings`), **Téma**
+  e-mail (12 px `sidebar-muted`), **Monitorok** (`MonitorCog`, `/monitors`; jobb szélen
+  13 px `Monitor` ikon és a jelenleg aktív kijelzők száma, 12 px `sidebar-muted`
+  `tabular-nums`, a felolvasónak `sr-only` „(N aktív)”), **Beállítások** (`Settings`, `/settings`), **Téma**
   (`role="switch"`, `aria-checked`, `aria-label="Sötét téma"`, jobbra Világos/Sötét
   ikon-szegmens; a panel nyitva marad), elválasztó, **Kijelentkezés** (`LogOut`).
   Elemei `SidebarItem` (36 px, `px-2.5`, 16 px ikon).
