@@ -1,4 +1,10 @@
-import { GuestDto, VisitType } from '@reform/shared';
+import {
+  CheckInResultPayload,
+  CheckInStatus,
+  GuestDto,
+  TreatmentSelectionOption,
+  VisitType,
+} from '@reform/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import React, { useCallback, useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -15,7 +21,10 @@ import { useScannerChannelStore } from '@/entities/check-in';
 import { DISPLAY_DEVICES_QUERY_KEY } from '@/entities/display-device';
 import { DigitalPassCardModal } from '@/entities/guest';
 import { GuestModal } from '@/widgets/guest-profile';
-import { DeductTreatmentModal } from '@/features/deduct-treatment';
+import {
+  DeductTreatmentModal,
+  getTreatmentPreselection,
+} from '@/features/deduct-treatment';
 import { RecordPaymentModal } from '@/features/record-payment';
 import { SellPassModal } from '@/features/sell-pass';
 import {
@@ -29,6 +38,18 @@ import { GuestsTab } from './guests/GuestsTab';
 import { FinanceTab } from './finance/FinanceTab';
 import { PassesTab } from './passes/PassesTab';
 import { WhatsNewPanel } from './WhatsNewPanel';
+
+// Offline tételek, amelyeknél nem rögzült belépés, mert kezelést kell választani (TICKET-39).
+const notifyOfflineTreatmentSelections = (results: CheckInResultPayload[]) => {
+  const pending = results.filter(
+    (r) => r.status === CheckInStatus.TREATMENT_SELECTION_REQUIRED,
+  );
+  if (pending.length === 0) return;
+  notify.warning(
+    `Kezelésválasztás kell (${pending.length} offline beolvasás)`,
+    `Nem rögzült belépés: ${pending.map((r) => r.guestName).join(', ')}. A kezelést a „Kezelés -1” gombbal vond le.`,
+  );
+};
 
 export const ReceptionPage: React.FC = () => {
   const navigate = useNavigate();
@@ -53,6 +74,9 @@ export const ReceptionPage: React.FC = () => {
     recordCheckInResult: setLastCheckIn,
     recordRevokedResult,
     recordScanAttempt,
+    pendingTreatmentSelection,
+    requestTreatmentSelection,
+    clearTreatmentSelection,
   } = useScannerChannelStore();
 
   // Modals
@@ -65,6 +89,8 @@ export const ReceptionPage: React.FC = () => {
   const [deductModalState, setDeductModalState] = useState<{
     isOpen: boolean;
     guest: GuestDto | null;
+    /** Beolvasás után (TICKET-39): a szóba jöhető bérletek az előválasztáshoz. */
+    treatmentOptions?: TreatmentSelectionOption[];
   }>({ isOpen: false, guest: null });
 
   const [paymentModalState, setPaymentModalState] = useState<{
@@ -178,6 +204,12 @@ export const ReceptionPage: React.FC = () => {
         visitType: vars.visitType ?? VisitType.CIRCUIT_TRAINING,
       }),
     onSuccess: (res) => {
+      // Alkalmas bérlet (TICKET-39): nincs belépés, a kezelésválasztó ablak nyílik meg.
+      if (res.status === CheckInStatus.TREATMENT_SELECTION_REQUIRED) {
+        notify.checkInResult(res);
+        requestTreatmentSelection(res);
+        return;
+      }
       setLastCheckIn(res);
       broadcastToScannerChannel({ type: 'CHECKIN_RESULT', payload: res });
       notify.checkInResult(res, {
@@ -246,6 +278,27 @@ export const ReceptionPage: React.FC = () => {
     [isOnline, enqueueScan, scanMutation, recordScanAttempt],
   );
 
+  // Kezelésválasztást igénylő beolvasás (bármelyik oldalról, TICKET-39): a vendég friss adataival
+  // megnyílik a kezelésválasztó; a levonás és az üdvözlés a megerősítéskor történik.
+  useEffect(() => {
+    const request = pendingTreatmentSelection;
+    if (!request) return;
+    clearTreatmentSelection();
+    if (!request.guestId) return;
+    api
+      .getGuest(request.guestId)
+      .then((guest) =>
+        setDeductModalState({
+          isOpen: true,
+          guest,
+          treatmentOptions: request.treatmentOptions ?? [],
+        }),
+      )
+      .catch((err) =>
+        handleAppError(err, { title: 'A vendég bérletei nem tölthetők be' }),
+      );
+  }, [pendingTreatmentSelection, clearTreatmentSelection]);
+
   // Online / Offline listener + automatic FIFO queue sync
   useEffect(() => {
     const handleOnline = () => setOnline(true);
@@ -265,8 +318,9 @@ export const ReceptionPage: React.FC = () => {
       clearQueue();
       notify.success(
         `Offline várólista szinkronizálva (${res.processed} tétel)!`,
-        'Minden várakozó beléptetés feldolgozásra került.',
+        'Minden várakozó beolvasás feldolgozásra került.',
       );
+      notifyOfflineTreatmentSelections(res.results);
       refreshAll();
     } catch (err) {
       handleAppError(err, { title: 'Offline szinkronizáció sikertelen' });
@@ -366,6 +420,19 @@ export const ReceptionPage: React.FC = () => {
     : null;
 
   const dashboard = todayDashboardQuery.data;
+
+  // Beolvasás után a vendég frissen betöltött adataival (a keresés miatt a listából hiányozhat is).
+  const guestList = guestsQuery.data ?? [];
+  const scannedGuest = deductModalState.treatmentOptions
+    ? deductModalState.guest
+    : null;
+  const deductGuests = scannedGuest
+    ? [scannedGuest, ...guestList.filter((g) => g.id !== scannedGuest.id)]
+    : guestList;
+  const deductPreselection = getTreatmentPreselection(
+    deductModalState.treatmentOptions ?? [],
+    servicesQuery.data ?? [],
+  );
 
   const openGuestSheet = (guest: GuestDto | null) => {
     setGuestModalState({ isOpen: true, guest });
@@ -556,7 +623,14 @@ export const ReceptionPage: React.FC = () => {
       <DeductTreatmentModal
         isOpen={deductModalState.isOpen}
         initialGuest={deductModalState.guest}
-        guests={guestsQuery.data ?? []}
+        initialPassId={deductPreselection.passId}
+        initialServiceId={deductPreselection.serviceId}
+        notice={
+          deductModalState.treatmentOptions
+            ? 'Alkalmas bérlet: a beolvasás nem rögzített belépést. Válaszd ki a kezelést, a belépés a levonással rögzül.'
+            : undefined
+        }
+        guests={deductGuests}
         services={servicesQuery.data ?? []}
         isSubmitting={deductTreatmentMutation.isPending}
         onClose={() => setDeductModalState({ isOpen: false, guest: null })}

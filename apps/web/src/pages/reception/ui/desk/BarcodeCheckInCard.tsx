@@ -47,9 +47,10 @@ export const BarcodeCheckInCard: React.FC<BarcodeCheckInCardProps> = ({
       </CardHeader>
       <CardContent className="space-y-3">
         <CardDescription>
-          Köredzésnél nem vonódik le alkalom ({DUPLICATE_SCAN_COOLDOWN_SECONDS}{' '}
-          mp dupla leolvasás elleni védelem). Kezeléshez az Alkalom
-          levonása gombot használd.
+          Havi tagsággal vagy köredzés-bérlettel köredzés érkezés, alkalom
+          levonása nélkül ({DUPLICATE_SCAN_COOLDOWN_SECONDS} mp dupla
+          leolvasás elleni védelem). Alkalmas bérletnél a beolvasás után a
+          kezelésválasztó ablak nyílik meg, a belépés a levonással rögzül.
         </CardDescription>
         <form
           onSubmit={(e) => {

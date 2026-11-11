@@ -2,6 +2,7 @@ import {
   appError,
   CheckInResultPayload,
   CheckInRevokedPayload,
+  CheckInStatus,
   DailyFinanceSummaryDto,
   DeductPassUsageRequestDto,
   DisplayDeviceDto,
@@ -341,7 +342,10 @@ export const api = {
       },
       () => mockStudioEngine.scanCheckIn(data),
     ).then((res) => {
-      broadcastToLocalMonitors({ type: 'CHECKIN_RESULT', payload: res });
+      // Kezelésválasztásnál nincs belépés, a monitor sem kap eseményt (TICKET-39).
+      if (res.status !== CheckInStatus.TREATMENT_SELECTION_REQUIRED) {
+        broadcastToLocalMonitors({ type: 'CHECKIN_RESULT', payload: res });
+      }
       return res;
     });
   },

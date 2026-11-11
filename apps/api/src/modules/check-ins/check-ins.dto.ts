@@ -21,7 +21,7 @@ export class ScanCheckInDto {
     enum: VisitType,
     default: VisitType.CIRCUIT_TRAINING,
     description:
-      'Köredzéses érkezés (CIRCUIT_TRAINING - nincs alkalomlevonás) vagy kezelési érkezés.',
+      'Kompatibilitási mező, a döntést nem befolyásolja: tagság vagy köredzésre érvényes időalapú bérlet → köredzés (0 levonás); csak kezelésre szóló bérlet → TREATMENT_SELECTION_REQUIRED (nincs belépés, a kezelésválasztóból történik a levonás).',
   })
   @IsOptional()
   @IsEnum(VisitType)

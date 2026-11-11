@@ -68,7 +68,7 @@ describe('CheckInsService — Kritikus Beléptetési és Köredzés vs. Kezelés
     service = new CheckInsService(prismaMock, monitorGatewayMock);
   });
 
-  it('1. Sikeres beléptetés (SUCCESS): OCCASION_BASED bérletből pontosan 1 alkalmat von le és commit után küld WebSocket eseményt', async () => {
+  it('1. Alkalmas bérlet (OCCASION_BASED) beolvasása: nincs belépés, levonás, napló és WebSocket esemény — kezelésválasztás kell (TICKET-39)', async () => {
     txMock.guest.findUnique.mockResolvedValue({
       id: 'guest-1',
       firstName: 'Anna',
@@ -80,6 +80,7 @@ describe('CheckInsService — Kritikus Beléptetési és Köredzés vs. Kezelés
         {
           id: 'pass-10',
           passTemplateId: 'tpl-10',
+          serviceId: null,
           type: 'OCCASION_BASED',
           totalPasses: 10,
           remainingPasses: 7,
@@ -97,23 +98,28 @@ describe('CheckInsService — Kritikus Beléptetési és Köredzés vs. Kezelés
       'staff-1',
     );
 
-    expect(result.status).toBe(CheckInStatus.SUCCESS);
-    expect(result.remainingPasses).toBe(6);
-    expect(result.warnings).toEqual([]);
-    expect(txMock.guestPass.updateMany).toHaveBeenCalledWith({
-      where: {
-        id: 'pass-10',
-        isActive: true,
-        isFrozen: false,
-        cancelledAt: null,
-        remainingPasses: { gt: 0 },
+    expect(result.status).toBe(CheckInStatus.TREATMENT_SELECTION_REQUIRED);
+    expect(result.guestId).toBe('guest-1');
+    expect(result.checkInId).toBeUndefined();
+    expect(result.treatmentOptions).toEqual([
+      {
+        passId: 'pass-10',
+        passName: '10 Alkalmas Reformer Bérlet',
+        passType: PassType.OCCASION_BASED,
+        serviceId: null,
+        serviceName: null,
+        remainingPasses: 7,
+        expirationDate: expect.any(String),
       },
-      data: { remainingPasses: { decrement: 1 } },
-    });
-    expect(monitorGatewayMock.emitCheckInResult).toHaveBeenCalledTimes(1);
+    ]);
+    expect(txMock.guestPass.updateMany).not.toHaveBeenCalled();
+    expect(txMock.passUsageLog.create).not.toHaveBeenCalled();
+    expect(txMock.visit.create).not.toHaveBeenCalled();
+    expect(txMock.loggedCheckIn.create).not.toHaveBeenCalled();
+    expect(monitorGatewayMock.emitCheckInResult).not.toHaveBeenCalled();
   });
 
-  it('2. Bérlet-priorizálás: TIME_BASED (korlátlan) bérletet részesíti előnyben az OCCASION_BASED bérlettel szemben', async () => {
+  it('2. Bérlet-priorizálás: TIME_BASED (korlátlan) bérlettel köredzés belépés, az OCCASION_BASED bérletből nem von le', async () => {
     txMock.guest.findUnique.mockResolvedValue({
       id: 'guest-1',
       firstName: 'Anna',
@@ -155,12 +161,13 @@ describe('CheckInsService — Kritikus Beléptetési és Köredzés vs. Kezelés
     );
 
     expect(result.status).toBe(CheckInStatus.SUCCESS);
+    expect(result.mode).toBe('CIRCUIT_GREETING');
     expect(result.passType).toBe(PassType.TIME_BASED);
     expect(result.remainingPasses).toBe('Korlátlan');
     expect(txMock.guestPass.updateMany).not.toHaveBeenCalled();
   });
 
-  it('3. Bérlet-priorizálás (2 alkalmas bérlet): mindig a leghamarabb lejáró OCCASION_BASED bérletből von le', async () => {
+  it('3. Kezelésválasztás (2 alkalmas bérlet): a választható bérletek a leghamarabb lejáróval kezdődnek', async () => {
     txMock.guest.findUnique.mockResolvedValue({
       id: 'guest-1',
       firstName: 'Anna',
@@ -201,16 +208,15 @@ describe('CheckInsService — Kritikus Beléptetési és Köredzés vs. Kezelés
       'staff-1',
     );
 
-    expect(result.status).toBe(CheckInStatus.SUCCESS);
-    expect(result.passName).toBe('Régebbi 5 Alkalmas');
-    expect(txMock.guestPass.updateMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({ id: 'pass-sooner' }),
-      }),
-    );
+    expect(result.status).toBe(CheckInStatus.TREATMENT_SELECTION_REQUIRED);
+    expect(result.treatmentOptions?.map((o) => o.passId)).toEqual([
+      'pass-sooner',
+      'pass-later',
+    ]);
+    expect(txMock.guestPass.updateMany).not.toHaveBeenCalled();
   });
 
-  it('4. Utolsó alkalom (1 -> 0) és Hamarosan lejár (<= 3 nap): LAST_OCCASION + EXPIRING_SOON figyelmeztetés és bérlet inaktiválás', async () => {
+  it('4. Köredzés időalapú bérlettel, hamarosan lejár (<= 3 nap): 0 levonás, EXPIRING_SOON figyelmeztetés', async () => {
     txMock.guest.findUnique.mockResolvedValue({
       id: 'guest-2',
       firstName: 'Péter',
@@ -220,16 +226,17 @@ describe('CheckInsService — Kritikus Beléptetési és Köredzés vs. Kezelés
       memberships: [],
       passes: [
         {
-          id: 'pass-last',
-          passTemplateId: 'tpl-5',
-          type: 'OCCASION_BASED',
-          totalPasses: 5,
-          remainingPasses: 1,
+          id: 'pass-month',
+          passTemplateId: 'tpl-unlimited',
+          serviceId: null,
+          type: 'TIME_BASED',
+          totalPasses: null,
+          remainingPasses: null,
           startDate: pastDate(28),
           expirationDate: futureDate(2),
           isActive: true,
           isFrozen: false,
-          passTemplate: { name: '5 Alkalmas Reformer Bérlet' },
+          passTemplate: { name: 'Havi Korlátlan Bérlet' },
         },
       ],
     });
@@ -240,17 +247,21 @@ describe('CheckInsService — Kritikus Beléptetési és Köredzés vs. Kezelés
     );
 
     expect(result.status).toBe(CheckInStatus.SUCCESS);
-    expect(result.remainingPasses).toBe(0);
-    expect(result.warnings).toContain('LAST_OCCASION');
+    expect(result.mode).toBe('CIRCUIT_GREETING');
+    expect(result.remainingPasses).toBe('Korlátlan');
     expect(result.warnings).toContain('EXPIRING_SOON');
-    expect(result.suggestedRenewalTemplateId).toBe('tpl-5');
-    expect(txMock.guestPass.update).toHaveBeenCalledWith({
-      where: { id: 'pass-last' },
-      data: { isActive: false },
+    expect(result.suggestedRenewalTemplateId).toBe('tpl-unlimited');
+    expect(txMock.guestPass.updateMany).not.toHaveBeenCalled();
+    expect(txMock.loggedCheckIn.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        guestPassId: 'pass-month',
+        visitType: 'CIRCUIT_TRAINING',
+        status: 'SUCCESS',
+      }),
     });
   });
 
-  it('5. 10 mp-es Dupla Lehúzás Védelem (DUPLICATE_SCAN): 10 mp-en belül nem von le újabb alkalmat, kivéve forceDuplicate=true esetén', async () => {
+  it('5. 10 mp-es Dupla Lehúzás Védelem (DUPLICATE_SCAN): 10 mp-en belül nem léptet be újra; forceDuplicate=true esetén újra dönt (alkalmas bérletnél kezelésválasztás)', async () => {
     expect(DUPLICATE_SCAN_COOLDOWN_SECONDS).toBe(10);
 
     txMock.guest.findUnique.mockResolvedValue({
@@ -299,13 +310,14 @@ describe('CheckInsService — Kritikus Beléptetési és Köredzés vs. Kezelés
     expect(duplicateRes.status).toBe(CheckInStatus.DUPLICATE_SCAN);
     expect(txMock.guestPass.updateMany).not.toHaveBeenCalled();
 
+    // Felülbírálva sem von le: alkalmas bérletnél a beolvasás kezelésválasztást kér (TICKET-39).
     const forcedRes = await service.processBarcodeCheckIn(
       { barcode: 'RS100001', forceDuplicate: true },
       'staff-1',
     );
-    expect(forcedRes.status).toBe(CheckInStatus.SUCCESS);
-    expect(forcedRes.remainingPasses).toBe(5);
-    expect(txMock.guestPass.updateMany).toHaveBeenCalledTimes(1);
+    expect(forcedRes.status).toBe(CheckInStatus.TREATMENT_SELECTION_REQUIRED);
+    expect(txMock.guestPass.updateMany).not.toHaveBeenCalled();
+    expect(txMock.loggedCheckIn.create).not.toHaveBeenCalled();
   });
 
   it('6. Elutasítások (DENIED): Fagyasztott bérlet, lejárt bérlet vagy ismeretlen vonalkód esetén nem történik levonás', async () => {
@@ -346,35 +358,49 @@ describe('CheckInsService — Kritikus Beléptetési és Köredzés vs. Kezelés
     ).rejects.toMatchObject({ code: 'CHECKIN.GUEST_NOT_FOUND', status: 400 });
   });
 
-  it('7. Versenyhelyzet (Race Condition) védelem: ha az atomi updateMany count=0 értéket ad vissza, CHECKIN.BALANCE_CHANGED hibát dob és nem megy negatívba', async () => {
+  it('7. Hypoxi bérlet + köredzés (VisitType.CIRCUIT_TRAINING): szolgáltatáshoz kötött alkalmas bérlet nem ad ingyenes köredzést, kezelésválasztás kell', async () => {
     txMock.guest.findUnique.mockResolvedValue({
-      id: 'guest-1',
-      firstName: 'Anna',
-      lastName: 'Kovács',
-      barcode: 'RS100001',
+      id: 'guest-hypoxi',
+      firstName: 'Dóra',
+      lastName: 'Horváth',
+      barcode: '100006',
       isActive: true,
       memberships: [],
       passes: [
         {
-          id: 'pass-race',
-          passTemplateId: 'tpl-1',
+          id: 'pass-hypoxi',
+          passTemplateId: 'tpl-hypoxi',
+          serviceId: 'srv-hypoxi',
+          service: { id: 'srv-hypoxi', name: 'Hypoxi', category: 'BODY_SHAPING' },
           type: 'OCCASION_BASED',
-          totalPasses: 1,
-          remainingPasses: 1,
-          startDate: pastDate(1),
-          expirationDate: futureDate(5),
+          totalPasses: 10,
+          remainingPasses: 8,
+          startDate: pastDate(5),
+          expirationDate: futureDate(30),
           isActive: true,
           isFrozen: false,
-          passTemplate: { name: 'Napijegy' },
+          passTemplate: { name: '10 Alkalmas Hypoxi Bérlet' },
         },
       ],
     });
 
-    txMock.guestPass.updateMany.mockResolvedValue({ count: 0 });
+    const res = await service.processBarcodeCheckIn(
+      { barcode: '100006', visitType: VisitType.CIRCUIT_TRAINING },
+      'staff-1',
+    );
 
-    await expect(
-      service.processBarcodeCheckIn({ barcode: 'RS100001' }, 'staff-1'),
-    ).rejects.toMatchObject({ code: 'CHECKIN.BALANCE_CHANGED', status: 409 });
+    expect(res.status).toBe(CheckInStatus.TREATMENT_SELECTION_REQUIRED);
+    expect(res.treatmentOptions).toEqual([
+      expect.objectContaining({
+        passId: 'pass-hypoxi',
+        serviceId: 'srv-hypoxi',
+        serviceName: 'Hypoxi',
+        remainingPasses: 8,
+      }),
+    ]);
+    expect(txMock.visit.create).not.toHaveBeenCalled();
+    expect(txMock.loggedCheckIn.create).not.toHaveBeenCalled();
+    expect(txMock.guestPass.updateMany).not.toHaveBeenCalled();
     expect(monitorGatewayMock.emitCheckInResult).not.toHaveBeenCalled();
   });
 
@@ -517,6 +543,7 @@ describe('CheckInsService — Kritikus Beléptetési és Köredzés vs. Kezelés
     expect(res.warnings).toContain('OVERDUE_DUES');
     // Nem vonhatott le a Hypoxi alkalmas bérletből!
     expect(txMock.guestPass.updateMany).not.toHaveBeenCalled();
+    expect(txMock.passUsageLog.create).not.toHaveBeenCalled();
     expect(txMock.visit.create).toHaveBeenCalledTimes(1);
     expect(monitorGatewayMock.emitCheckInResult).toHaveBeenCalledTimes(1);
   });
@@ -536,16 +563,17 @@ describe('CheckInsService — Kritikus Beléptetési és Köredzés vs. Kezelés
         memberships: [],
         passes: [
           {
-            id: 'pass-10',
-            passTemplateId: 'tpl-10',
-            type: 'OCCASION_BASED',
-            totalPasses: 10,
-            remainingPasses: 7,
+            id: 'pass-month',
+            passTemplateId: 'tpl-unlimited',
+            serviceId: null,
+            type: 'TIME_BASED',
+            totalPasses: null,
+            remainingPasses: null,
             startDate: pastDate(5),
             expirationDate: futureDate(25),
             isActive: true,
             isFrozen: false,
-            passTemplate: { name: '10 Alkalmas Reformer Bérlet' },
+            passTemplate: { name: 'Havi Korlátlan Bérlet' },
           },
         ],
       });
@@ -571,5 +599,215 @@ describe('CheckInsService — Kritikus Beléptetési és Köredzés vs. Kezelés
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  describe('TICKET-39 — beolvasás: kezelésválasztás alkalmas bérletnél, nincs ingyenes köredzés', () => {
+    const hypoxiPass = (over: Record<string, unknown> = {}) => ({
+      id: 'pass-hypoxi',
+      passTemplateId: 'tpl-hypoxi',
+      serviceId: 'srv-hypoxi',
+      service: { id: 'srv-hypoxi', name: 'Hypoxi', category: 'BODY_SHAPING' },
+      type: 'OCCASION_BASED',
+      totalPasses: 10,
+      remainingPasses: 8,
+      startDate: pastDate(20),
+      expirationDate: futureDate(30),
+      isActive: true,
+      isFrozen: false,
+      frozenAt: null,
+      cancelledAt: null,
+      passTemplate: { name: '10 Alkalmas Hypoxi Bérlet' },
+      ...over,
+    });
+    const guestWith = (passes: unknown[], memberships: unknown[] = []) => ({
+      id: 'guest-dora',
+      firstName: 'Dóra',
+      lastName: 'Horváth',
+      barcode: '100006',
+      isActive: true,
+      memberships,
+      passes,
+    });
+
+    it('fagyasztás → feloldás → beolvasás alkalmas bérlettel: előbb elutasítás, utána nincs belépés, kezelésválasztás kell', async () => {
+      txMock.guest.findUnique.mockResolvedValue(
+        guestWith([hypoxiPass({ isFrozen: true, frozenAt: pastDate(4) })]),
+      );
+      const frozen = await service.processBarcodeCheckIn(
+        { barcode: '100006', visitType: VisitType.CIRCUIT_TRAINING },
+        'staff-1',
+      );
+      expect(frozen.status).toBe(CheckInStatus.DENIED);
+      expect(frozen.reason).toContain('fagyasztva');
+
+      txMock.loggedCheckIn.create.mockClear();
+      monitorGatewayMock.emitCheckInResult.mockClear();
+
+      // Feloldás után ugyanaz a bérlet: nem fagyasztott, 8 alkalom.
+      txMock.guest.findUnique.mockResolvedValue(guestWith([hypoxiPass()]));
+      const afterUnfreeze = await service.processBarcodeCheckIn(
+        { barcode: '100006', visitType: VisitType.CIRCUIT_TRAINING },
+        'staff-1',
+      );
+
+      expect(afterUnfreeze.status).toBe(
+        CheckInStatus.TREATMENT_SELECTION_REQUIRED,
+      );
+      expect(afterUnfreeze.guestId).toBe('guest-dora');
+      expect(afterUnfreeze.treatmentOptions).toEqual([
+        {
+          passId: 'pass-hypoxi',
+          passName: '10 Alkalmas Hypoxi Bérlet',
+          passType: PassType.OCCASION_BASED,
+          serviceId: 'srv-hypoxi',
+          serviceName: 'Hypoxi',
+          remainingPasses: 8,
+          expirationDate: expect.any(String),
+        },
+      ]);
+      expect(txMock.visit.create).not.toHaveBeenCalled();
+      expect(txMock.loggedCheckIn.create).not.toHaveBeenCalled();
+      expect(txMock.passUsageLog.create).not.toHaveBeenCalled();
+      expect(txMock.guestPass.updateMany).not.toHaveBeenCalled();
+      expect(monitorGatewayMock.emitCheckInResult).not.toHaveBeenCalled();
+    });
+
+    it('havi tagság + alkalmas bérlet: köredzés belépés 0 levonással (visitType nélkül is)', async () => {
+      txMock.guest.findUnique.mockResolvedValue(
+        guestWith(
+          [hypoxiPass()],
+          [{ id: 'memb-1', status: 'ACTIVE', monthlyFeeHuf: 22000, dues: [] }],
+        ),
+      );
+
+      const res = await service.processBarcodeCheckIn(
+        { barcode: '100006' },
+        'staff-1',
+      );
+
+      expect(res.status).toBe(CheckInStatus.SUCCESS);
+      expect(res.mode).toBe('CIRCUIT_GREETING');
+      expect(res.remainingPasses).toBe('Korlátlan');
+      expect(txMock.loggedCheckIn.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          guestPassId: null,
+          visitType: 'CIRCUIT_TRAINING',
+          status: 'SUCCESS',
+        }),
+      });
+      expect(txMock.guestPass.updateMany).not.toHaveBeenCalled();
+      expect(txMock.passUsageLog.create).not.toHaveBeenCalled();
+      expect(monitorGatewayMock.emitCheckInResult).toHaveBeenCalledTimes(1);
+    });
+
+    it('időalapú köredzés bérlet (CIRCUIT szolgáltatás): köredzés belépés a bérletre, 0 levonás', async () => {
+      txMock.guest.findUnique.mockResolvedValue(
+        guestWith([
+          hypoxiPass(),
+          {
+            id: 'pass-circuit',
+            passTemplateId: 'tpl-unlimited',
+            serviceId: 'srv-circuit',
+            service: {
+              id: 'srv-circuit',
+              name: 'Női Köredzés',
+              category: 'CIRCUIT',
+            },
+            type: 'TIME_BASED',
+            totalPasses: null,
+            remainingPasses: null,
+            startDate: pastDate(3),
+            expirationDate: futureDate(27),
+            isActive: true,
+            isFrozen: false,
+            cancelledAt: null,
+            passTemplate: { name: 'Havi Korlátlan Köredzés Bérlet' },
+          },
+        ]),
+      );
+
+      const res = await service.processBarcodeCheckIn(
+        { barcode: '100006', visitType: VisitType.CIRCUIT_TRAINING },
+        'staff-1',
+      );
+
+      expect(res.status).toBe(CheckInStatus.SUCCESS);
+      expect(res.mode).toBe('CIRCUIT_GREETING');
+      expect(res.passName).toBe('Havi Korlátlan Köredzés Bérlet');
+      expect(res.passType).toBe(PassType.TIME_BASED);
+      expect(txMock.loggedCheckIn.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          guestPassId: 'pass-circuit',
+          visitType: 'CIRCUIT_TRAINING',
+          status: 'SUCCESS',
+        }),
+      });
+      expect(txMock.guestPass.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('nem köredzés szolgáltatáshoz kötött időalapú bérlet (kozmetika): nem ad köredzést, kezelésválasztás kell', async () => {
+      txMock.guest.findUnique.mockResolvedValue(
+        guestWith([
+          {
+            id: 'pass-facial-month',
+            passTemplateId: 'tpl-facial-month',
+            serviceId: 'srv-facial',
+            service: { id: 'srv-facial', name: 'Arckezelés', category: 'COSMETIC' },
+            type: 'TIME_BASED',
+            totalPasses: null,
+            remainingPasses: null,
+            startDate: pastDate(3),
+            expirationDate: futureDate(27),
+            isActive: true,
+            isFrozen: false,
+            cancelledAt: null,
+            passTemplate: { name: 'Havi Prémium Kozmetika' },
+          },
+        ]),
+      );
+
+      const res = await service.processBarcodeCheckIn(
+        { barcode: '100006', visitType: VisitType.CIRCUIT_TRAINING },
+        'staff-1',
+      );
+
+      expect(res.status).toBe(CheckInStatus.TREATMENT_SELECTION_REQUIRED);
+      expect(res.treatmentOptions).toEqual([
+        expect.objectContaining({
+          passId: 'pass-facial-month',
+          serviceId: 'srv-facial',
+          remainingPasses: 'Korlátlan',
+        }),
+      ]);
+      expect(txMock.loggedCheckIn.create).not.toHaveBeenCalled();
+      expect(monitorGatewayMock.emitCheckInResult).not.toHaveBeenCalled();
+    });
+
+    it('offline szinkron: a kezelésválasztást igénylő tétel nem rögzül, de az eredménylistában látszik', async () => {
+      txMock.guest.findUnique.mockResolvedValue(guestWith([hypoxiPass()]));
+
+      const res = await service.syncOfflineScans(
+        {
+          items: [
+            {
+              idempotencyKey: 'offline-1',
+              barcode: '100006',
+              scannedAt: pastDate(0).toISOString(),
+            },
+          ],
+        },
+        'staff-1',
+      );
+
+      expect(res.processed).toBe(1);
+      expect(res.treatmentSelectionRequired).toBe(1);
+      expect(res.results[0]).toMatchObject({
+        status: CheckInStatus.TREATMENT_SELECTION_REQUIRED,
+        guestName: 'Horváth Dóra',
+      });
+      expect(txMock.loggedCheckIn.create).not.toHaveBeenCalled();
+      expect(txMock.visit.create).not.toHaveBeenCalled();
+      expect(monitorGatewayMock.emitCheckInResult).not.toHaveBeenCalled();
+    });
   });
 });

@@ -10,4 +10,8 @@ export const CHECK_IN_STATUS_BADGES: Record<
   [CheckInStatus.DUPLICATE_SCAN]: { variant: 'warning', label: 'Dupla leolvasás' },
   [CheckInStatus.DENIED]: { variant: 'destructive', label: 'Elutasítva' },
   [CheckInStatus.CANCELLED]: { variant: 'secondary', label: 'Visszavonva' },
+  [CheckInStatus.TREATMENT_SELECTION_REQUIRED]: {
+    variant: 'warning',
+    label: 'Kezelésválasztás',
+  },
 };

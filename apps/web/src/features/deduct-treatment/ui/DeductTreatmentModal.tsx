@@ -39,6 +39,12 @@ const blockTitleClassName = 'mb-2 text-xs font-semibold text-muted-foreground';
 interface DeductTreatmentModalProps {
   isOpen: boolean;
   initialGuest: GuestDto | null;
+  /** Előre kijelölt kezelés (pl. beolvasás után, ha csak egy jöhet szóba). */
+  initialServiceId?: string | null;
+  /** Előre kijelölt bérlet (pl. beolvasás után, ha csak egy jöhet szóba). */
+  initialPassId?: string | null;
+  /** Tájékoztató az ablak tetején (pl. miért nyílt meg a beolvasás után). */
+  notice?: string;
   guests: GuestDto[];
   services: ServiceDto[];
   isSubmitting?: boolean;
@@ -56,6 +62,9 @@ interface DeductTreatmentModalProps {
 export const DeductTreatmentModal: React.FC<DeductTreatmentModalProps> = ({
   isOpen,
   initialGuest,
+  initialServiceId,
+  initialPassId,
+  notice,
   guests,
   services,
   isSubmitting = false,
@@ -82,10 +91,11 @@ export const DeductTreatmentModal: React.FC<DeductTreatmentModalProps> = ({
     setShowErrors(false);
 
     const defaultService =
+      treatmentServices.find((s) => s.id === initialServiceId) ??
       treatmentServices.find((s) => s.name.toLowerCase().includes('hypoxi')) ??
       treatmentServices[0];
     setSelectedServiceId(defaultService?.id ?? '');
-  }, [isOpen, initialGuest]);
+  }, [isOpen, initialGuest, initialServiceId]);
 
   const selectedGuest = guests.find((g) => g.id === selectedGuestId) ?? null;
 
@@ -101,11 +111,14 @@ export const DeductTreatmentModal: React.FC<DeductTreatmentModalProps> = ({
       setSelectedPassId('');
       return;
     }
+    const preselectedPass = activePasses.find((p) => p.id === initialPassId);
     const matchingByService = activePasses.find(
       (p) => p.serviceId && p.serviceId === selectedServiceId,
     );
-    setSelectedPassId(matchingByService?.id ?? activePasses[0]?.id ?? '');
-  }, [selectedGuestId, selectedServiceId]);
+    setSelectedPassId(
+      preselectedPass?.id ?? matchingByService?.id ?? activePasses[0]?.id ?? '',
+    );
+  }, [selectedGuestId, selectedServiceId, initialPassId]);
 
   if (!isOpen) return null;
 
@@ -162,6 +175,12 @@ export const DeductTreatmentModal: React.FC<DeductTreatmentModalProps> = ({
 
         <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
           <DialogBody className="space-y-5">
+            {notice && (
+              <Alert>
+                <AlertDescription>{notice}</AlertDescription>
+              </Alert>
+            )}
+
             <div className="flex flex-col gap-1.5">
               <Label htmlFor={`${fieldId}-guest`}>Vendég</Label>
               {!initialGuest && (

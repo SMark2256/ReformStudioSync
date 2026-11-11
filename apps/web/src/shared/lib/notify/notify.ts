@@ -51,6 +51,18 @@ export const notify = {
     payload: CheckInResultPayload,
     callbacks?: CheckInToastCallbacks,
   ) {
+    // Alkalmas bérlet (TICKET-39): nincs belépés, a kezelésválasztó ablak nyílik meg.
+    if (payload.status === CheckInStatus.TREATMENT_SELECTION_REQUIRED) {
+      soundFeedback.playWarning();
+      toast.info(`Kezelésválasztás: ${payload.guestName}`, {
+        description:
+          payload.reason ??
+          'Alkalmas bérlet: a belépés a kezelés kiválasztásával és az alkalom levonásával rögzül.',
+        duration: 5500,
+      });
+      return;
+    }
+
     if (payload.status === CheckInStatus.SUCCESS) {
       const hasWarnings = payload.warnings && payload.warnings.length > 0;
       if (hasWarnings) {

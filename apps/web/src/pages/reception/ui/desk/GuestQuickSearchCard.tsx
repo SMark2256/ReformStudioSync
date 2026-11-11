@@ -101,7 +101,7 @@ export const GuestQuickSearchCard: React.FC<GuestQuickSearchCardProps> = ({
                   <Button
                     size="sm"
                     onClick={() => onScan(g.barcode)}
-                    title="Köredzés érkezés rögzítése (0 levonás)"
+                    title="Köredzés érkezés (tagsággal vagy köredzés-bérlettel 0 levonás). Alkalmas bérletnél a kezelésválasztó ablak nyílik meg."
                   >
                     Köredzés
                   </Button>

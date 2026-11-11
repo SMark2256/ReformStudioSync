@@ -1,26 +1,38 @@
 import {
   CheckInResultPayload,
   CheckInRevokedPayload,
+  CheckInStatus,
   SCANNER_BROADCAST_CHANNEL,
   VisitType,
 } from '@reform/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import React, { useCallback, useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   normalizeScannedCode,
   useBarcodeScanner,
 } from '@/shared/lib/barcode-scanner';
 import {
+  broadcastToLocalMonitors,
   broadcastToScannerChannel,
   MonitorBroadcastMessage,
   useMonitorChannel,
 } from '@/shared/lib/monitor-channel';
 import { api } from '@/shared/api';
+import { APP_ROUTES, normalizePathname } from '@/shared/config';
 import { handleAppError } from '@/shared/lib/errors';
 import { notify } from '@/shared/lib/notify';
 import { useOfflineQueueStore } from '@/entities/check-in';
 import { useScannerChannelStore } from '@/entities/check-in';
+
+// A kezelésválasztó ablakot a recepció oldalai (ReceptionPage) nyitják meg (TICKET-39).
+const TREATMENT_SELECTION_PATHS: readonly string[] = [
+  APP_ROUTES.reception.path,
+  APP_ROUTES.guests.path,
+  APP_ROUTES.passes.path,
+  APP_ROUTES.finance.path,
+  APP_ROUTES.news.path,
+];
 
 /**
  * Globális, oldalaktól független QR-kód / vonalkód szkennelési csatorna.
@@ -31,8 +43,11 @@ import { useScannerChannelStore } from '@/entities/check-in';
 export const GlobalScannerChannel: React.FC = () => {
   const queryClient = useQueryClient();
   const location = useLocation();
+  const navigate = useNavigate();
   const isLoginPage = location.pathname === '/login';
   const isMonitorPage = location.pathname === '/monitor';
+  // A vendégeknek szóló tableten nem nyílik recepciós ablak, és onnan nem is navigálunk el.
+  const isTabletPage = location.pathname === '/tablet';
 
   const { isOnline, enqueueScan } = useOfflineQueueStore();
   const {
@@ -41,6 +56,7 @@ export const GlobalScannerChannel: React.FC = () => {
     recordScanAttempt,
     recordCheckInResult,
     recordRevokedResult,
+    requestTreatmentSelection,
   } = useScannerChannelStore();
 
   const invalidateCheckInQueries = useCallback(() => {
@@ -120,6 +136,27 @@ export const GlobalScannerChannel: React.FC = () => {
           visitType: options?.visitType ?? VisitType.CIRCUIT_TRAINING,
         });
 
+        // Alkalmas bérlet (TICKET-39): nincs belépés. A recepción a kezelésválasztó nyílik meg
+        // (más oldalról odanavigálunk), a Vendégmonitoron semleges „fáradj a recepcióhoz” üzenet.
+        if (result.status === CheckInStatus.TREATMENT_SELECTION_REQUIRED) {
+          if (isMonitorPage) {
+            broadcastToLocalMonitors({ type: 'CHECKIN_RESULT', payload: result });
+            return result;
+          }
+          notify.checkInResult(result);
+          if (!isTabletPage) {
+            requestTreatmentSelection(result);
+            if (
+              !TREATMENT_SELECTION_PATHS.includes(
+                normalizePathname(location.pathname),
+              )
+            ) {
+              navigate(APP_ROUTES.reception.path);
+            }
+          }
+          return result;
+        }
+
         recordCheckInResult(result);
         broadcastToScannerChannel({
           type: 'CHECKIN_RESULT',
@@ -160,8 +197,11 @@ export const GlobalScannerChannel: React.FC = () => {
       isOnline,
       enqueueScan,
       isMonitorPage,
+      isTabletPage,
       setProcessing,
       recordCheckInResult,
+      requestTreatmentSelection,
+      navigate,
       invalidateCheckInQueries,
       handleRevoke,
     ],

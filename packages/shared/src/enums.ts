@@ -29,6 +29,11 @@ export enum CheckInStatus {
   DENIED = 'DENIED',
   DUPLICATE_SCAN = 'DUPLICATE_SCAN',
   CANCELLED = 'CANCELLED',
+  /**
+   * Csak beolvasási válasz, nem tárolódik (a Prisma enumban nincs): a vendégnek csak kezelésre
+   * szóló bérlete van, a belépés a kezelésválasztóban, a levonással rögzül (TICKET-39).
+   */
+  TREATMENT_SELECTION_REQUIRED = 'TREATMENT_SELECTION_REQUIRED',
 }
 
 export enum GuestStatus {

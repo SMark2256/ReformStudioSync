@@ -10,6 +10,7 @@ import {
   PaymentMethod,
   toMonitorPayload,
   toMonitorRevokedPayload,
+  TreatmentSelectionOption,
   VisitType,
 } from '@reform/shared';
 import {
@@ -49,7 +50,10 @@ import {
 import { DigitalPassCardModal } from '@/entities/guest';
 import { GuestModal } from '@/widgets/guest-profile';
 import { MonitorDisplayCard } from '@/entities/check-in';
-import { DeductTreatmentModal } from '@/features/deduct-treatment';
+import {
+  DeductTreatmentModal,
+  getTreatmentPreselection,
+} from '@/features/deduct-treatment';
 import { RecordPaymentModal } from '@/features/record-payment';
 import { SellPassModal } from '@/features/sell-pass';
 
@@ -107,6 +111,8 @@ export const DemoSandboxPage: React.FC = () => {
   const [deductModalState, setDeductModalState] = useState<{
     isOpen: boolean;
     guest: GuestDto | null;
+    /** Beolvasás után (TICKET-39): a szóba jöhető bérletek az előválasztáshoz. */
+    treatmentOptions?: TreatmentSelectionOption[];
   }>({ isOpen: false, guest: null });
 
   const [paymentModalState, setPaymentModalState] = useState<{
@@ -144,6 +150,11 @@ export const DemoSandboxPage: React.FC = () => {
   const templates = mockStudioEngine.getTemplates(true);
   const todayCheckIns = mockStudioEngine.getTodayCheckIns();
   const financeSummary = mockStudioEngine.getDailyFinanceSummary();
+
+  const deductPreselection = getTreatmentPreselection(
+    deductModalState.treatmentOptions ?? [],
+    services,
+  );
 
   const activeModalGuest = guestModalState.guest
     ? (guests.find((g) => g.id === guestModalState.guest?.id) ??
@@ -223,6 +234,19 @@ export const DemoSandboxPage: React.FC = () => {
           visitType,
           serviceId,
         });
+        // Alkalmas bérlet (TICKET-39): nincs belépés, a kezelésválasztó ablak nyílik meg.
+        if (result.status === CheckInStatus.TREATMENT_SELECTION_REQUIRED) {
+          notify.checkInResult(result);
+          setDeductModalState({
+            isOpen: true,
+            guest:
+              mockStudioEngine
+                .getGuests()
+                .find((g) => g.id === result.guestId) ?? null,
+            treatmentOptions: result.treatmentOptions ?? [],
+          });
+          return;
+        }
         recordCheckInResult(result);
         broadcastToScannerChannel({ type: 'CHECKIN_RESULT', payload: result });
         showOnEmbeddedMonitor(result);
@@ -291,13 +315,22 @@ export const DemoSandboxPage: React.FC = () => {
     const res = mockStudioEngine.syncOfflineScans(offlineQueue);
     clearQueue();
     setOnline(true);
-    if (res.results.length > 0) {
-      showOnEmbeddedMonitor(res.results[res.results.length - 1]);
+    const recorded = res.results.filter(
+      (r) => r.status !== CheckInStatus.TREATMENT_SELECTION_REQUIRED,
+    );
+    if (recorded.length > 0) {
+      showOnEmbeddedMonitor(recorded[recorded.length - 1]);
     }
     notify.success(
-      `Offline várólista feldolgozva (${res.processed} db beléptetés)`,
+      `Offline várólista feldolgozva (${res.processed} db beolvasás)`,
       'Az összes offline beolvasott vonalkód szinkronizálva lett.',
     );
+    if (res.treatmentSelectionRequired > 0) {
+      notify.warning(
+        `Kezelésválasztás kell (${res.treatmentSelectionRequired} offline beolvasás)`,
+        'Alkalmas bérletnél nem rögzült belépés; a kezelést a „Kezelés -1” gombbal vond le.',
+      );
+    }
     forceRender();
   };
 
@@ -885,6 +918,13 @@ export const DemoSandboxPage: React.FC = () => {
       <DeductTreatmentModal
         isOpen={deductModalState.isOpen}
         initialGuest={deductModalState.guest}
+        initialPassId={deductPreselection.passId}
+        initialServiceId={deductPreselection.serviceId}
+        notice={
+          deductModalState.treatmentOptions
+            ? 'Alkalmas bérlet: a beolvasás nem rögzített belépést. Válaszd ki a kezelést, a belépés a levonással rögzül.'
+            : undefined
+        }
         guests={guests}
         services={services}
         onClose={() => setDeductModalState({ isOpen: false, guest: null })}

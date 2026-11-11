@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import {
+  CheckInStatus,
   computeRemainingPasses,
   getPassStatus,
   PassStatus,
@@ -343,9 +344,17 @@ describe('TICKET-16 — Bérlet-alkalom egyetlen forrásból, sztornó és vissz
     ]);
   });
 
-  it('vonalkódos (kezelés) beléptetés levonása is a beléptetéshez kötött: visszavonás után a sztornó már nem ír jóvá', async () => {
+  it('vonalkódos beolvasás alkalmas bérletnél nem von le (TICKET-39); a kezelésválasztó levonása a beléptetéshez kötött: visszavonás után a sztornó már nem ír jóvá', async () => {
     const pass = addPass({ passTemplateId: 'tpl-general', serviceId: null, remainingPasses: 3, totalPasses: 3 });
-    const res = await checkIns.processBarcodeCheckIn({ barcode: 'RS100001' }, 'staff-1', STUDIO);
+    const scan = await checkIns.processBarcodeCheckIn({ barcode: 'RS100001' }, 'staff-1', STUDIO);
+    expect(scan.status).toBe(CheckInStatus.TREATMENT_SELECTION_REQUIRED);
+    expect(scan.treatmentOptions?.map((o) => o.passId)).toEqual([pass.id]);
+    expect(db.t.usages).toHaveLength(0);
+    expect(db.t.checkIns).toHaveLength(0);
+    expect(db.t.visits).toHaveLength(0);
+    expect(pass.remainingPasses).toBe(3);
+
+    const res = await deduct(pass.id);
     expect(res.remainingPasses).toBe(2);
     const usage = db.t.usages[0];
     expect(usage.checkInId).toBe(res.checkInId);
