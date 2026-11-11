@@ -1,6 +1,7 @@
 import { Check, Moon, Sun } from 'lucide-react';
 import React from 'react';
 import { useSidebarCollapsed } from '@/widgets/app-shell';
+import { useIsMobile } from '@/shared/lib/hooks';
 import {
   SURFACE_COLORS,
   THEME_LABELS,
@@ -60,6 +61,8 @@ export const SettingsPage: React.FC = () => {
   const theme = useThemeStore((state) => state.theme);
   const surface = useSurfaceStore((state) => state.surface);
   const { collapsed, setCollapsed } = useSidebarCollapsed();
+  // Mobilon nincs ikonsáv (kihúzható menü van), ott a kapcsoló a tablet beállítását állítaná.
+  const isMobile = useIsMobile();
 
   return (
     <>
@@ -138,25 +141,27 @@ export const SettingsPage: React.FC = () => {
             </div>
           </SettingRow>
 
-          <SettingRow
-            id="settings-sidebar"
-            title="Oldalsáv"
-            description="Csak ikonok, több hely a tartalomnak. Keskeny és széles képernyőn külön mentődik."
-          >
-            <div className="flex items-center gap-2">
-              <Switch
-                id="settings-sidebar-collapsed"
-                checked={collapsed}
-                onCheckedChange={setCollapsed}
-              />
-              <Label
-                htmlFor="settings-sidebar-collapsed"
-                className="text-[13px] font-normal text-foreground"
-              >
-                Összecsukott oldalsáv
-              </Label>
-            </div>
-          </SettingRow>
+          {!isMobile && (
+            <SettingRow
+              id="settings-sidebar"
+              title="Oldalsáv"
+              description="Csak ikonok, több hely a tartalomnak. Keskeny és széles képernyőn külön mentődik."
+            >
+              <div className="flex items-center gap-2">
+                <Switch
+                  id="settings-sidebar-collapsed"
+                  checked={collapsed}
+                  onCheckedChange={setCollapsed}
+                />
+                <Label
+                  htmlFor="settings-sidebar-collapsed"
+                  className="text-[13px] font-normal text-foreground"
+                >
+                  Összecsukott oldalsáv
+                </Label>
+              </div>
+            </SettingRow>
+          )}
         </CardContent>
       </Card>
     </>

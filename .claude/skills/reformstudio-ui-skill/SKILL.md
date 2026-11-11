@@ -696,7 +696,8 @@ A fiókpanelből nyílik (4.2), a menüben nincs.
     `muted-foreground`. Egyedi színválasztó nincs.
   - **Oldalsáv** „Csak ikonok, több hely a tartalomnak. Keskeny és széles
     képernyőn külön mentődik.” → `Switch` „Összecsukott oldalsáv” (az aktuális
-    sáv beállítása, ugyanaz, mint az összecsukó gomb).
+    sáv beállítása, ugyanaz, mint az összecsukó gomb). Mobilon (768 px alatt)
+    rejtve, mert ott kihúzható menü van, nincs ikonsáv.
 - Kártya „Stúdió adatai” (későbbi jegy, még nincs hozzá API): nem adminnál
   fejlécben `secondary` „Csak admin” jelvény `Lock` ikonnal, a mezők letiltva;
   Stúdió neve · Cím · Vendégmonitor kijelzési idő (4 / 6 / 10 mp) · Lejárat előtti
