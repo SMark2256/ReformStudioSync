@@ -2,9 +2,98 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * shadcn/ui tokenek (UI-specifikáció 3. fejezet, HSL-számhármasok). Csak változókat
+ * definiálnak: a régi oldalak nyers `slate`/`emerald` osztályait nem érintik. A shadcn
+ * globális alapstílusa (`* { border-border }`, body háttér/szín) szándékosan nincs itt,
+ * mert a régi oldalak kinézetét megváltoztatná; a `shared/ui` komponensek a keretszínt
+ * maguk adják meg. A `--primary`/`--primary-foreground` futásidőben állítható
+ * (`applyAccent`, `@/shared/theme`).
+ */
 @layer base {
+  :root {
+    --background: 220 20% 97%; /* #f5f6f8 oldal háttér */
+    --foreground: 215 24% 14%; /* #1b222c */
+    --card: 0 0% 100%;
+    --card-foreground: 215 24% 14%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 215 24% 14%;
+    --muted: 216 20% 95%; /* #f0f2f5 táblafejléc, hover */
+    --muted-foreground: 213 14% 39%; /* #556170 */
+    --faint: 215 10% 46%; /* #6a7482 csoportcímkék, segédszöveg */
+    --secondary: 0 0% 100%; /* a másodlagos gomb háttere */
+    --secondary-foreground: 215 24% 14%;
+    --accent: 216 20% 95%; /* shadcn hover-háttér, NEM a kiemelő szín */
+    --accent-foreground: 215 24% 14%;
+    --border: 216 17% 89%; /* #dde1e7 */
+    --input: 215 14% 80%; /* #c5cbd3 mezők és másodlagos gomb kerete */
+    --primary: 175 77% 26%; /* #0f766e kiemelő szín, állítható */
+    --primary-foreground: 0 0% 100%;
+    --primary-text: hsl(var(--primary));
+    --primary-soft: hsl(var(--primary) / 0.1); /* aktív menüpont, kijelölt sor */
+    --ring: var(--primary);
+    --destructive: 0 74% 42%; /* #b91c1c */
+    --destructive-foreground: 0 0% 100%;
+    --success: 142 72% 29%; /* #15803d */
+    --success-foreground: 0 0% 100%;
+    --warning: 26 90% 37%; /* #b45309 */
+    --warning-foreground: 0 0% 100%;
+    --radius: 0.375rem; /* 6 px */
+
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 213 14% 39%;
+    --sidebar-primary: var(--primary);
+    --sidebar-primary-foreground: var(--primary-foreground);
+    --sidebar-accent: 216 20% 95%;
+    --sidebar-accent-foreground: 215 24% 14%;
+    --sidebar-border: 216 17% 89%;
+    --sidebar-ring: var(--primary);
+  }
+
+  /* `[data-theme]` a <html>-en (app/ThemeSync): a body-ba portált elemek is sötét tokent kapnak. */
+  :root[data-theme='dark'],
+  .reception-theme-dark {
+    --background: 216 21% 7%; /* #0e1115 */
+    --foreground: 214 16% 91%; /* #e5e8ec */
+    --card: 216 19% 10%; /* #161a20 */
+    --card-foreground: 214 16% 91%;
+    --popover: 216 19% 10%;
+    --popover-foreground: 214 16% 91%;
+    --muted: 217 18% 14%; /* #1d222a */
+    --muted-foreground: 214 13% 68%; /* #a3adba */
+    --faint: 212 12% 59%; /* #8b96a3 */
+    --primary-text: color-mix(in srgb, hsl(var(--primary)) 60%, white);
+    --primary-soft: hsl(var(--primary) / 0.2);
+    --secondary: 216 19% 10%;
+    --secondary-foreground: 214 16% 91%;
+    --accent: 217 18% 14%;
+    --accent-foreground: 214 16% 91%;
+    --border: 215 17% 20%; /* #2a313b */
+    --input: 216 15% 27%; /* #3a424e */
+    --destructive: 0 91% 71%; /* #f87171 */
+    --destructive-foreground: 216 21% 7%;
+    --success: 142 69% 58%; /* #4ade80 */
+    --success-foreground: 216 21% 7%;
+    --warning: 43 96% 56%; /* #fbbf24 */
+    --warning-foreground: 216 21% 7%;
+
+    --sidebar-background: 216 19% 10%;
+    --sidebar-foreground: 214 13% 68%;
+    --sidebar-accent: 217 18% 14%;
+    --sidebar-accent-foreground: 214 16% 91%;
+    --sidebar-border: 215 17% 20%;
+  }
+
   body {
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+}
+
+/* A `shared/ui` Radix-animációi (tailwindcss-animate) mozgáscsökkentésnél kikapcsolnak. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-in,
+  .animate-out {
+    animation: none !important;
   }
 }
 
@@ -54,15 +143,16 @@
   color: #94a3b8 !important;
 }
 
-.reception-theme-dark input:not(.monitor-invariant *),
-.reception-theme-dark select:not(.monitor-invariant *),
-.reception-theme-dark textarea:not(.monitor-invariant *) {
+/* A `shared/ui` mezői (`.ui-field`) tokenszínt használnak, ezért kimaradnak (a specificitás nem változik). */
+.reception-theme-dark input:not(.monitor-invariant *, .ui-field),
+.reception-theme-dark select:not(.monitor-invariant *, .ui-field),
+.reception-theme-dark textarea:not(.monitor-invariant *, .ui-field) {
   background-color: #0f172a !important;
   color: #f8fafc !important;
   border-color: #334155 !important;
 }
 
-.reception-theme-dark input::placeholder {
+.reception-theme-dark input:where(:not(.ui-field))::placeholder {
   color: #64748b !important;
 }
 
