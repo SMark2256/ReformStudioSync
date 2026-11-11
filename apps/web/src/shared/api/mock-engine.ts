@@ -23,6 +23,7 @@ import {
   DUPLICATE_SCAN_COOLDOWN_SECONDS,
   EXPIRING_SOON_THRESHOLD_DAYS,
   formatPeriod,
+  frozenDaysBetween,
   getDueDate,
   getMembershipStatusTimestamps,
   getMissingDues,
@@ -37,6 +38,7 @@ import {
   GuestStatus,
   isBirthdayToday,
   isDueRemovableOnStop,
+  isPassFreezable,
   LoggedCheckInDto,
   MeasurementDto,
   MembershipDto,
@@ -1825,6 +1827,10 @@ class MockStudioEngine {
       const pass = (guest.passes ?? []).find((p) => p.id === passId);
       if (pass) {
         if (!pass.isFrozen) {
+          // Csak érvényes bérlet fagyasztható (az API-val azonos szabály); a feloldás mindig mehet.
+          if (!isPassFreezable(syncPassState(pass, now).status)) {
+            throw appError('PASS.NOT_FREEZABLE');
+          }
           pass.isFrozen = true;
           pass.frozenAt = now.toISOString();
           pass.usageLogs = [
@@ -1833,6 +1839,8 @@ class MockStudioEngine {
               guestPassId: pass.id,
               guestId: guest.id,
               guestName: `${guest.lastName} ${guest.firstName}`,
+              employeeId: 'staff-default-1',
+              employeeName: 'Recepciós Munkatárs',
               delta: 0,
               usedAt: now.toISOString(),
               note: `Bérlet fagyasztva${note ? `: ${note}` : ''}`,
@@ -1840,13 +1848,7 @@ class MockStudioEngine {
             ...(pass.usageLogs ?? []),
           ];
         } else {
-          const frozenSince = pass.frozenAt ? new Date(pass.frozenAt) : now;
-          const frozenDays = Math.max(
-            1,
-            Math.ceil(
-              (now.getTime() - frozenSince.getTime()) / (24 * 60 * 60 * 1000),
-            ),
-          );
+          const frozenDays = frozenDaysBetween(pass.frozenAt ?? now, now);
           pass.isFrozen = false;
           pass.frozenAt = null;
           pass.expirationDate = new Date(
@@ -1859,6 +1861,8 @@ class MockStudioEngine {
               guestPassId: pass.id,
               guestId: guest.id,
               guestName: `${guest.lastName} ${guest.firstName}`,
+              employeeId: 'staff-default-1',
+              employeeName: 'Recepciós Munkatárs',
               delta: 0,
               usedAt: now.toISOString(),
               note: `Fagyasztás feloldva (+${frozenDays} nap jóváírva a lejáratra)`,
@@ -1866,6 +1870,7 @@ class MockStudioEngine {
             ...(pass.usageLogs ?? []),
           ];
         }
+        syncPassState(pass, now);
         this.save(state);
         return pass;
       }

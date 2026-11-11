@@ -58,6 +58,7 @@ export const APP_ERROR_CATALOG = {
   'PASS.SERVICE_MISMATCH': { status: 400, message: 'A kiválasztott bérlet nem erre a kezelésre szól.', action: 'notify' },
   'PASS.EXPIRED': { status: 400, message: 'A kiválasztott bérlet lejárt vagy inaktív!', action: 'notify' },
   'PASS.NO_REMAINING': { status: 400, message: 'A bérleten elfogytak a felhasználható alkalmak (0 maradt)!', action: 'notify' },
+  'PASS.NOT_FREEZABLE': { status: 400, message: 'Csak érvényes bérlet fagyasztható; a lejárt, elfogyott vagy sztornózott bérlet nem.', action: 'notify' },
   'PASS.BALANCE_CHANGED': { status: 409, message: 'Versenyhelyzet észlelve: a bérlet egyenlege időközben módosult, nem történt túlfogyasztás.', action: 'reload' },
   'PASS.USAGE_NOT_FOUND': { status: 404, message: 'A kezelési levonás nem található.', action: 'notify' },
   'PASS.USAGE_ALREADY_REVERSED': { status: 400, message: 'Ez a levonás már korábban vissza lett vonva.', action: 'notify' },

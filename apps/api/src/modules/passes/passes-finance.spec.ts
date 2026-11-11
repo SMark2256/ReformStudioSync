@@ -172,7 +172,11 @@ describe('PassesService & FinanceService — Kritikus Bérlet, Kezeléslevonás,
       }),
     );
 
-    const unfreezeRes = await passesService.toggleFreezePass('pass-1', {});
+    const unfreezeRes = await passesService.toggleFreezePass(
+      'pass-1',
+      {},
+      'staff-1',
+    );
 
     expect(unfreezeRes.isFrozen).toBe(false);
     const addedDays = Math.round(
