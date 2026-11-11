@@ -9,7 +9,7 @@ import {
   toasts,
 } from './fixtures';
 
-const ARRIVAL_LOG_WITH_ONE_NEW = /Mai Érkezési & Kezelési Napló \(2\)/;
+const ARRIVAL_LOG_WITH_ONE_NEW = /Mai érkezések és kezelések \(2\)/;
 
 test.describe('Beléptetés vonalkóddal', () => {
   test.beforeEach(async ({ page }) => {
@@ -24,7 +24,7 @@ test.describe('Beléptetés vonalkóddal', () => {
     await scanBarcode(page, '100001');
 
     await expect(toasts(page)).toContainText('Köredzés érkezés: Kovács Anna');
-    await expect(page.getByRole('heading', { name: 'Kovács Anna', level: 4 })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Kovács Anna', level: 3 })).toBeVisible();
     await expect(page.getByRole('heading', { name: ARRIVAL_LOG_WITH_ONE_NEW })).toBeVisible();
     await expect(row).toContainText('10 Alkalmas Hypoxi Bérlet (7 alk.)');
   });
