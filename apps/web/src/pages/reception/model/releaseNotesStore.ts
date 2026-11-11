@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { countUnseenReleaseNotes } from './releaseNotes';
 
 interface ReleaseNotesState {
   seenIds: string[];
@@ -20,3 +21,7 @@ export const useReleaseNotesStore = create<ReleaseNotesState>()(
     },
   ),
 );
+
+/** Olvasatlan újdonságok száma (az Újdonságok menüpont számlálója). */
+export const useUnseenReleaseNotesCount = (): number =>
+  useReleaseNotesStore((s) => countUnseenReleaseNotes(s.seenIds));

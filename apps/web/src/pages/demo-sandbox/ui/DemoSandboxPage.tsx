@@ -18,10 +18,7 @@ import {
   CalendarPlus,
   CheckCircle2,
   CloudOff,
-  ExternalLink,
   FileSignature,
-  FlaskConical,
-  Monitor,
   QrCode,
   RefreshCw,
   RotateCcw,
@@ -36,8 +33,6 @@ import {
 } from 'lucide-react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { ThemeToggleButton } from '@/features/toggle-theme';
-import { VersionBadge } from '@/widgets/version-changelog';
 import { normalizeScannedCode } from '@/shared/lib/barcode-scanner';
 import { broadcastToScannerChannel } from '@/shared/lib/monitor-channel';
 import { mockStudioEngine } from '@/shared/api';
@@ -45,7 +40,7 @@ import { handleAppError } from '@/shared/lib/errors';
 import { notify } from '@/shared/lib/notify';
 import { useOfflineQueueStore } from '@/entities/check-in';
 import { useScannerChannelStore } from '@/entities/check-in';
-import { useThemeStore } from '@/shared/theme';
+import { Button, PageHeader } from '@/shared/ui';
 import { DigitalPassCardModal } from '@/entities/guest';
 import { GuestModal } from '@/widgets/guest-profile';
 import { MonitorDisplayCard } from '@/entities/check-in';
@@ -56,7 +51,6 @@ import { SellPassModal } from '@/features/sell-pass';
 export const DemoSandboxPage: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { theme } = useThemeStore();
   const [, setTick] = useState(0);
   const forceRender = useCallback(() => setTick((t) => t + 1), []);
 
@@ -312,78 +306,27 @@ export const DemoSandboxPage: React.FC = () => {
   }, [location.key, location.state]);
 
   return (
-    <div
-      className={`min-h-screen bg-slate-50 dark:bg-slate-950 pb-12 transition-colors duration-200 ${
-        theme === 'dark' ? 'reception-theme-dark dark' : ''
-      }`}
-    >
-      {/* Top Demo Header */}
-      <header className="sticky top-0 z-30 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/15 border border-emerald-500/30">
-              <FlaskConical className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-base font-extrabold text-slate-900 dark:text-white">
-                  RE-FORM Stúdió — Interaktív Demo & Tesztkörnyezet
-                </h1>
-                <VersionBadge />
-              </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                Köredzés (0 levonás) vs. Alkalmas Kezelés (Hypoxi -1), 10 mp dupla védelem, Vendégkartoték és adatvédett Vendégmonitor.
-              </p>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <ThemeToggleButton />
-
-            <Link
-              to="/tablet"
-              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-amber-300 hover:bg-slate-200 dark:hover:bg-slate-700"
-            >
-              <FileSignature className="h-3.5 w-3.5 text-amber-500 dark:text-amber-400" />
-              Tablet Aláíró (/tablet)
-            </Link>
-
-            <Link
-              to="/reception"
-              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700"
-            >
-              Recepciós Felület (/reception)
-            </Link>
-
-            <button
-              type="button"
-              onClick={() =>
-                window.open(
-                  '/monitor',
-                  'ReformStudioGuestMonitor',
-                  'width=1280,height=800',
-                )
-              }
-              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 px-3 py-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-300 hover:bg-slate-200 dark:hover:bg-slate-700"
-            >
-              <Monitor className="h-3.5 w-3.5" />
-              Külön Monitor Ablak
-              <ExternalLink className="h-3 w-3" />
-            </button>
-
-            <button
-              type="button"
-              onClick={handleResetDemo}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-amber-500 px-3.5 py-1.5 text-xs font-extrabold text-slate-950 hover:bg-amber-400"
-            >
-              <RefreshCw className="h-3.5 w-3.5" />
+    <div>
+      <PageHeader
+        title="Interaktív Demo & Tesztkörnyezet"
+        description="Köredzés (0 levonás) vs. Alkalmas Kezelés (Hypoxi -1), 10 mp dupla védelem, Vendégkartoték és adatvédett Vendégmonitor."
+        actions={
+          <>
+            <Button variant="secondary" asChild>
+              <Link to="/tablet">
+                <FileSignature aria-hidden strokeWidth={1.75} />
+                Tablet Aláíró (/tablet)
+              </Link>
+            </Button>
+            <Button variant="secondary" onClick={handleResetDemo}>
+              <RefreshCw aria-hidden strokeWidth={1.75} />
               Demo Adatok Visszaállítása (Reset)
-            </button>
-          </div>
-        </div>
-      </header>
+            </Button>
+          </>
+        }
+      />
 
-      <main className="mx-auto max-w-7xl px-4 pt-6 sm:px-6 space-y-6">
+      <div className="space-y-6">
         {guestModalState.isOpen ? (
           <GuestModal
             isOpen={guestModalState.isOpen}
@@ -953,7 +896,7 @@ export const DemoSandboxPage: React.FC = () => {
         </div>
         </>
         )}
-      </main>
+      </div>
 
       {/* Modals */}
       <DeductTreatmentModal

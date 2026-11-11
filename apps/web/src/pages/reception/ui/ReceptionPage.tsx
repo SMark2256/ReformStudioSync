@@ -23,10 +23,7 @@ import {
   Edit3,
   ExternalLink,
   FileSignature,
-  FlaskConical,
   KeyRound,
-  LogOut,
-  Megaphone,
   Monitor,
   Plus,
   QrCode,
@@ -34,7 +31,6 @@ import {
   RefreshCw,
   RotateCcw,
   Search,
-  Settings,
   Smartphone,
   Snowflake,
   Sparkles,
@@ -49,11 +45,10 @@ import {
 } from 'lucide-react';
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { ThemeToggleButton } from '@/features/toggle-theme';
-import { VersionBadge } from '@/widgets/version-changelog';
 import { normalizeScannedCode } from '@/shared/lib/barcode-scanner';
 import {
   broadcastToScannerChannel,
+  openGuestMonitorWindow,
   useMonitorChannel,
 } from '@/shared/lib/monitor-channel';
 import { api } from '@/shared/api';
@@ -61,27 +56,25 @@ import { mockStudioEngine } from '@/shared/api';
 import { handleAppError } from '@/shared/lib/errors';
 import { notify } from '@/shared/lib/notify';
 import { soundFeedback } from '@/shared/lib/sound';
-import { useAuthStore } from '@/shared/auth';
 import { useOfflineQueueStore } from '@/entities/check-in';
 import { useScannerChannelStore } from '@/entities/check-in';
-import { useThemeStore } from '@/shared/theme';
+import { Button } from '@/shared/ui';
 import { DigitalPassCardModal } from '@/entities/guest';
 import { GuestModal } from '@/widgets/guest-profile';
 import { DeductTreatmentModal } from '@/features/deduct-treatment';
 import { RecordPaymentModal } from '@/features/record-payment';
 import { SellPassModal } from '@/features/sell-pass';
-import { countUnseenReleaseNotes, type ReceptionMainTab } from '../model/releaseNotes';
-import { useReleaseNotesStore } from '../model/releaseNotesStore';
+import {
+  getReceptionTab,
+  RECEPTION_TAB_ROUTES,
+  type ReceptionTab,
+} from '../model/receptionTabs';
 import { WhatsNewPanel } from './WhatsNewPanel';
-
-type ActiveTab = ReceptionMainTab | 'news';
 
 export const ReceptionPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
-  const { user, logout } = useAuthStore();
-  const { theme } = useThemeStore();
   const {
     queue: offlineQueue,
     isOnline,
@@ -90,8 +83,8 @@ export const ReceptionPage: React.FC = () => {
     clearQueue,
   } = useOfflineQueueStore();
 
-  const [activeTab, setActiveTab] = useState<ActiveTab>('desk');
-  const unseenReleaseNotes = useReleaseNotesStore((s) => countUnseenReleaseNotes(s.seenIds));
+  // A fül az útvonalból jön (/reception, /guests, /passes, /finance, /news).
+  const activeTab = getReceptionTab(location.pathname);
   const [manualBarcode, setManualBarcode] = useState('');
   const [guestSearch, setGuestSearch] = useState('');
   const {
@@ -542,18 +535,6 @@ export const ReceptionPage: React.FC = () => {
     },
   });
 
-  const openSecondaryMonitorWindow = () => {
-    window.open(
-      '/monitor',
-      'ReformStudioGuestMonitor',
-      'width=1280,height=800,menubar=no,toolbar=no,location=no,status=no',
-    );
-    notify.info(
-      'Másodlagos Vendégmonitor ablak megnyitva',
-      'Húzd át az ablakot a pult felé néző kijelzőre és nyomj Teljes Képernyőt.',
-    );
-  };
-
   const lastIdentifiedGuest = lastCheckIn?.guestId
     ? (guestsQuery.data ?? []).find((g) => g.id === lastCheckIn.guestId) ?? null
     : null;
@@ -564,7 +545,6 @@ export const ReceptionPage: React.FC = () => {
     setGuestModalState({ isOpen: true, guest });
     navigate(location.pathname, {
       state: {
-        mainTab: activeTab,
         guestSheetOpen: true,
         guestId: guest?.id ?? '__NEW__',
         guestSnapshot: guest,
@@ -577,7 +557,6 @@ export const ReceptionPage: React.FC = () => {
     setGuestModalState({ isOpen: false, guest: null });
     navigate(location.pathname, {
       state: {
-        mainTab: activeTab,
         guestSheetOpen: false,
         guestId: null,
         guestSnapshot: null,
@@ -586,13 +565,11 @@ export const ReceptionPage: React.FC = () => {
     });
   };
 
-  const handleSelectMainTab = (nextTab: ActiveTab) => {
+  const handleSelectMainTab = (nextTab: ReceptionTab) => {
     if (!guestModalState.isOpen && nextTab === activeTab) return;
     setGuestModalState({ isOpen: false, guest: null });
-    setActiveTab(nextTab);
-    navigate(location.pathname, {
+    navigate(RECEPTION_TAB_ROUTES[nextTab].path, {
       state: {
-        mainTab: nextTab,
         guestSheetOpen: false,
         guestId: null,
         guestSnapshot: null,
@@ -604,20 +581,12 @@ export const ReceptionPage: React.FC = () => {
   useEffect(() => {
     const st =
       (location.state as {
-        mainTab?: ActiveTab;
         guestSheetOpen?: boolean;
         guestId?: string | null;
         guestSnapshot?: GuestDto | null;
       } | null) ?? null;
 
-    if (!st) {
-      setActiveTab('desk');
-      setGuestModalState({ isOpen: false, guest: null });
-      return;
-    }
-
-    setActiveTab(st.mainTab ?? 'desk');
-    if (st.guestSheetOpen) {
+    if (st?.guestSheetOpen) {
       const matched =
         st.guestId && st.guestId !== '__NEW__'
           ? ((guestsQuery.data ?? []).find((g) => g.id === st.guestId) ??
@@ -631,190 +600,87 @@ export const ReceptionPage: React.FC = () => {
   }, [location.key, location.state]);
 
   return (
-    <div
-      className={`min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col transition-colors duration-200 ${
-        theme === 'dark' ? 'reception-theme-dark dark' : ''
-      }`}
-    >
-      {/* Top Navigation Bar */}
-      <header className="sticky top-0 z-30 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/15 border border-emerald-500/30">
-              <Sparkles className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-base font-extrabold tracking-tight text-slate-900 dark:text-white">
-                  RE-FORM Stúdió
-                </h1>
-                <VersionBadge />
-              </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                Bejelentkezve: {user?.name ?? 'Recepciós Munkatárs'}
-              </p>
-            </div>
-          </div>
+    <div className="space-y-4">
+      <h1 className="sr-only">{RECEPTION_TAB_ROUTES[activeTab].title}</h1>
 
-          {/* Center Tabs */}
-          <nav className="flex items-center gap-1 rounded-xl bg-slate-100 dark:bg-slate-800 p-1">
-            {[
-              { id: 'desk', label: 'Recepciós Pult', icon: Barcode },
-              { id: 'guests', label: 'Vendégkartoték', icon: Users },
-              { id: 'finance', label: 'Pénzügy & Tartozások', icon: Wallet },
-              { id: 'admin', label: 'Szolgáltatások & Monitor', icon: Settings },
-              { id: 'news', label: 'Újdonságok', icon: Megaphone },
-            ].map((tab) => {
-              const Icon = tab.icon;
-              const active = !guestModalState.isOpen && activeTab === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => handleSelectMainTab(tab.id as ActiveTab)}
-                  className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
-                    active
-                      ? 'bg-emerald-600 text-white shadow'
-                      : 'text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-white'
-                  }`}
-                >
-                  <Icon className="h-3.5 w-3.5" />
-                  {tab.label}
-                  {tab.id === 'news' && unseenReleaseNotes > 0 && (
-                    <span
-                      className="ml-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-600 px-1 text-[10px] font-bold text-white"
-                      title={`${unseenReleaseNotes} még nem látott újdonság`}
-                    >
-                      {unseenReleaseNotes}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </nav>
+      {/* Recepciós eszközsor: a szkenner, az offline mód és a hang kapcsolói (minden fülön). */}
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          variant="secondary"
+          size="sm"
+          aria-pressed={isScannerListening}
+          onClick={() => {
+            const next = !isScannerListening;
+            setScannerListening(next);
+            notify.info(
+              next
+                ? 'Folyamatos QR/Vonalkód figyelés bekapcsolva'
+                : 'QR/Vonalkód csatorna szüneteltetve',
+              next
+                ? 'A rendszer minden oldalon folyamatosan figyeli a beérkező QR és vonalkódokat.'
+                : 'A háttérbeli automatikus HID leolvasás ideiglenesen kikapcsolva.',
+            );
+          }}
+          title="Globális QR / Vonalkód Szkenner Csatorna állapota (minden oldalon aktív)"
+        >
+          <QrCode
+            aria-hidden
+            strokeWidth={1.75}
+            className={isScannerListening ? 'text-success' : 'text-muted-foreground'}
+          />
+          {isScannerListening
+            ? `QR Csatorna: Aktív${lastScannedCode ? ` (#${lastScannedCode})` : ''}`
+            : 'QR Csatorna: Szünetel'}
+        </Button>
 
-          {/* Right Status & Actions */}
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                const next = !isScannerListening;
-                setScannerListening(next);
-                notify.info(
-                  next
-                    ? 'Folyamatos QR/Vonalkód figyelés bekapcsolva'
-                    : 'QR/Vonalkód csatorna szüneteltetve',
-                  next
-                    ? 'A rendszer minden oldalon folyamatosan figyeli a beérkező QR és vonalkódokat.'
-                    : 'A háttérbeli automatikus HID leolvasás ideiglenesen kikapcsolva.',
-                );
-              }}
-              title="Globális QR / Vonalkód Szkenner Csatorna állapota (minden oldalon aktív)"
-              className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold border transition-all ${
-                isScannerListening
-                  ? 'border-emerald-500/30 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
-                  : 'border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 text-slate-500'
-              }`}
-            >
-              <QrCode className="h-3.5 w-3.5" />
-              <span>
-                {isScannerListening
-                  ? `QR Csatorna: Aktív${lastScannedCode ? ` (#${lastScannedCode})` : ''}`
-                  : 'QR Csatorna: Szünetel'}
-              </span>
-            </button>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => setOnline(!isOnline)}
+          title="Kattints az Offline / Online mód szimulálásához"
+        >
+          {isOnline ? (
+            <>
+              <span aria-hidden className="size-2 rounded-full bg-success" />
+              Online ({connectedDisplays} kijelző)
+            </>
+          ) : (
+            <>
+              <CloudOff aria-hidden strokeWidth={1.75} className="text-warning" />
+              Offline Puffer ({offlineQueue.length})
+            </>
+          )}
+        </Button>
 
-            <button
-              type="button"
-              onClick={() => setOnline(!isOnline)}
-              title="Kattints az Offline / Online mód szimulálásához"
-              className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold border transition-all ${
-                isOnline
-                  ? 'border-emerald-500/30 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
-                  : 'border-amber-500/40 bg-amber-500/20 text-amber-800 dark:text-amber-300'
-              }`}
-            >
-              {isOnline ? (
-                <>
-                  <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                  Online ({connectedDisplays} kijelző)
-                </>
-              ) : (
-                <>
-                  <CloudOff className="h-3.5 w-3.5" />
-                  Offline Puffer ({offlineQueue.length})
-                </>
-              )}
-            </button>
+        <Button
+          variant="secondary"
+          size="icon"
+          aria-label="Hangjelzés"
+          aria-pressed={soundEnabled}
+          title="Hangjelzés ki/bekapcsolása"
+          onClick={() => {
+            const next = !soundEnabled;
+            setSoundEnabled(next);
+            soundFeedback.setEnabled(next);
+            notify.info(
+              next ? 'Hangjelzések bekapcsolva' : 'Hangjelzések némítva',
+            );
+          }}
+        >
+          {soundEnabled ? (
+            <Volume2 aria-hidden strokeWidth={1.75} />
+          ) : (
+            <VolumeX aria-hidden strokeWidth={1.75} />
+          )}
+        </Button>
 
-            <button
-              type="button"
-              onClick={() => {
-                const next = !soundEnabled;
-                setSoundEnabled(next);
-                soundFeedback.setEnabled(next);
-                notify.info(
-                  next ? 'Hangjelzések bekapcsolva' : 'Hangjelzések némítva',
-                );
-              }}
-              className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 p-2 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700"
-              title="Hangjelzés ki/bekapcsolása"
-            >
-              {soundEnabled ? (
-                <Volume2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-              ) : (
-                <VolumeX className="h-4 w-4 text-slate-400" />
-              )}
-            </button>
-
-            <ThemeToggleButton />
-
-            <Link
-              to="/tablet"
-              className="inline-flex items-center gap-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-white hover:bg-slate-200 dark:hover:bg-slate-700"
-              title="Tablet dokumentum-kitöltő és aláíró nézet"
-            >
-              <FileSignature className="h-3.5 w-3.5 text-amber-500 dark:text-amber-400" />
-              Tablet Aláíró
-            </Link>
-
-            <button
-              type="button"
-              onClick={openSecondaryMonitorWindow}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-white hover:bg-slate-200 dark:hover:bg-slate-700"
-            >
-              <Monitor className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-              Vendégmonitor
-              <ExternalLink className="h-3 w-3 text-slate-400" />
-            </button>
-
-            <Link
-              to="/demo"
-              className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-500"
-            >
-              <FlaskConical className="h-3.5 w-3.5" />
-              Demo Oldal
-            </Link>
-
-            <button
-              type="button"
-              onClick={() => {
-                logout();
-                notify.info(
-                  'Sikeres kijelentkezés',
-                  'A munkamenet lezárult.',
-                );
-                navigate('/login');
-              }}
-              className="inline-flex items-center gap-1 rounded-xl border border-slate-700 bg-slate-800 px-2.5 py-1.5 text-xs font-medium text-slate-300 hover:bg-slate-700 hover:text-white"
-              title="Kijelentkezés a recepciós munkamenetből"
-            >
-              <LogOut className="h-3.5 w-3.5 text-rose-400" />
-              Kilépés
-            </button>
-          </div>
-        </div>
-      </header>
+        <Button variant="secondary" size="sm" asChild>
+          <Link to="/tablet" title="Tablet dokumentum-kitöltő és aláíró nézet">
+            <FileSignature aria-hidden strokeWidth={1.75} />
+            Tablet Aláíró
+          </Link>
+        </Button>
+      </div>
 
       {/* Offline Queue Banner if items waiting */}
       {offlineQueue.length > 0 && (
@@ -837,7 +703,7 @@ export const ReceptionPage: React.FC = () => {
       )}
 
       {/* Main Content */}
-      <main className="mx-auto w-full max-w-7xl flex-1 p-4 sm:p-6 space-y-4">
+      <div className="space-y-4">
         {guestModalState.isOpen ? (
           <GuestModal
             isOpen={guestModalState.isOpen}
@@ -2275,7 +2141,7 @@ export const ReceptionPage: React.FC = () => {
                 <div className="flex flex-wrap items-center gap-2 pt-1">
                   <button
                     type="button"
-                    onClick={openSecondaryMonitorWindow}
+                    onClick={openGuestMonitorWindow}
                     className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 dark:bg-emerald-600 px-3.5 py-2 text-xs font-bold text-white hover:bg-slate-800 dark:hover:bg-emerald-500 transition-colors"
                   >
                     <Monitor className="h-3.5 w-3.5 text-emerald-400 dark:text-white" />
@@ -2645,7 +2511,7 @@ export const ReceptionPage: React.FC = () => {
         )}
         </>
         )}
-      </main>
+      </div>
 
       {/* Modals */}
       <DeductTreatmentModal

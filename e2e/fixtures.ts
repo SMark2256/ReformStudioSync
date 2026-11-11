@@ -27,7 +27,9 @@ export async function loginToReception(page: Page) {
   await page.goto('/login');
   await page.getByRole('button', { name: 'Belépés a Recepciós Pultra' }).click();
   await expect(page).toHaveURL(/\/reception$/);
-  await expect(page.getByRole('heading', { name: 'RE-FORM Stúdió', level: 1 })).toBeVisible();
+  await expect(
+    page.getByRole('navigation', { name: 'Főmenü' }).getByRole('link', { name: 'Recepció', exact: true }),
+  ).toHaveAttribute('aria-current', 'page');
 }
 
 /** Vonalkód beírása a recepció beolvasó mezőjébe (ugyanaz az út, mint a kézi szkennelés). */
