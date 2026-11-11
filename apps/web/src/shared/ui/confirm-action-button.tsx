@@ -1,4 +1,5 @@
-import React from 'react';
+import * as React from 'react';
+
 import {
   AlertDialog,
   AlertDialogAction,
@@ -10,9 +11,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-  Button,
-  type ButtonProps,
-} from '@/shared/ui';
+} from './alert-dialog';
+import { Button, type ButtonProps } from './button';
 
 interface ConfirmActionButtonProps extends Pick<
   ButtonProps,

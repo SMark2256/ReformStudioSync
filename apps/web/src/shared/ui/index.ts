@@ -38,6 +38,7 @@ export {
   CardTitle,
 } from './card';
 export { Checkbox } from './checkbox';
+export { ConfirmActionButton } from './confirm-action-button';
 export { DataList, DataListItem } from './data-list';
 export {
   Dialog,

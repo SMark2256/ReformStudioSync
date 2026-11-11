@@ -8,6 +8,7 @@ export const APP_ROUTES = {
   finance: { path: '/finance', title: 'Pénzügy' },
   news: { path: '/news', title: 'Újdonságok' },
   demo: { path: '/demo', title: 'Demó mód' },
+  monitors: { path: '/monitors', title: 'Monitorok' },
   settings: { path: '/settings', title: 'Beállítások' },
 } as const;
 

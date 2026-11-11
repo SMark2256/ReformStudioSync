@@ -1,5 +1,5 @@
 import { DisplayDeviceDto } from '@reform/shared';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Edit3,
   ExternalLink,
@@ -9,6 +9,10 @@ import {
   Trash2,
 } from 'lucide-react';
 import React, { useEffect, useId, useState } from 'react';
+import {
+  DISPLAY_DEVICES_QUERY_KEY,
+  useDisplayDevices,
+} from '@/entities/display-device';
 import { api, mockStudioEngine } from '@/shared/api';
 import { handleAppError } from '@/shared/lib/errors';
 import { openGuestMonitorWindow } from '@/shared/lib/monitor-channel';
@@ -21,10 +25,10 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
+  ConfirmActionButton,
   Input,
   Label,
 } from '@/shared/ui';
-import { ConfirmActionButton } from '../ConfirmActionButton';
 
 const sectionTitleClassName = 'text-[13px] font-semibold text-foreground';
 const helpTextClassName = 'mt-1 text-[13px] text-muted-foreground';
@@ -50,17 +54,13 @@ export const MonitorDevicesCard: React.FC = () => {
   );
   const [newDeviceName, setNewDeviceName] = useState('Recepciós Tablet #1');
 
-  const devicesQuery = useQuery({
-    queryKey: ['display-devices'],
-    queryFn: () => api.getDisplayDevices(),
-    refetchInterval: 4000,
-  });
+  const devicesQuery = useDisplayDevices();
   const devices = devicesQuery.data ?? [];
   const nowTick = useNowTick(devices.some((d) => d.pairingCode));
   // A kijelzőműveletek csak a kijelzőlistát érintik.
   const queryClient = useQueryClient();
   const refreshDevices = () =>
-    queryClient.invalidateQueries({ queryKey: ['display-devices'] });
+    queryClient.invalidateQueries({ queryKey: DISPLAY_DEVICES_QUERY_KEY });
 
   const initPairingMutation = useMutation({
     mutationFn: (name: string) => api.initDisplayPairing(name),

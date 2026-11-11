@@ -1,7 +1,19 @@
 import { Role } from '@reform/shared';
-import { ChevronUp, LogOut, Moon, Settings, Sun } from 'lucide-react';
+import {
+  ChevronUp,
+  LogOut,
+  Monitor,
+  MonitorCog,
+  Moon,
+  Settings,
+  Sun,
+} from 'lucide-react';
 import React, { useEffect, useId, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import {
+  countActiveDisplayDevices,
+  useDisplayDevices,
+} from '@/entities/display-device';
 import { useAuthStore } from '@/shared/auth';
 import { APP_ROUTES } from '@/shared/config';
 import { notify } from '@/shared/lib/notify';
@@ -63,6 +75,39 @@ const ThemeSwitch: React.FC = () => {
   );
 };
 
+// Monitorok oldal; jobbra a jelenleg aktív kijelzők száma. A lista csak nyitott panelnél frissül.
+const MonitorsLink: React.FC<{ isOpen: boolean; onSelect?: () => void }> = ({
+  isOpen,
+  onSelect,
+}) => {
+  const devicesQuery = useDisplayDevices({ enabled: isOpen });
+  const activeCount = devicesQuery.data
+    ? countActiveDisplayDevices(devicesQuery.data)
+    : null;
+
+  return (
+    <SidebarItem asChild>
+      <Link to={APP_ROUTES.monitors.path} onClick={onSelect}>
+        <MonitorCog aria-hidden strokeWidth={1.75} />
+        {APP_ROUTES.monitors.title}
+        {activeCount !== null && (
+          <>
+            <span className="sr-only"> ({activeCount} aktív)</span>
+            <span
+              aria-hidden
+              title={`${activeCount} aktív monitor`}
+              className="ml-auto flex items-center gap-1 text-xs tabular-nums text-sidebar-muted [&_svg]:size-[13px]"
+            >
+              <Monitor strokeWidth={1.75} />
+              {activeCount}
+            </span>
+          </>
+        )}
+      </Link>
+    </SidebarItem>
+  );
+};
+
 interface SidebarAccountProps {
   isVisuallyExpanded: boolean;
   /** A futó verzió (pl. „0.3”), az Újdonságokra visz. */
@@ -73,8 +118,8 @@ interface SidebarAccountProps {
 
 /**
  * Az oldalsáv lábrésze (UI-specifikáció 4.2): a munkatárs sora a mögüle felcsúszó fiókpanelt
- * nyitja (Beállítások, Téma, Kijelentkezés), alatta a futó verzió. Ugyanez a sor, a kívüli
- * kattintás és az Esc zárja a panelt, ahogy a navigálás és az oldalsáv csukódása is.
+ * nyitja (Monitorok, Beállítások, Téma, Kijelentkezés), alatta a futó verzió. Ugyanez a sor, a
+ * kívüli kattintás és az Esc zárja a panelt, ahogy a navigálás és az oldalsáv csukódása is.
  */
 export const SidebarAccount: React.FC<SidebarAccountProps> = ({
   isVisuallyExpanded,
@@ -150,6 +195,7 @@ export const SidebarAccount: React.FC<SidebarAccountProps> = ({
         <p className="truncate px-2.5 pb-1.5 pt-1 text-xs text-sidebar-muted">
           {user?.email ?? roleLabel}
         </p>
+        <MonitorsLink isOpen={isOpen} onSelect={onItemSelect} />
         <SidebarItem asChild>
           <Link to={APP_ROUTES.settings.path} onClick={onItemSelect}>
             <Settings aria-hidden strokeWidth={1.75} />
