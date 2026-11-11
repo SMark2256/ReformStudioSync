@@ -1,5 +1,7 @@
 import type { Page } from '@playwright/test';
+import { SOCKET_EVENTS } from '@reform/shared';
 import { deductTreatment, expect, expectMonitorIdle, loginToReception, scanBarcode, test } from './fixtures';
+import { installSocketIoStub } from './socketio-stub';
 
 /** Belépés a recepcióra, és a „Vendégmonitor” menüponttal a monitor megnyitása külön ablakban. */
 async function openReceptionWithMonitor(page: Page) {
@@ -84,5 +86,33 @@ test.describe('Vendégmonitor adatszűrés: TICKET-17', () => {
     for (const needle of ['overdue', 'barcode', 'guestId', 'checkInId', 'usageId', 'reason', 'OVERDUE_DUES', '100005', 'Varga Judit']) {
       expect(json, `"${needle}" nem juthat el a monitorra`).not.toContain(needle);
     }
+  });
+});
+
+test.describe('Monitor kapcsolat: TICKET-29', () => {
+  test('TICKET-29: a recepció és a monitor socketje nem nyílik újra rendernként', async ({ page, context }) => {
+    const server = await installSocketIoStub(context);
+    await loginToReception(page);
+    const popupPromise = page.waitForEvent('popup');
+    await page.getByRole('navigation', { name: 'Főmenü' }).getByRole('link', { name: 'Vendégmonitor' }).click();
+    const monitor = await popupPromise;
+    await expect(monitor).toHaveURL(/\/monitor$/);
+    // A monitor a stub szerverhez kapcsolódott.
+    await expect(monitor.getByText('Élő Socket + Helyi Szinkron Aktív')).toBeVisible();
+
+    await expect.poll(() => server.countByKind(false)).toBe(2);
+
+    // A szerver minden csatlakozáskor broadcastol; a javítás előtt ez is újracsatlakozást gerjesztett.
+    server.emit(SOCKET_EVENTS.MONITOR_STATE, { studioId: 'default-studio', connectedDisplays: 2 }, false);
+    await expect(page.getByRole('button', { name: 'Online (2 kijelző)' })).toBeVisible();
+
+    // Néhány másodpercig nem nyílhat új kapcsolat (a hibás hurok ennyi idő alatt sokat nyitott).
+    await page.waitForTimeout(3_000);
+    // Monitor: egyetlen kijelző-kapcsolat. Recepció: a globális szkenner-csatorna és a
+    // kijelzőszámot mutató recepciós pult egy-egy munkatársi kapcsolata.
+    expect(server.countByKind(true)).toBe(1);
+    expect(server.countByKind(false)).toBe(2);
+    expect(server.openedCount()).toBe(3);
+    expect(server.closedCount()).toBe(0);
   });
 });

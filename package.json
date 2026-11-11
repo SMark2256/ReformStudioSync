@@ -19,7 +19,7 @@
     "db:migrate": "npm --workspace=@reform/api run prisma:migrate",
     "db:push": "npm --workspace=@reform/api run prisma:push",
     "db:seed": "npm --workspace=@reform/api run prisma:seed",
-    "test": "npm run build:shared && npm --workspace=@reform/api run test",
+    "test": "npm run build:shared && npm --workspace=@reform/api run test && npm --workspace=@reform/web run test",
     "test:watch": "npm --workspace=@reform/api run test:watch",
     "typecheck": "npm run build:shared && npm --workspace=@reform/api run typecheck && npm --workspace=@reform/web run typecheck && tsc -p e2e",
     "lint": "npm run build:shared && npm run db:generate && eslint .",

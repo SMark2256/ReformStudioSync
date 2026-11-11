@@ -14,7 +14,7 @@ import {
   toMonitorPayload,
   toMonitorRevokedPayload,
 } from '@reform/shared';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useAuthStore } from '@/shared/auth';
 
@@ -109,56 +109,55 @@ export function useMonitorChannel(options: UseMonitorChannelOptions = {}) {
   const [connectedDisplays, setConnectedDisplays] = useState<number>(1);
   const [wakeLockActive, setWakeLockActive] = useState<boolean>(false);
 
-  const handleResult = useCallback(
-    (payload: CheckInResultPayload) => {
-      options.onCheckInResult?.(payload);
-    },
-    [options],
-  );
+  // A hívók renderenként új opció-objektumot (inline callbackeket) adnak át. Ha a
+  // kezelők ezektől függnének, a kapcsolat-effektek minden rendernél bontanának és
+  // újranyitnának (TICKET-29), ezért a kezelők stabilak, és ebből a ref-ből olvassák
+  // a legutóbbi opciókat és azonosítókat.
+  const latestRef = useRef({ options, accessToken, deviceId });
+  useLayoutEffect(() => {
+    latestRef.current = { options, accessToken, deviceId };
+  });
 
-  const handleRevoked = useCallback(
-    (payload: CheckInRevokedPayload) => {
-      options.onCheckInRevoked?.(payload);
-    },
-    [options],
-  );
+  const handleResult = useCallback((payload: CheckInResultPayload) => {
+    latestRef.current.options.onCheckInResult?.(payload);
+  }, []);
 
-  const handleMonitorCheckIn = useCallback(
-    (payload: MonitorCheckInPayload) => {
-      options.onMonitorCheckIn?.(payload);
-    },
-    [options],
-  );
+  const handleRevoked = useCallback((payload: CheckInRevokedPayload) => {
+    latestRef.current.options.onCheckInRevoked?.(payload);
+  }, []);
+
+  const handleMonitorCheckIn = useCallback((payload: MonitorCheckInPayload) => {
+    latestRef.current.options.onMonitorCheckIn?.(payload);
+  }, []);
 
   const handleMonitorRevoked = useCallback(
     (payload: MonitorCheckInRevokedPayload) => {
-      options.onMonitorCheckInRevoked?.(payload);
+      latestRef.current.options.onMonitorCheckInRevoked?.(payload);
     },
-    [options],
+    [],
   );
 
-  const handleTestPing = useCallback(
-    (payload: MonitorTestPingPayload) => {
-      if (
-        payload.deviceId &&
-        deviceId &&
-        !accessToken &&
-        payload.deviceId !== deviceId
-      ) {
-        return;
-      }
-      options.onTestPing?.(payload);
-    },
-    [options, deviceId, accessToken],
-  );
+  const handleTestPing = useCallback((payload: MonitorTestPingPayload) => {
+    const { options, deviceId, accessToken } = latestRef.current;
+    if (
+      payload.deviceId &&
+      deviceId &&
+      !accessToken &&
+      payload.deviceId !== deviceId
+    ) {
+      return;
+    }
+    options.onTestPing?.(payload);
+  }, []);
 
   const handleDeviceRevoked = useCallback(
     (payload: MonitorDeviceRevokedPayload) => {
+      const { options, deviceId } = latestRef.current;
       if (deviceId && payload.deviceId === deviceId) {
         options.onDeviceRevoked?.(payload);
       }
     },
-    [options, deviceId],
+    [],
   );
 
   // 1. Azonos PC-n futó másodlagos ablak (<1ms késleltetésű BroadcastChannel)
@@ -190,9 +189,11 @@ export function useMonitorChannel(options: UseMonitorChannelOptions = {}) {
     handleDeviceRevoked,
   ]);
 
-  // 2. Socket.io kapcsolat (Recepciós PC és különálló Tablet/TV szinkronizáció)
+  // 2. Socket.io kapcsolat (Recepciós PC és különálló Tablet/TV szinkronizáció).
+  // Csak a jogosultság, a token vagy a kijelzőmód változása nyit új kapcsolatot.
+  const token = deviceToken || accessToken;
+  const displayOnly = options.displayOnly === true;
   useEffect(() => {
-    const token = deviceToken || accessToken;
     if (!channelEnabled || !token) {
       setIsConnected(false);
       return;
@@ -204,7 +205,7 @@ export function useMonitorChannel(options: UseMonitorChannelOptions = {}) {
       'http://localhost:3001';
 
     const socket: Socket = io(`${wsBaseUrl}${SOCKET_NAMESPACE}`, {
-      auth: { token, displayOnly: options.displayOnly === true },
+      auth: { token, displayOnly },
       transports: ['websocket', 'polling'],
       reconnectionAttempts: 10,
       reconnectionDelay: 2000,
@@ -223,7 +224,7 @@ export function useMonitorChannel(options: UseMonitorChannelOptions = {}) {
     });
 
     // Kijelzőként csak a szűkített, recepcióként csak a teljes eseményekre figyelünk.
-    if (options.displayOnly) {
+    if (displayOnly) {
       socket.on(
         SOCKET_EVENTS.MONITOR_CHECKIN_RESULT,
         (payload: MonitorCheckInPayload) => {
@@ -277,9 +278,8 @@ export function useMonitorChannel(options: UseMonitorChannelOptions = {}) {
     };
   }, [
     channelEnabled,
-    accessToken,
-    deviceToken,
-    options.displayOnly,
+    token,
+    displayOnly,
     handleResult,
     handleRevoked,
     handleMonitorCheckIn,
