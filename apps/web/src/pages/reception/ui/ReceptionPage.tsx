@@ -71,6 +71,7 @@ import {
 } from '../model/receptionTabs';
 import { ReceptionDeskTab } from './desk/ReceptionDeskTab';
 import { ReceptionToolbar } from './desk/ReceptionToolbar';
+import { GuestsTab } from './guests/GuestsTab';
 import { WhatsNewPanel } from './WhatsNewPanel';
 
 export const ReceptionPage: React.FC = () => {
@@ -607,15 +608,16 @@ export const ReceptionPage: React.FC = () => {
   );
   // Az átállított recepció a saját `PageHeader`-ében adja a `h1`-et, alatta az eszközsort.
   const deskOwnsHeader = activeTab === 'desk' && !guestModalState.isOpen;
+  const tabOwnsTitle =
+    (activeTab === 'desk' || activeTab === 'guests') && !guestModalState.isOpen;
 
   return (
     <div className="space-y-4">
-      {!deskOwnsHeader && (
-        <>
-          <h1 className="sr-only">{RECEPTION_TAB_ROUTES[activeTab].title}</h1>
-          {receptionToolbar}
-        </>
+      {/* Az átállított fülek (Recepció, Vendégek) saját, látható `h1`-et adnak (PageHeader). */}
+      {!tabOwnsTitle && (
+        <h1 className="sr-only">{RECEPTION_TAB_ROUTES[activeTab].title}</h1>
       )}
+      {!deskOwnsHeader && receptionToolbar}
 
       {/* Main Content */}
       <div className="space-y-4">
@@ -668,157 +670,23 @@ export const ReceptionPage: React.FC = () => {
         )}
 
         {activeTab === 'guests' && (
-          <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-sm space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <h2 className="text-lg font-bold text-slate-900 dark:text-white">
-                  Vendégkartoték
-                </h2>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Áttekintés, Havi Tagságok, Bérletek, Kezelések, Befizetések, Mérések, Fényképek és Dokumentumok.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => openGuestSheet(null)}
-                className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-500"
-              >
-                <Plus className="h-4 w-4" />
-                Új Vendég Felvétele
-              </button>
-            </div>
-
-            <div className="relative">
-              <Search className="absolute left-3.5 top-3 h-4 w-4 text-slate-400" />
-              <input
-                type="text"
-                value={guestSearch}
-                onChange={(e) => setGuestSearch(e.target.value)}
-                placeholder="Keresés név, vonalkód, telefonszám vagy e-mail alapján..."
-                className="w-full rounded-xl border border-slate-200 pl-10 pr-4 py-2.5 text-sm focus:border-emerald-600 focus:outline-none"
-              />
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead>
-                  <tr className="border-b border-slate-200 text-xs uppercase text-slate-500">
-                    <th className="py-3 px-3">Vendég</th>
-                    <th className="py-3 px-3">Kártya</th>
-                    <th className="py-3 px-3">Elérhetőség</th>
-                    <th className="py-3 px-3">Tagság & Bérletek</th>
-                    <th className="py-3 px-3 text-right">Műveletek</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {(guestsQuery.data ?? []).map((g) => {
-                    // Számolt állapot: a lejárt, elfogyott vagy sztornózott bérlet nem látszik, a fagyasztott igen.
-                    const usablePasses = (g.passes ?? []).filter(
-                      (p) =>
-                        p.status === PassStatus.ACTIVE ||
-                        p.status === PassStatus.FROZEN,
-                    );
-                    const activeMembership = (g.memberships ?? [])[0];
-                    return (
-                      <tr key={g.id} className="hover:bg-slate-50/80">
-                        <td className="py-3 px-3">
-                          <div className="font-bold text-slate-900">
-                            {g.lastName} {g.firstName}
-                          </div>
-                          {g.notes && (
-                            <div className="text-xs text-slate-500">
-                              {g.notes}
-                            </div>
-                          )}
-                        </td>
-                        <td className="py-3 px-3 font-mono text-xs font-semibold text-slate-700">
-                          #{g.barcode}
-                        </td>
-                        <td className="py-3 px-3 text-xs text-slate-600">
-                          <div>{g.phone ?? '—'}</div>
-                          <div className="text-slate-400">{g.email ?? ''}</div>
-                        </td>
-                        <td className="py-3 px-3 text-xs space-y-1">
-                          {activeMembership && (
-                            <div>
-                              <span className="rounded bg-indigo-50 dark:bg-indigo-950/60 px-2 py-0.5 font-semibold text-indigo-700 dark:text-indigo-300">
-                                Havi Köredzés Tagság:{' '}
-                                {activeMembership.monthlyFeeHuf.toLocaleString(
-                                  'hu-HU',
-                                )}{' '}
-                                Ft/hó ({activeMembership.status})
-                              </span>
-                            </div>
-                          )}
-                          {usablePasses.length > 0 ? (
-                            usablePasses.map((p) => (
-                              <div key={p.id} className="text-slate-600">
-                                <span className="font-semibold text-slate-900">
-                                  {p.passTemplateName}
-                                </span>
-                                :{' '}
-                                {p.isFrozen
-                                  ? 'FAGYASZTVA'
-                                  : p.type === PassType.TIME_BASED
-                                    ? 'Korlátlan'
-                                    : `${p.calculatedRemainingPasses ?? p.remainingPasses} / ${p.totalPasses} alk.`}
-                              </div>
-                            ))
-                          ) : (
-                            <span className="text-rose-600 font-medium">
-                              Nincs aktív bérlet
-                            </span>
-                          )}
-                        </td>
-                        <td className="py-3 px-3 text-right">
-                          <div className="inline-flex flex-wrap justify-end items-center gap-1.5">
-                            <button
-                              type="button"
-                              onClick={() => setDigitalCardGuest(g)}
-                              className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-100"
-                            >
-                              <QrCode className="h-3.5 w-3.5" />
-                              Kártya
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setDeductModalState({ isOpen: true, guest: g })
-                              }
-                              className="rounded-lg bg-teal-600 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-teal-500"
-                            >
-                              Kezelés -1
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setSellModalState({
-                                  isOpen: true,
-                                  guest: g,
-                                  preselectedTemplateId:
-                                    usablePasses[0]?.passTemplateId,
-                                })
-                              }
-                              className="rounded-lg bg-emerald-600 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500"
-                            >
-                              + Bérlet
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => openGuestSheet(g)}
-                              className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-bold text-white hover:bg-slate-800"
-                            >
-                              Adatlap
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          <GuestsTab
+            guests={guestsQuery.data ?? []}
+            isLoading={guestsQuery.isPending}
+            isError={guestsQuery.isError}
+            onRetry={() => void guestsQuery.refetch()}
+            search={guestSearch}
+            onSearchChange={setGuestSearch}
+            onNewGuest={() => openGuestSheet(null)}
+            onOpenGuest={openGuestSheet}
+            onOpenDigitalCard={setDigitalCardGuest}
+            onDeductTreatment={(g) =>
+              setDeductModalState({ isOpen: true, guest: g })
+            }
+            onSellPass={(g, preselectedTemplateId) =>
+              setSellModalState({ isOpen: true, guest: g, preselectedTemplateId })
+            }
+          />
         )}
 
         {activeTab === 'finance' && (
