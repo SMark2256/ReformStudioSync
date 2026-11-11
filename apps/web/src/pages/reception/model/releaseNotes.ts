@@ -63,6 +63,23 @@ export const getJiraIssueUrl = (jiraKey: string): string =>
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    id: 'v0.3-app-shell-sidebar',
+    version: '0.3',
+    date: '2026-11-11',
+    kind: 'IMPROVEMENT',
+    title: 'Új oldalsó menü és fejléc',
+    summary:
+      'A felső fülsor helyett bal oldali menüből éred el a Recepciót, a Vendégeket, a Bérleteket és termékeket és a Pénzügyet. Minden résznek saját címe van, így könyvjelzőzhető, és frissítés után is ugyanott maradsz.',
+    details: [
+      'A menü összecsukható ikonsávvá (Ctrl+B), tableten alapból így látszik; telefonon a fejléc menü gombjával nyílik.',
+      'A Vendégmonitor a menüből külön ablakban nyílik, ahogy eddig a felső gombbal.',
+      'Az Újdonságok és a Demó mód a menü alján van; az Újdonságok mellett látszik az olvasatlan bejegyzések száma.',
+      'A kijelentkezés a menü alján, a nevedre kattintva érhető el. A téma gomb és a dátum a fejlécben maradt.',
+      'A szkenner, az offline mód és a hang kapcsolója, valamint a Tablet Aláíró a recepció tetején található.',
+    ],
+    jiraKey: 'TICKET-21',
+  },
+  {
     id: 'v0.3-pass-occasion-consistency',
     version: '0.3',
     date: '2026-11-09',

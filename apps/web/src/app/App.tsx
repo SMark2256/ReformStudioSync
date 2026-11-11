@@ -1,11 +1,23 @@
 import React, { Suspense, lazy } from 'react';
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import {
+  BrowserRouter,
+  Navigate,
+  Outlet,
+  Route,
+  Routes,
+} from 'react-router-dom';
 import { GlobalScannerChannel } from '@/features/scanner-channel';
 import { LoginPage } from '@/pages/login';
 import { DemoSandboxPage } from '@/pages/demo-sandbox';
 import { MonitorPage } from '@/pages/monitor';
-import { ReceptionPage } from '@/pages/reception';
+import {
+  RECEPTION_PATHS,
+  ReceptionPage,
+  useUnseenReleaseNotesCount,
+} from '@/pages/reception';
 import { TabletDocumentPage } from '@/pages/tablet-document';
+import { AppShell } from '@/widgets/app-shell';
+import { APP_ROUTES } from '@/shared/config';
 
 // Fejlesztői UI-előnézet (`/dev/ui`): csak `npm run dev:web` alatt, a buildbe nem kerül be.
 const UiPreviewPage = import.meta.env.DEV
@@ -16,6 +28,17 @@ const UiPreviewPage = import.meta.env.DEV
     )
   : null;
 
+// Az alkalmazáskeretes oldalak közös elrendezése. A Vendégmonitor, a bejelentkezés és a
+// `/tablet` keret nélkül marad.
+const AppLayout: React.FC = () => {
+  const newsCount = useUnseenReleaseNotesCount();
+  return (
+    <AppShell newsCount={newsCount}>
+      <Outlet />
+    </AppShell>
+  );
+};
+
 export const App: React.FC = () => {
   return (
     <BrowserRouter>
@@ -23,10 +46,15 @@ export const App: React.FC = () => {
       <Routes>
         <Route path="/" element={<Navigate to="/login" replace />} />
         <Route path="/login" element={<LoginPage />} />
-        <Route path="/reception" element={<ReceptionPage />} />
-        <Route path="/monitor" element={<MonitorPage />} />
+        <Route element={<AppLayout />}>
+          {/* A recepció fülei útvonalak; mindet ugyanaz az oldal rajzolja. */}
+          {RECEPTION_PATHS.map((path) => (
+            <Route key={path} path={path} element={<ReceptionPage />} />
+          ))}
+          <Route path={APP_ROUTES.demo.path} element={<DemoSandboxPage />} />
+        </Route>
+        <Route path={APP_ROUTES.monitor.path} element={<MonitorPage />} />
         <Route path="/tablet" element={<TabletDocumentPage />} />
-        <Route path="/demo" element={<DemoSandboxPage />} />
         {UiPreviewPage && (
           <Route
             path="/dev/ui"

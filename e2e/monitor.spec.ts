@@ -1,11 +1,11 @@
 import type { Page } from '@playwright/test';
 import { deductTreatment, expect, expectMonitorIdle, loginToReception, scanBarcode, test } from './fixtures';
 
-/** Belépés a recepcióra, és a „Vendégmonitor” gombbal a monitor megnyitása külön ablakban. */
+/** Belépés a recepcióra, és a „Vendégmonitor” menüponttal a monitor megnyitása külön ablakban. */
 async function openReceptionWithMonitor(page: Page) {
   await loginToReception(page);
   const popupPromise = page.waitForEvent('popup');
-  await page.getByRole('button', { name: 'Vendégmonitor' }).click();
+  await page.getByRole('navigation', { name: 'Főmenü' }).getByRole('link', { name: 'Vendégmonitor' }).click();
   const monitor = await popupPromise;
   await expect(monitor).toHaveURL(/\/monitor$/);
   await expectMonitorIdle(monitor);
@@ -14,7 +14,7 @@ async function openReceptionWithMonitor(page: Page) {
 }
 
 test.describe('Vendégmonitor azonos böngészőben', () => {
-  test('a „Vendégmonitor” gomb külön ablakban nyitja a jogosult monitort', async ({ page }) => {
+  test('a „Vendégmonitor” menüpont külön ablakban nyitja a jogosult monitort', async ({ page }) => {
     await openReceptionWithMonitor(page);
   });
 
