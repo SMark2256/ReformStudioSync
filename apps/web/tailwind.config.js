@@ -46,15 +46,17 @@ export default {
         warning: { DEFAULT: 'hsl(var(--warning))', foreground: 'hsl(var(--warning-foreground))' },
         popover: { DEFAULT: 'hsl(var(--popover))', foreground: 'hsl(var(--popover-foreground))' },
         card: { DEFAULT: 'hsl(var(--card))', foreground: 'hsl(var(--card-foreground))' },
+        // A sötét, lebegő oldalsáv kártya (mindkét témában sötét). A `border`, `hover` és `accent`
+        // átlátszó, kész színérték, ezért nem kap átlátszóság-módosítót.
         sidebar: {
-          DEFAULT: 'hsl(var(--sidebar-background))',
+          DEFAULT: 'hsl(var(--sidebar))',
+          raised: 'hsl(var(--sidebar-raised))',
           foreground: 'hsl(var(--sidebar-foreground))',
-          primary: 'hsl(var(--sidebar-primary))',
-          'primary-foreground': 'hsl(var(--sidebar-primary-foreground))',
-          accent: 'hsl(var(--sidebar-accent))',
-          'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
-          border: 'hsl(var(--sidebar-border))',
-          ring: 'hsl(var(--sidebar-ring))',
+          muted: 'hsl(var(--sidebar-muted-foreground))',
+          highlight: 'hsl(var(--sidebar-highlight))',
+          border: 'var(--sidebar-border)',
+          hover: 'var(--sidebar-hover)',
+          accent: 'var(--sidebar-accent)',
         },
       },
       // `md` = 6 px (`--radius`), `lg` = 8 px, `sm` = 4 px (UI-specifikáció 3.5). Az `md` és az

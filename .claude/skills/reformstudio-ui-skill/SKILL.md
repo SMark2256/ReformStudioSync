@@ -1,6 +1,6 @@
 ---
 name: reformstudio-ui-skill
-description: A ReformStudioSync webes felületének (apps/web) teljes UI-specifikációja shadcn/ui alapon - színek (világos/sötét, hexa és HSL), lekerekítések, térközök, betűméretek, árnyékok, ikonok, az összecsukható oldalsáv minden menüpontja, a fejléc, minden komponens (háromféle gomb: elsődleges, másodlagos, link; mezők, táblázat, jelvény, modál, toast) és minden oldal (Recepció, Vendégmonitor, Órarend, Vendégek, Bérletek és termékek, Felhasználókezelés, Szerepkörök és jogok, Beállítások) pontos felépítése, plusz akadálymentesség és reszponzív viselkedés (mobil, tablet, asztali, max. 1400 px középre igazított tartalom). Használd mindig, ha az apps/web felületén bármit építesz vagy módosítasz - új oldal, komponens, űrlap, táblázat, modál, menüpont, admin felület -, ha a felhasználó a kinézetet, a gombokat, a menüt, a színeket, a témát, a mobil nézetet vagy az akadálymentességet említi, vagy ha egy oldalt az új UI-ra kell átállítani („állítsd át az új UI-ra”, „legyen olyan, mint a prototípus”), akkor is, ha a „UI” vagy „skill” szó nem hangzik el.
+description: A ReformStudioSync webes felületének (apps/web) teljes UI-specifikációja shadcn/ui alapon - színek (világos/sötét, hexa és HSL), lekerekítések, térközök, betűméretek, árnyékok, ikonok, a sötét, lebegő oldalsáv (fiókpanel, peek) minden menüpontja, a fejléc, minden komponens (háromféle gomb: elsődleges, másodlagos, link; mezők, táblázat, jelvény, modál, toast) és minden oldal (Recepció, Vendégmonitor, Órarend, Vendégek, Bérletek és termékek, Felhasználókezelés, Szerepkörök és jogok, Beállítások: téma és felületszín) pontos felépítése, plusz akadálymentesség és reszponzív viselkedés (mobil, tablet, asztali, max. 1400 px középre igazított tartalom). Használd mindig, ha az apps/web felületén bármit építesz vagy módosítasz - új oldal, komponens, űrlap, táblázat, modál, menüpont, admin felület -, ha a felhasználó a kinézetet, a gombokat, a menüt, a színeket, a témát, a mobil nézetet vagy az akadálymentességet említi, vagy ha egy oldalt az új UI-ra kell átállítani („állítsd át az új UI-ra”, „legyen olyan, mint a prototípus”), akkor is, ha a „UI” vagy „skill” szó nem hangzik el.
 ---
 
 # ReformStudioSync UI-specifikáció
@@ -26,6 +26,10 @@ szegélyek, 6 px-es lekerekítés, táblázatok és űrlapmezők, **egy** kiemel
 emoji a felületen, pasztell kártyahalmaz, túlméretezett lekerekítés (`rounded-2xl`
 és fölötte), túlméretezett árnyék, csillogó „AI” ikonok (`Sparkles`), animált
 háttér, minden kártyán más szín.
+
+**Kivétel:** az oldalsáv sötét, lebegő kártya mindkét témában, 14 px-es
+lekerekítéssel (`rounded-[14px]`) és saját árnyékkal (4.1). Ez az egyetlen hely,
+ahol ez megengedett; máshol a `rounded-[14px]` és a nagy árnyék tilos.
 
 ## 2. Mikor melyik részlet
 
@@ -54,15 +58,15 @@ Komponensben **csak tokenosztály**: `bg-background`, `bg-card`, `bg-muted`,
 | Token | Hex | Mire |
 | --- | --- | --- |
 | `background` | `#f5f6f8` | oldal háttere (a kártyák mögött) |
-| `card` / `popover` | `#ffffff` | kártya, modál, legördülő, oldalsáv, fejléc |
+| `card` / `popover` | `#ffffff` | kártya, modál, legördülő, fejléc (az oldalsáv saját sötét tokeneket kap, 4.1) |
 | `muted` | `#f0f2f5` | táblafejléc, sor hover, szegmens aktív háttere, avatar háttér |
 | `foreground` | `#1b222c` | alap szöveg, címek |
 | `muted-foreground` | `#556170` | leírások, címkék, táblafejléc szövege, másodlagos adatok |
 | `faint` (csak csoportcímkék) | `#6a7482` | oldalsáv csoportcímkéi, segédszöveg |
 | `border` | `#dde1e7` | kártya, táblasor, elválasztó |
 | `input` | `#c5cbd3` | mezők és a másodlagos gomb kerete |
-| `primary` | `#0f766e` | **kiemelő szín**, állítható: elsődleges gomb, aktív menüpont, link, fókuszgyűrű, jelölőnégyzet |
-| `primary-foreground` | `#ffffff` | szöveg a kiemelő színen (automatikusan fekete, ha a szín világos) |
+| `primary` | `#0f766e` | **kiemelő szín**, a felületszín adja (3.4): elsődleges gomb, link, fókuszgyűrű, jelölőnégyzet |
+| `primary-foreground` | `#ffffff` | szöveg a kiemelő színen |
 | `success` | `#15803d` | érvényes, aktív, bent van |
 | `warning` | `#b45309` | hamarosan lejár, telt ház |
 | `destructive` | `#b91c1c` | lejárt, elutasítva, hibaüzenet |
@@ -79,14 +83,15 @@ Komponensben **csak tokenosztály**: `bg-background`, `bg-card`, `bg-muted`,
 | `faint` | `#8b96a3` |
 | `border` | `#2a313b` |
 | `input` | `#3a424e` |
-| `primary` | a választott kiemelő szín, változatlanul |
+| `primary` | a felületszín világos árnyalata (3.4) |
+| `primary-foreground` | `#0e1115` (sötét felirat a világos árnyalaton) |
 | `success` | `#4ade80` |
 | `warning` | `#fbbf24` |
 | `destructive` | `#f87171` |
 
-Sötét témában a kiemelő szín **szövegként** (link gomb, aktív menüpont felirata)
-világosított változatot kap: `color-mix(in srgb, hsl(var(--primary)) 60%, white)`.
-Kitöltésként (elsődleges gomb) marad az eredeti.
+Sötét témában a felületszín világos árnyalata a `--primary`: kitöltésként (elsődleges
+gomb) sötét felirattal, szövegként (link gomb) és kijelölésként a sötét kártyán is
+olvasható. Külön világosítás (`color-mix`) nincs.
 
 ### 3.3 Halvány változatok
 
@@ -94,28 +99,35 @@ Kitöltésként (elsődleges gomb) marad az eredeti.
 
 | Mire | Osztály |
 | --- | --- |
-| Aktív menüpont háttere, kijelölt táblasor | `bg-primary/10` (sötétben `bg-primary/20`) |
+| Kijelölt táblasor | `bg-primary-soft` (`primary` 10%, sötétben 16%) |
+| Aktív menüpont háttere (sötét oldalsáv) | `bg-sidebar-accent` (a világos árnyalat 14%-a) |
 | Fókuszgyűrű mezőn | `ring-[3px] ring-primary/15` + `border-primary` |
 | Jelvény hátterek | `bg-success/10`, `bg-warning/10`, `bg-destructive/10` |
 | Jelvény keretek | `border-success/30`, `border-warning/30`, `border-destructive/30` |
 | Hibadoboz (`Alert` hiba) | `bg-destructive/10 border-destructive/35 text-destructive` |
 | Infódoboz (`Alert` info) | `bg-primary/10 border-primary/35 text-foreground` |
 
-### 3.4 Kiemelő szín presetek (Beállítások)
+### 3.4 Felületszínek (Beállítások)
 
-| Név | Hex |
-| --- | --- |
-| Kékeszöld (alapértelmezett) | `#0f766e` |
-| Kék | `#1d4ed8` |
-| Indigó | `#4338ca` |
-| Bordó | `#9d174d` |
-| Borostyán | `#b45309` |
-| Olajzöld | `#3f6212` |
-| Palaszürke | `#334155` |
-| Fekete | `#111827` |
+Kész paletták, mindegyik egy telített színnel (világos téma `--primary`) és egy
+világos árnyalattal (sötét téma `--primary`, és mindkét témában az oldalsáv
+kiemelése, `--sidebar-highlight`). A `<html>` `data-surface` attribútuma választ
+(`shared/theme/surface.ts`, `app/styles/index.css`); a felirat a színen világos
+témában fehér, sötétben `#0e1115`.
 
-Mellettük egyedi színválasztó. A szöveg színét a rendszer számolja (WCAG
-fényesség, `references/tokens.md`). A kiemelő szín a Vendégmonitorra nem hat.
+| Név | `data-surface` | Világos téma | Sötét téma / oldalsáv kiemelés |
+| --- | --- | --- | --- |
+| Kékeszöld (alapértelmezett) | `teal` | `#0f766e` | `#2dd4bf` |
+| Kék | `blue` | `#1d4ed8` | `#60a5fa` |
+| Indigó | `indigo` | `#4338ca` | `#818cf8` |
+| Bordó | `burgundy` | `#9d174d` | `#f472b6` |
+| Borostyán | `amber` | `#b45309` | `#fbbf24` |
+| Olajzöld | `olive` | `#3f6212` | `#a3e635` |
+
+Egyedi színválasztó nincs. A választás ezen a gépen mentődik (localStorage), és az
+`index.html` inline scriptje az első kirajzolás előtt beállítja (nincs villanás). A
+korábban mentett kiemelő szín (hexa), ha egy preset volt, a megfelelő palettára
+fordul, különben az alapértelmezett lesz. A felületszín a Vendégmonitorra nem hat.
 
 ### 3.5 Lekerekítések
 
@@ -129,9 +141,12 @@ fényesség, `references/tokens.md`). A kiemelő szín a Vendégmonitorra nem ha
 | Jelölőnégyzet | 4 px | `rounded-sm` |
 | Színminta (Beállítások) | 6 px | `rounded-md` |
 | Mobil teljes képernyős modál | 0 | `rounded-none` |
+| Oldalsáv kártya (asztali és mobil) | 14 px | `rounded-[14px]`, csak itt |
+| Fiókpanel (az oldalsáv alján) | 8 px felül | `rounded-t-lg` |
 | Toast | 6 px | `rounded-md` |
 
-Nagyobb lekerekítés (`rounded-xl`, `rounded-2xl`, `rounded-3xl`) **sehol**.
+Nagyobb lekerekítés (`rounded-xl`, `rounded-2xl`, `rounded-3xl`) **sehol**; az
+oldalsáv kártya `rounded-[14px]`-e az egyetlen kivétel (1.).
 
 ### 3.6 Térközök
 
@@ -147,7 +162,7 @@ Nagyobb lekerekítés (`rounded-xl`, `rounded-2xl`, `rounded-3xl`) **sehol**.
 | Gombok egymás mellett | `gap-2` (8 px) |
 | Űrlapmezők egymás alatt | `mb-3.5` (14 px) mezőnként, címke és mező között `gap-1.5` |
 | PageHeader alatt | `mb-5` (20 px) |
-| Menüpontok között | `gap-px` (1 px), csoportcímke fölött `pt-3.5` |
+| Menüpontok között | `space-y-0.5` (2 px), szakaszok között `mt-3` |
 
 ### 3.7 Betűk
 
@@ -165,7 +180,7 @@ Nagyobb lekerekítés (`rounded-xl`, `rounded-2xl`, `rounded-3xl`) **sehol**.
 | `h2` kártyacím | 14 px | 600 | `foreground` |
 | `h3` alblokk, beállítássor címe | 13 px | 600 | `foreground` |
 | Kis címke (stat, mező felett, `lbl`) | 12 px (`text-xs`) | 600 | `muted-foreground` |
-| Csoportcímke az oldalsávban | 11 px, nagybetűs, `tracking-wide` (0.6 px) | 600 | `faint` |
+| Szakaszcím az oldalsávban | 12 px (`text-xs`) | 500 | `sidebar-muted` |
 | Táblafejléc | 12 px | 600 | `muted-foreground` |
 | Táblacella | 13 px | 400 | `foreground` |
 | Stat érték | 24 px (mobil 20 px) | 600 | `foreground` |
@@ -173,8 +188,8 @@ Nagyobb lekerekítés (`rounded-xl`, `rounded-2xl`, `rounded-3xl`) **sehol**.
 | Jelvény | 12 px | 500 | állapot szerint |
 | Monospace adat | 12 px | 400 | `muted-foreground` |
 
-Dőlt betű, csupa nagybetűs szöveg (a csoportcímkéken kívül) és 700 feletti
-vastagság nincs.
+Dőlt betű, csupa nagybetűs szöveg és 700 feletti vastagság nincs (az oldalsáv
+„RS” jele 700).
 
 ### 3.8 Szegélyek, árnyékok, rétegek
 
@@ -184,16 +199,28 @@ vastagság nincs.
   - kártya, másodlagos gomb: `shadow-sm` (`0 1px 2px rgba(16,24,40,.06)`;
     sötétben `rgba(0,0,0,.4)`);
   - modál, legördülő, tooltip: `shadow-lg`;
-  - mobil kihúzott oldalsáv: `0 0 40px rgba(0,0,0,.25)`.
-- Rétegek (`z-index`): fejléc 10, mobil menü háttér 44, mobil menü 45, modál 50,
-  toast 60, „Ugrás a tartalomra” 100.
+  - mobil kihúzott oldalsáv: `0 0 40px rgba(0,0,0,.25)`;
+  - oldalsáv kártya: `0 12px 32px rgba(15,18,24,.28)`, peek közben
+    `0 18px 48px rgba(15,18,24,.45)`; fiókpanel: `0 -6px 24px rgba(0,0,0,.35)`.
+- Rétegek (`z-index`): fejléc 10, oldalsáv kártya 20, mobil menü (háttér és
+  panel, Radix `Sheet`) 50, modál 50, toast 60, „Ugrás a tartalomra” 100.
 - Modál háttere: `bg-black/45`, elmosás nélkül.
 
 ### 3.9 Mozgás
 
 - Átmenet csak színre és háttérre: `transition-colors` 150 ms.
-- Oldalsáv nyitás/csukás: szélesség 180–200 ms `ease`.
+- Oldalsáv nyitás/csukás és peek: a kártya szélessége 200 ms `ease-in-out`, a
+  tartalom bal margója és a fejléc bal belső margója ugyanígy. A feliratok,
+  szakaszcímek és az „RS” jel / név átváltása `opacity` 200 ms.
+- Peek: ikonsávban egér fölé húzásra vagy billentyűzetes fókuszra a kártya a
+  tartalom fölött kinyílik (a tartalom nem mozdul); elhagyásra, kívüli
+  kattintásra, fókuszvesztésre és navigáláskor visszacsukódik. Érintésnél csak a
+  kívüli koppintás csukja.
+- Fiókpanel: a munkatárs sora mögül alulról felcsúszik (`translateY(105%)
+  scale(.94)` → `0 / 1`), nyitás 300 ms `cubic-bezier(.22,1,.36,1)`, zárás 240 ms;
+  a nyíl 180°-ot fordul.
 - Mobil menü: `translateX` 200 ms.
+- Mindez CSS-átmenet, animációs könyvtár (`motion`, `framer-motion`) nincs.
 - Modál: a shadcn alap fade/zoom, ne bővítsd.
 - Toast: 200 ms becsúszás alulról.
 - `prefers-reduced-motion: reduce` esetén minden animáció és átmenet ki.
@@ -211,86 +238,111 @@ vastagság nincs.
 
 ## 4. Alkalmazáskeret
 
-shadcn `SidebarProvider` + `Sidebar collapsible="icon"` + `SidebarInset`, az
-`app` rétegben vagy `widgets/app-shell`-ben. A DOM-ban pontosan egy `header`, egy
-fő `nav` és egy `main` van. A Vendégmonitor (`/monitor`) és a bejelentkezés
-**nem** kapja meg a keretet.
+`widgets/app-shell`: `AppShell` → `AppSidebar` (asztali lebegő kártya) vagy
+`MobileSidebar` (768 px alatt, `Sheet`), `AppHeader`, `PageContainer` a
+`<main>`-en. A DOM-ban pontosan egy `header`, egy fő `nav` és egy `main` van. A
+Vendégmonitor (`/monitor`) és a bejelentkezés **nem** kapja meg a keretet.
 
 ```
-┌──────────────┬───────────────────────────────────────────────────┐
-│ Oldalsáv     │ Fejléc (56 px)  ☰  ReformStudio Sync / Recepció ☀ │
-│ 236 px       ├───────────────────────────────────────────────────┤
-│ (ikonsáv     │   ┌──────────── max. 1400 px, középen ──────────┐ │
-│  64 px)      │   │ PageHeader: h1 + leírás        [műveletek]  │ │
-│              │   │ Kártyák, táblázatok …                       │ │
-│              │   └─────────────────────────────────────────────┘ │
-└──────────────┴───────────────────────────────────────────────────┘
+ 8/12 px                     a fejléc háttere a kártya alatt fal a falig fut
+┌──────────────┐┌───────────────────────────────────────────────────────┐
+│ RS / név  [▯]││ Fejléc (56 px) ☰ ReformStudio Sync / Recepció  dátum ☀│
+├──────────────┤├───────────────────────────────────────────────────────┤
+│ Napi működés ││   ┌───────────── max. 1400 px, középen ─────────────┐ │
+│  Recepció    ││   │ PageHeader: h1 + leírás           [műveletek]   │ │
+│  …           ││   │ Kártyák, táblázatok …                           │ │
+│ Ügyfelek     ││   └─────────────────────────────────────────────────┘ │
+│  …           ││                                                       │
+│ Újdonságok 3 ││                                                       │
+│ Demó mód     ││                                                       │
+├──────────────┤│                                                       │
+│ (KA) Név  ˄  ││                                                       │
+│ Verzió 0.3   ││                                                       │
+└──────────────┘│                                                       │
+ sötét kártya, 236 px (ikonsáv 64 px), a széltől 8 px (md-től 12 px)
 ```
 
 ### 4.1 Oldalsáv méretei
 
 | Rész | Érték |
 | --- | --- |
-| Szélesség nyitva / ikonsáv | 236 px / 64 px (`--sidebar-width: 14.75rem`, `--sidebar-width-icon: 4rem`) |
-| Háttér, jobb szegély | `bg-card`, `border-r border-border` |
-| Fejrész | 56 px magas, alsó szegéllyel, `px-3.5`: logó + név |
-| Logó | 32 × 32 px, `rounded-md`, `bg-primary`, benne „RS” 13 px 700 `text-primary-foreground` |
-| Név | „ReformStudio Sync” 14 px 600, alatta a stúdió neve 11 px `muted-foreground` |
-| Menü | `px-2 py-2.5`, függőlegesen görgethető |
-| Menüpont | 36 px magas (`py-2 px-2.5`), `rounded-md`, ikon és szöveg között 11 px |
-| Lábrész | felső szegély, `p-2.5`: munkatárs, szerepkör, összecsukó gomb |
-| Mobilon | 300 px (max. 86vw), kihúzható, sötétített háttérrel |
+| Kártya | `fixed`, a széltől `--sidebar-inset` (8 px, md-től 12 px) felül, alul és balra; `rounded-[14px]`, `ring-1 ring-sidebar-border`, árnyék (3.8), `z-20` |
+| Szélesség nyitva / ikonsáv | 236 px / 64 px; a belső oszlop mindig 236 px, a kártya levágja |
+| Tartalom és fejléc | a tartalom bal margója és a fejléc bal belső margója `--sidebar-offset` (= szélesség + 2 × inset); peek közben nem változik |
+| Kezdőállapot | 1280 px-től nyitva, alatta ikonsáv; a választás sávonként (keskeny / széles) a localStorage-ban (`reform_studio_sidebar`) |
+| Tokenek | `--sidebar` (#171b21, sötét témában #0b0e12), `--sidebar-raised` (fiókpanel), `--sidebar-foreground`, `--sidebar-muted-foreground`, `--sidebar-border`, `--sidebar-hover` (fehér 6%), `--sidebar-highlight` és `--sidebar-accent` (a felületszínből, 3.4) |
+| Fejrész | 56 px, alsó `sidebar-border` szegély, `pl-5 pr-3`: ikonsávban „RS” jel (15 px 700 `sidebar-highlight`, a menüikonok tengelyében), nyitva „ReformStudio Sync” (15 px 600); jobbra az összecsukó gomb |
+| Összecsukó gomb | `SidebarItem variant="icon"` (32 px), `PanelLeft` ikon, `aria-label` „Oldalsáv összecsukása” / „Oldalsáv kinyitása”, `aria-expanded`; ikonsávban kívül esik a sávon (a fókusz előbb kinyitja a peeket). Billentyű: `Ctrl+B` |
+| Menü | `nav aria-label="Főmenü"`, `px-3 py-3`, függőlegesen görgethető |
+| Menüpont | `SidebarItem variant="nav"`: 36 px (érintőn 44 px), `px-3`, ikon és szöveg között 12 px, 14 px 500 `sidebar-muted`; ikonsávban 40 px-es négyzet |
+| Lábrész | felső `sidebar-border` szegély, `px-2 pt-2 pb-1.5`: munkatárs sora (44 px) és alatta a verzió (24 px) |
+| Mobilon | 300 px (max. 86vw), ugyanaz a sötét kártya 8 px-re a szélektől, kihúzható, sötétített háttérrel |
 
 ### 4.2 Menüpontok
 
 Pontosan ezek, ebben a sorrendben. Ha egy útvonal még nincs, az új route-ot ezen
-a néven hozd létre.
+a néven hozd létre; a még nem létező oldal nem kerül a menübe.
 
-| Csoport | Felirat | Ikon (lucide) | Útvonal | Jog |
+| Szakasz | Felirat | Ikon (lucide) | Útvonal | Jog |
 | --- | --- | --- | --- | --- |
 | Napi működés | Recepció | `ConciergeBell` | `/reception` | mindenki |
-| Napi működés | Vendégmonitor | `MonitorSmartphone` | `/monitor` | mindenki |
+| Napi működés | Vendégmonitor | `MonitorSmartphone` | `/monitor` (külön ablakban) | mindenki |
 | Napi működés | Órarend | `CalendarDays` | `/schedule` | mindenki |
 | Ügyfelek | Vendégek | `Users` | `/guests` | mindenki |
 | Ügyfelek | Bérletek és termékek | `Ticket` | `/passes` | mindenki (szerkesztés: `prices`) |
+| Ügyfelek | Pénzügy | `Wallet` | `/finance` | mindenki |
 | Adminisztráció | Felhasználókezelés | `UserCog` | `/admin/users` | `users` |
 | Adminisztráció | Szerepkörök és jogok | `ShieldCheck` | `/admin/roles` | `roles` |
-| Adminisztráció | Beállítások | `Settings` | `/settings` | mindenki (stúdióadatok: admin) |
 
-A lábrészben, a munkatárs fölött:
+A **Beállítások** (`/settings`) nem a menüben, hanem a fiókpanelben van.
+
+A menü alján, a munkatárs fölött:
 
 | Felirat | Ikon | Útvonal / művelet |
 | --- | --- | --- |
-| Újdonságok | `Megaphone` | a meglévő Újdonságok panel (`releaseNotes.ts`); olvasatlannál számláló |
+| Újdonságok | `Megaphone` | `/news` (`releaseNotes.ts`); olvasatlannál számláló, ikonsávban pötty |
 | Demó mód | `FlaskConical` | `/demo` |
 
 **Menüpont állapotai**
 
 | Állapot | Kinézet |
 | --- | --- |
-| Alap | `text-muted-foreground`, átlátszó háttér |
-| Hover | `bg-muted text-foreground` |
-| Aktív | `bg-primary/10 text-primary font-semibold` (sötétben világosított szöveg), `aria-current="page"` |
-| Fókusz | 2 px `ring-ring` gyűrű, 2 px eltolással |
+| Alap | `text-sidebar-muted`, átlátszó háttér |
+| Hover | `bg-sidebar-hover text-sidebar-foreground` |
+| Aktív | `bg-sidebar-accent text-sidebar-highlight font-semibold` (a felületszín halvány és világos árnyalata), `aria-current="page"` |
+| Fókusz | 2 px belső gyűrű `ring-sidebar-highlight` (a kártya levágná a külsőt) |
 | Nincs jog | 60% átlátszóság, jobb szélen 14 px `Lock` ikon, `aria-disabled="true"`; kattintásra toast: „Ehhez a menüponthoz admin jogosultság kell” |
-| Számláló (Recepció: bent lévők) | jobb szélen `rounded-full border bg-muted px-1.5 text-[11px] text-muted-foreground` |
+| Számláló | jobb szélen `rounded-full border-sidebar-border bg-sidebar-raised px-1.5 text-[11px] text-sidebar-muted`, a felolvasónak `sr-only` „(N olvasatlan)” |
 
-**Ikonsáv módban** csak az ikon látszik, középre igazítva, a név tooltipben
-jobbra és `aria-label`-ben. A csoportcímkék helyén 1 px-es vízszintes elválasztó.
-A lábrészben csak az avatar és a kinyitó gomb marad.
+**Ikonsáv módban** csak az ikon látszik; a felirat elhalványul (`opacity-0`), de a
+link neve marad (felolvasó, tesztek). A szakaszcímek helyén 1 px-es vízszintes
+elválasztó, ugyanabban a 16 px-es dobozban. A lábrészben csak az avatar és a
+verzió rövid alakja („v0.3”) látszik.
 
 **Lábrész**
 
-- Munkatárs: 32 px-es kör avatar (monogram, `bg-muted border text-xs 600`),
-  mellette a név 13 px 600 és a szerepkör 12 px `muted-foreground`. Kattintásra
-  `DropdownMenu`: Profil, Téma, Kijelentkezés.
-- Összecsukó gomb: `Button variant="secondary" size="icon"`, ikon
-  `PanelLeftClose` / `PanelLeftOpen`, `aria-label="Menü összecsukása"` /
-  „Menü kinyitása”, `aria-expanded`. Billentyű: `Ctrl+B` (shadcn alap).
+- Munkatárs sora: `section aria-label="Bejelentkezett felhasználó"`, benne egy
+  gomb (`aria-label="Fiók és beállítások: {név}"`, `aria-expanded`,
+  `aria-controls`): 32 px-es kör avatar (`bg-sidebar-raised border-sidebar-border`),
+  a név 13 px 600 és a szerepkör 12 px `sidebar-muted`, jobbra `ChevronUp`.
+- **Fiókpanel**: kattintásra a sor mögül felcsúszik (3.9), `bg-sidebar-raised`,
+  `rounded-t-lg`, felső és oldalsó `sidebar-border` szegély. Tartalma: felül az
+  e-mail (12 px `sidebar-muted`), **Beállítások** (`Settings`, `/settings`), **Téma**
+  (`role="switch"`, `aria-checked`, `aria-label="Sötét téma"`, jobbra Világos/Sötét
+  ikon-szegmens; a panel nyitva marad), elválasztó, **Kijelentkezés** (`LogOut`).
+  Elemei `SidebarItem` (36 px, `px-2.5`, 16 px ikon).
+- A panelt Esc (a fókusz a sorra kerül vissza), kívüli kattintás, navigálás és az
+  oldalsáv csukódása zárja. Billentyűzettel nyitva a fókusz a panel első elemére
+  kerül. Mobilon nyitott panelnél az Esc csak a panelt zárja.
+- **Verzió**: a sor alatt a futó verzió („Verzió 0.3”, ikonsávban „v0.3”), 12 px
+  `sidebar-muted` `tabular-nums`, link az Újdonságokra. Az értéke a legújabb
+  `releaseNotes.ts` bejegyzés verziója.
 
 ### 4.3 Fejléc
 
-- 56 px magas, `bg-card border-b border-border`, `sticky top-0 z-10`.
+- 56 px magas, `bg-card border-b border-border`, `sticky top-0 z-10`. A háttere
+  a lebegő oldalsáv alatt a teljes szélességen fut, a tartalma
+  `pl-[var(--sidebar-offset)]`-tól.
 - A tartalma ugyanabban a 1400 px-es, középre igazított sávban van, mint az oldal
   (lásd 9.).
 - Bal oldal: mobilon a menü gomb (`Menu` ikon, `aria-label="Menü megnyitása"`),
@@ -535,7 +587,7 @@ mindig `minmax(0, …)` oszlopokkal, a gyerekeken `min-w-0`.
 
 ### 6.2 Vendégmonitor (`/monitor`)
 
-- Nem kap keretet, nem követi a témát és a kiemelő színt (`.monitor-invariant`,
+- Nem kap keretet, nem követi a témát és a felületszínt (`.monitor-invariant`,
   a `theme-support.mdc` szerint fix sötét/smaragd dizájn).
 - **Alapképernyő:** bal felül „REFORM STUDIO”, jobb felül óra (nagy, vékony,
   `tabular-nums`). Középen: „Érintsd a kártyádat vagy a telefonodat az olvasóhoz”,
@@ -626,22 +678,30 @@ mindig `minmax(0, …)` oszlopokkal, a gyerekeken `min-w-0`.
 
 ### 6.9 Beállítások (`/settings`)
 
-- PageHeader: „Beállítások” / „A megjelenés felhasználónként mentődik, a stúdió
-  adatait csak admin módosíthatja.”
+A fiókpanelből nyílik (4.2), a menüben nincs.
+
+- PageHeader: „Beállítások” / „A megjelenés ezen a gépen mentődik.”
 - Kártya „Megjelenés”, soronként kétoszlopos beállítássor (220 px leírás +
-  vezérlő, alsó szegéllyel, `py-4`; mobilon egymás alatt):
-  - **Téma** (`h3`) „Világos vagy sötét felület” → szegmens: Világos · Sötét.
-  - **Kiemelő szín** „Elsődleges gombok, aktív menüpont, jelölők” → 8 színminta
-    (30 × 30 px, érintőn 40 px, `rounded-md`, kijelölt: 2 px `outline-foreground`
-    2 px eltolással, `aria-label` a névvel, `aria-pressed`) + egyedi színválasztó
-    (44 × 30 px) + a hexa kód monospace. Alatta: „Egyedi színnél ügyelj rá, hogy a
-    szöveg jól olvasható maradjon.”
-  - **Oldalsáv** „Csak ikonok, több hely a tartalomnak” → `Switch` „Összecsukott
-    oldalsáv”.
-- Kártya „Stúdió adatai” (nem adminnál fejlécben `secondary` „Csak admin” jelvény
-  `Lock` ikonnal, a mezők letiltva): Stúdió neve · Cím · Vendégmonitor kijelzési
-  idő (4 / 6 / 10 mp) · Lejárat előtti figyelmeztetés (1 / 3 / 7 nap), két
-  oszlopban. Alul `primary` „Mentés” · `link` „Mégse”.
+  vezérlő, a sorok között 1 px elválasztó, `py-4`; mobilon egymás alatt). Minden
+  változás azonnal érvényes és mentődik; a téma és a felületszín váltásakor egy
+  közös toast: „Megjelenés mentve” + „Téma: Sötét” / „Felületszín: Kék” (gyors
+  egymás utáni váltásnál ugyanaz frissül).
+  - **Téma** (`h3`) „Világos vagy sötét felület” → szegmens (`ToggleGroup`):
+    Világos (`Sun`) · Sötét (`Moon`). Ugyanez a fiókpanel Téma kapcsolója.
+  - **Felületszín** „Elsődleges gombok, aktív menüpont, jelölők” → 6 színminta
+    (3.4; 30 × 30 px, érintőn 40 px, `rounded-md`, `border-border`; minden minta a
+    saját `data-surface`-ével a saját palettáját mutatja, sötét témában a világos
+    árnyalatot; kijelölt: 2 px `outline-foreground` 2 px eltolással és `Check`
+    ikon; `aria-label` a névvel), mellette a kiválasztott szín neve 13 px
+    `muted-foreground`. Egyedi színválasztó nincs.
+  - **Oldalsáv** „Csak ikonok, több hely a tartalomnak. Keskeny és széles
+    képernyőn külön mentődik.” → `Switch` „Összecsukott oldalsáv” (az aktuális
+    sáv beállítása, ugyanaz, mint az összecsukó gomb).
+- Kártya „Stúdió adatai” (későbbi jegy, még nincs hozzá API): nem adminnál
+  fejlécben `secondary` „Csak admin” jelvény `Lock` ikonnal, a mezők letiltva;
+  Stúdió neve · Cím · Vendégmonitor kijelzési idő (4 / 6 / 10 mp) · Lejárat előtti
+  figyelmeztetés (1 / 3 / 7 nap), két oszlopban. Alul `primary` „Mentés” · `link`
+  „Mégse”.
 
 ## 7. Állapotok és szövegek
 
@@ -680,7 +740,9 @@ A 3 nap az admin beállítása („Lejárat előtti figyelmeztetés”).
 - `document.title`: „{Oldal neve} · ReformStudio Sync”.
 - Minden ikon gomb, jelölőnégyzet, színminta, soron belüli gomb egyedi nevet kap.
 - Állapotjelzők: `aria-current="page"` (aktív menü), `aria-expanded`
-  (összecsukó), `aria-pressed` (téma, színminta), `aria-disabled` (jog nélküli menü).
+  (összecsukó, fiókpanel), `aria-pressed` (fejléc téma gombja), `aria-checked`
+  (Téma kapcsoló; a szegmens és a színminták `ToggleGroup`-ként), `aria-disabled`
+  (jog nélküli menü).
 - Billentyűzet: minden művelet elérhető. Kattintható sor Enterre és szóközre nyílik.
   Oldalváltáskor a fókusz a `main`-re kerül. Újrarajzolás után a fókusz a helyén
   marad vagy a párjára kerül (Beléptetés → Kiléptetés).
@@ -707,7 +769,8 @@ A 3 nap az admin beállítása („Lejárat előtti figyelmeztetés”).
   cím alatt, teljes szélességben; a kereső teljes szélességű; a szegmensek
   tördelődnek; a toast alul teljes szélességű; nincs vízszintes görgetés.
 - Mobil menü: Escape, háttérre koppintás vagy menüpont választása zárja; nyitva a
-  háttér `inert`; zárás után a fókusz a ☰ gombra kerül.
+  háttér `inert`; zárás után a fókusz a ☰ gombra kerül. `Ctrl+B` mobilon a menüt
+  nyitja-zárja, asztalin az oldalsávot csukja-nyitja.
 - Érintőn (`pointer: coarse`): gomb, mező, menüpont legalább 44 px, mezőben 16 px
   betű, jelölőnégyzet 22 px, színminta 40 px.
 - Részletek: `references/responsive.md`.
@@ -747,6 +810,7 @@ kérdezd meg a felhasználót, ne találj ki negyediket.
   rg -n "variant=\"(destructive|ghost|outline|default)\"" apps/web/src
   rg -n "(bg|text|border)-(white|black|slate|gray|zinc|neutral|emerald|green|rose|red|amber|yellow)-?[0-9]*\b" apps/web/src --glob '!**/monitor/**'
   rg -n "rounded-(xl|2xl|3xl)|bg-gradient|backdrop-blur" apps/web/src
+  rg -n "rounded-\[14px\]" apps/web/src   # csak az oldalsáv kártyája
   ```
 - Az app futott (`run` skill vagy `npm run dev:web`), és megnézted világos és
   sötét témában, 375, 1024, 1440 és 2560 px szélességen.

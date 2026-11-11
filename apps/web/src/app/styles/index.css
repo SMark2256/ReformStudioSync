@@ -7,8 +7,8 @@
  * definiálnak: a régi oldalak nyers `slate`/`emerald` osztályait nem érintik. A shadcn
  * globális alapstílusa (`* { border-border }`, body háttér/szín) szándékosan nincs itt,
  * mert a régi oldalak kinézetét megváltoztatná; a `shared/ui` komponensek a keretszínt
- * maguk adják meg. A `--primary`/`--primary-foreground` futásidőben állítható
- * (`applyAccent`, `@/shared/theme`).
+ * maguk adják meg. A `--primary` és a belőle számolt tokenek a felületszínből jönnek
+ * (`[data-surface]`, lent).
  */
 @layer base {
   :root {
@@ -27,11 +27,6 @@
     --accent-foreground: 215 24% 14%;
     --border: 216 17% 89%; /* #dde1e7 */
     --input: 215 14% 80%; /* #c5cbd3 mezők és másodlagos gomb kerete */
-    --primary: 175 77% 26%; /* #0f766e kiemelő szín, állítható */
-    --primary-foreground: 0 0% 100%;
-    --primary-text: hsl(var(--primary));
-    --primary-soft: hsl(var(--primary) / 0.1); /* aktív menüpont, kijelölt sor */
-    --ring: var(--primary);
     --destructive: 0 74% 42%; /* #b91c1c */
     --destructive-foreground: 0 0% 100%;
     --success: 142 72% 29%; /* #15803d */
@@ -40,14 +35,13 @@
     --warning-foreground: 0 0% 100%;
     --radius: 0.375rem; /* 6 px */
 
-    --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 213 14% 39%;
-    --sidebar-primary: var(--primary);
-    --sidebar-primary-foreground: var(--primary-foreground);
-    --sidebar-accent: 216 20% 95%;
-    --sidebar-accent-foreground: 215 24% 14%;
-    --sidebar-border: 216 17% 89%;
-    --sidebar-ring: var(--primary);
+    /* Az oldalsáv mindkét témában sötét, lebegő kártya (UI-specifikáció 4.1). */
+    --sidebar: 216 18% 11%; /* #171b21 */
+    --sidebar-raised: 217 18% 14%; /* #1e232b fiókpanel */
+    --sidebar-foreground: 220 23% 97%; /* #f7f8fa */
+    --sidebar-muted-foreground: 240 5% 65%; /* #a1a1aa */
+    --sidebar-border: hsl(0 0% 100% / 0.08);
+    --sidebar-hover: hsl(0 0% 100% / 0.06);
   }
 
   /* `[data-theme]` a <html>-en (app/ThemeSync): a body-ba portált elemek is sötét tokent kapnak. */
@@ -62,8 +56,6 @@
     --muted: 217 18% 14%; /* #1d222a */
     --muted-foreground: 214 13% 68%; /* #a3adba */
     --faint: 212 12% 59%; /* #8b96a3 */
-    --primary-text: color-mix(in srgb, hsl(var(--primary)) 60%, white);
-    --primary-soft: hsl(var(--primary) / 0.2);
     --secondary: 216 19% 10%;
     --secondary-foreground: 214 16% 91%;
     --accent: 217 18% 14%;
@@ -77,11 +69,59 @@
     --warning: 43 96% 56%; /* #fbbf24 */
     --warning-foreground: 216 21% 7%;
 
-    --sidebar-background: 216 19% 10%;
-    --sidebar-foreground: 214 13% 68%;
-    --sidebar-accent: 217 18% 14%;
-    --sidebar-accent-foreground: 214 16% 91%;
-    --sidebar-border: 215 17% 20%;
+    /* Sötét oldalon a kártya az oldalnál is sötétebb, hogy kiváljon. */
+    --sidebar: 214 24% 6%; /* #0b0e12 */
+    --sidebar-raised: 213 21% 10%; /* #151a20 */
+  }
+
+  /*
+   * Felületszínek (UI-specifikáció 3.4, `shared/theme/surface.ts`). Az alkalmazás a <html>-re
+   * teszi a `data-surface`-t; a Kékeszöld a jelöletlen alapértelmezés is. A Beállítások
+   * színmintái a saját `data-surface`-ükkel a saját palettájukat mutatják. Minden paletta egy
+   * telített színt (`--primary`, világos téma) és egy világos árnyalatot (`--sidebar-highlight`:
+   * az oldalsáv kiemelése, sötét témában a `--primary`) ad.
+   */
+  :root,
+  [data-surface='teal'] {
+    --primary: 175 77% 26%; /* #0f766e */
+    --sidebar-highlight: 172 66% 50%; /* #2dd4bf */
+  }
+  [data-surface='blue'] {
+    --primary: 224 76% 48%; /* #1d4ed8 */
+    --sidebar-highlight: 213 94% 68%; /* #60a5fa */
+  }
+  [data-surface='indigo'] {
+    --primary: 245 58% 51%; /* #4338ca */
+    --sidebar-highlight: 234 89% 74%; /* #818cf8 */
+  }
+  [data-surface='burgundy'] {
+    --primary: 336 74% 35%; /* #9d174d */
+    --sidebar-highlight: 329 86% 70%; /* #f472b6 */
+  }
+  [data-surface='amber'] {
+    --primary: 26 90% 37%; /* #b45309 */
+    --sidebar-highlight: 43 96% 56%; /* #fbbf24 */
+  }
+  [data-surface='olive'] {
+    --primary: 86 69% 23%; /* #3f6212 */
+    --sidebar-highlight: 83 78% 55%; /* #a3e635 */
+  }
+  /* A palettából számolt tokenek ott, ahol a paletta be van állítva (a színminták is). */
+  :root,
+  [data-surface] {
+    --primary-foreground: 0 0% 100%;
+    --ring: var(--primary);
+    --primary-text: hsl(var(--primary));
+    --primary-soft: hsl(var(--primary) / 0.1); /* aktív menüpont, kijelölt sor */
+    --sidebar-accent: hsl(var(--sidebar-highlight) / 0.14);
+  }
+  /* Sötét témában a világos árnyalat a `--primary`: a gombon sötét felirat, a szöveg és a
+     kijelölés a sötét kártyán is olvasható. */
+  :root[data-theme='dark'],
+  :root[data-theme='dark'] [data-surface] {
+    --primary: var(--sidebar-highlight);
+    --primary-foreground: 216 21% 7%;
+    --primary-soft: hsl(var(--primary) / 0.16);
   }
 
   body {

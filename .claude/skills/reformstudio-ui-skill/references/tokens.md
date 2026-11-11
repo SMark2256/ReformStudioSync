@@ -1,11 +1,12 @@
-# Tokenek: színek, téma, kiemelő szín
+# Tokenek: színek, téma, felületszín
 
 Minden szín CSS-változóból jön. Komponensben csak a Tailwind tokenosztályokat
 használd: `bg-background`, `bg-card`, `bg-muted`, `text-foreground`,
 `text-muted-foreground`, `border-border`, `border-input`, `bg-primary`,
 `text-primary-foreground`, `ring-ring`, `text-destructive`, `text-success`,
-`text-warning`. Így a sötét téma és a kiemelő szín váltása minden komponensben
-automatikusan működik, és nem kell `dark:` párt írni.
+`text-warning`, az oldalsávon a `sidebar-*` tokenek. Így a sötét téma és a
+felületszín váltása minden komponensben automatikusan működik, és nem kell `dark:`
+párt írni.
 
 ## Alapértékek
 
@@ -28,9 +29,6 @@ Az `apps/web/src/app/styles/index.css` elejére (a `@tailwind` sorok után):
     --accent-foreground: 215 24% 14%;
     --border: 216 17% 89%;          /* #dde1e7 */
     --input: 215 14% 80%;           /* #c5cbd3 mezők és másodlagos gomb kerete */
-    --primary: 175 77% 26%;         /* #0f766e kiemelő szín, állítható */
-    --primary-foreground: 0 0% 100%;
-    --ring: var(--primary);
     --destructive: 0 74% 42%;       /* #b91c1c */
     --destructive-foreground: 0 0% 100%;
     --success: 142 72% 29%;         /* #15803d */
@@ -39,16 +37,16 @@ Az `apps/web/src/app/styles/index.css` elejére (a `@tailwind` sorok után):
     --warning-foreground: 0 0% 100%;
     --radius: 0.375rem;             /* 6px: hagyományos, nem „buborékos” */
 
-    --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 213 14% 39%;
-    --sidebar-primary: var(--primary);
-    --sidebar-primary-foreground: var(--primary-foreground);
-    --sidebar-accent: 216 20% 95%;
-    --sidebar-accent-foreground: 215 24% 14%;
-    --sidebar-border: 216 17% 89%;
-    --sidebar-ring: var(--primary);
+    /* Az oldalsáv mindkét témában sötét, lebegő kártya. */
+    --sidebar: 216 18% 11%;              /* #171b21 */
+    --sidebar-raised: 217 18% 14%;       /* #1e232b fiókpanel */
+    --sidebar-foreground: 220 23% 97%;   /* #f7f8fa */
+    --sidebar-muted-foreground: 240 5% 65%; /* #a1a1aa */
+    --sidebar-border: hsl(0 0% 100% / 0.08); /* kész szín, nem hármas */
+    --sidebar-hover: hsl(0 0% 100% / 0.06);
   }
 
+  :root[data-theme='dark'],
   .reception-theme-dark {
     --background: 216 21% 7%;       /* #0e1115 */
     --foreground: 214 16% 91%;      /* #e5e8ec */
@@ -71,11 +69,32 @@ Az `apps/web/src/app/styles/index.css` elejére (a `@tailwind` sorok után):
     --warning: 43 96% 56%;          /* #fbbf24 */
     --warning-foreground: 216 21% 7%;
 
-    --sidebar-background: 216 19% 10%;
-    --sidebar-foreground: 214 13% 68%;
-    --sidebar-accent: 217 18% 14%;
-    --sidebar-accent-foreground: 214 16% 91%;
-    --sidebar-border: 215 17% 20%;
+    --sidebar: 214 24% 6%;               /* #0b0e12, az oldalnál sötétebb */
+    --sidebar-raised: 213 21% 10%;       /* #151a20 */
+  }
+
+  /* Felületszínek: a <html> data-surface-e választ (a Kékeszöld a jelöletlen alap). */
+  :root, [data-surface='teal'] { --primary: 175 77% 26%; --sidebar-highlight: 172 66% 50%; }
+  [data-surface='blue']     { --primary: 224 76% 48%; --sidebar-highlight: 213 94% 68%; }
+  [data-surface='indigo']   { --primary: 245 58% 51%; --sidebar-highlight: 234 89% 74%; }
+  [data-surface='burgundy'] { --primary: 336 74% 35%; --sidebar-highlight: 329 86% 70%; }
+  [data-surface='amber']    { --primary: 26 90% 37%;  --sidebar-highlight: 43 96% 56%; }
+  [data-surface='olive']    { --primary: 86 69% 23%;  --sidebar-highlight: 83 78% 55%; }
+
+  /* A palettából számolt tokenek ott is, ahol egy színminta saját palettát kap. */
+  :root, [data-surface] {
+    --primary-foreground: 0 0% 100%;
+    --ring: var(--primary);
+    --primary-text: hsl(var(--primary));
+    --primary-soft: hsl(var(--primary) / 0.1);
+    --sidebar-accent: hsl(var(--sidebar-highlight) / 0.14);
+  }
+  /* Sötét témában a világos árnyalat a --primary, sötét felirattal. */
+  :root[data-theme='dark'],
+  :root[data-theme='dark'] [data-surface] {
+    --primary: var(--sidebar-highlight);
+    --primary-foreground: 216 21% 7%;
+    --primary-soft: hsl(var(--primary) / 0.16);
   }
 
   * { @apply border-border; }
@@ -83,65 +102,43 @@ Az `apps/web/src/app/styles/index.css` elejére (a `@tailwind` sorok után):
 }
 ```
 
-A `--primary` sötét témában is ugyanaz: a felhasználó által választott szín.
-Sötét háttéren a link gomb világosított változatot kap (`components.md`).
+A `--primary` a felületszínből jön: világos témában a paletta telített színe,
+sötétben a világos árnyalata (a link gomb így külön világosítás nélkül olvasható).
+A Tailwind configban az oldalsáv színei: `sidebar` (`DEFAULT`, `raised`,
+`foreground`, `muted`, `highlight` HSL-hármasból; `border`, `hover`, `accent` kész
+színértékként, `var(...)`, ezért ezekre nem tehető átlátszóság-módosító).
 
-## Kiemelő szín a Beállításokban
+## Felületszín a Beállításokban
 
-A kiemelő szín felhasználónként mentődik (első körben `zustand` + `persist`,
-localStorage, később az API-ba). A téma store-ja mellé, az `entities` vagy
-`shared` rétegbe, ahol most a `useThemeStore` van:
+A paletták listája a `shared/theme/surface.ts`-ben van (`SURFACE_COLORS`: `id`,
+magyar név, a régi kiemelő szín hexája az átfordításhoz), a választás a
+`useSurfaceStore`-ban (`zustand` + `persist`, localStorage
+`reform_studio_surface`). Az értékek a `SKILL.md` 3.4 táblázatában.
 
 ```ts
-// shared/lib/theme/accent.ts
-export const ACCENT_PRESETS = [
-  { hex: '#0f766e', name: 'Kékeszöld' },
-  { hex: '#1d4ed8', name: 'Kék' },
-  { hex: '#4338ca', name: 'Indigó' },
-  { hex: '#9d174d', name: 'Bordó' },
-  { hex: '#b45309', name: 'Borostyán' },
-  { hex: '#3f6212', name: 'Olajzöld' },
-  { hex: '#334155', name: 'Palaszürke' },
-  { hex: '#111827', name: 'Fekete' },
+// shared/theme/surface.ts
+export const SURFACE_COLORS = [
+  { id: 'teal', name: 'Kékeszöld', legacyHex: '#0f766e' },
+  { id: 'blue', name: 'Kék', legacyHex: '#1d4ed8' },
+  { id: 'indigo', name: 'Indigó', legacyHex: '#4338ca' },
+  { id: 'burgundy', name: 'Bordó', legacyHex: '#9d174d' },
+  { id: 'amber', name: 'Borostyán', legacyHex: '#b45309' },
+  { id: 'olive', name: 'Olajzöld', legacyHex: '#3f6212' },
 ] as const;
-
-export function hexToHslTriplet(hex: string): string {
-  const r = parseInt(hex.slice(1, 3), 16) / 255, g = parseInt(hex.slice(3, 5), 16) / 255, b = parseInt(hex.slice(5, 7), 16) / 255;
-  const max = Math.max(r, g, b), min = Math.min(r, g, b), l = (max + min) / 2;
-  let h = 0, s = 0;
-  if (max !== min) {
-    const d = max - min;
-    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-    h = max === r ? (g - b) / d + (g < b ? 6 : 0) : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
-    h *= 60;
-  }
-  return `${Math.round(h)} ${Math.round(s * 100)}% ${Math.round(l * 100)}%`;
-}
-
-// WCAG relatív fényesség alapján fekete vagy fehér felirat.
-export function foregroundFor(hex: string): string {
-  const lin = (c: number) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
-  const [r, g, b] = [1, 3, 5].map((i) => lin(parseInt(hex.slice(i, i + 2), 16) / 255));
-  const L = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-  return L > 0.179 ? '222 47% 11%' : '0 0% 100%';
-}
-
-export function applyAccent(hex: string) {
-  const root = document.documentElement;
-  root.style.setProperty('--primary', hexToHslTriplet(hex));
-  root.style.setProperty('--primary-foreground', foregroundFor(hex));
-}
 ```
 
-- Az `applyAccent`-et az `app` rétegben hívd meg indításkor és változáskor (ott,
-  ahol a téma osztálya is felkerül).
-- A Beállítások oldalon: a preset színek `ToggleGroup`-ban (minden elem
-  `aria-label` a szín nevével), mellette `<input type="color">` `Label`-lel
-  („Egyedi kiemelő szín”). Egyedi színnél írd ki: „Ügyelj rá, hogy a szöveg jól
-  olvasható maradjon.” Ha a választott szín kontrasztja fehér háttéren 3:1 alatt
-  van, figyelmeztess a mező alatt, a mentést ne tiltsd.
-- A Vendégmonitorra (`.monitor-invariant`) az `applyAccent` nem hat: ott a
-  komponensek fix színeket használnak, nem a `--primary`-t.
+- Az `app/ThemeSync` teszi a `<html>`-re a `data-theme`-et és a `data-surface`-t;
+  az első kirajzolás előtt ugyanezt az `index.html` inline scriptje (a két
+  localStorage kulcsból: `reform_studio_reception_theme`, `reform_studio_surface`,
+  és a régi `reform_studio_accent` hexa átfordítása), így nincs villanás.
+- Felületről váltani a `saveTheme(theme)` / `saveSurface(surface)` hívással kell
+  (`@/shared/theme`): beállítja és egy közös „Megjelenés mentve” toastot ad (azonos
+  `id`, gyors váltásnál ugyanaz frissül).
+- A Beállítások színmintái `ToggleGroupItem`-ek saját `data-surface`-szel és
+  `bg-primary`-val, így mindegyik a saját palettáját mutatja, a sötét témában is;
+  `aria-label` a szín nevével. Egyedi színválasztó nincs.
+- A Vendégmonitorra (`.monitor-invariant`) a felületszín nem hat: ott a komponensek
+  fix színeket használnak, nem a `--primary`-t.
 
 ## Mire figyelj
 

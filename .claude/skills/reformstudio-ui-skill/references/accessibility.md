@@ -31,7 +31,7 @@ szerkezet, a nevek és a címsorok a mi dolgunk.
 - Ismétlődő gombok a táblázatban egyedi nevet kapnak: `aria-label="Nagy Eszter kiléptetése"`.
 - Jogosultsági mátrix: minden `Checkbox` `aria-label="{Szerepkör}: {Jogosultság}"`.
   A sor első cellája `th scope="row"`.
-- Színminták (kiemelő szín): `aria-label` a szín nevével, `aria-pressed` vagy
+- Színminták (felületszín): `aria-label` a szín nevével, `aria-pressed` vagy
   `ToggleGroup`-elem `data-state`.
 - Haladásjelző: `role="progressbar"` (a shadcn `Progress` adja), plusz `aria-label`.
   Ha mellette szövegben is ott a szám, a sáv lehet `aria-hidden`.

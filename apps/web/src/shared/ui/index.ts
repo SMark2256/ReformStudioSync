@@ -99,24 +99,7 @@ export {
   SheetTitle,
   SheetTrigger,
 } from './sheet';
-export {
-  Sidebar,
-  SidebarContent,
-  SidebarFooter,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
-  SidebarHeader,
-  SidebarInset,
-  SidebarMenu,
-  SidebarMenuBadge,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  SidebarProvider,
-  SidebarSeparator,
-  SidebarTrigger,
-} from './sidebar';
-export { useSidebar, useSidebarStore } from './sidebar-context';
+export { SidebarItem } from './sidebar-item';
 export { Skeleton } from './skeleton';
 export { SkipLink } from './skip-link';
 export { Toaster } from './sonner';

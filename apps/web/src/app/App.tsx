@@ -11,10 +11,12 @@ import { LoginPage } from '@/pages/login';
 import { DemoSandboxPage } from '@/pages/demo-sandbox';
 import { MonitorPage } from '@/pages/monitor';
 import {
+  CURRENT_VERSION,
   RECEPTION_PATHS,
   ReceptionPage,
   useUnseenReleaseNotesCount,
 } from '@/pages/reception';
+import { SettingsPage } from '@/pages/settings';
 import { TabletDocumentPage } from '@/pages/tablet-document';
 import { AppShell } from '@/widgets/app-shell';
 import { APP_ROUTES } from '@/shared/config';
@@ -33,7 +35,7 @@ const UiPreviewPage = import.meta.env.DEV
 const AppLayout: React.FC = () => {
   const newsCount = useUnseenReleaseNotesCount();
   return (
-    <AppShell newsCount={newsCount}>
+    <AppShell newsCount={newsCount} version={CURRENT_VERSION}>
       <Outlet />
     </AppShell>
   );
@@ -52,19 +54,23 @@ export const App: React.FC = () => {
             <Route key={path} path={path} element={<ReceptionPage />} />
           ))}
           <Route path={APP_ROUTES.demo.path} element={<DemoSandboxPage />} />
+          <Route
+            path={APP_ROUTES.settings.path}
+            element={<SettingsPage />}
+          />
+          {UiPreviewPage && (
+            <Route
+              path="/dev/ui"
+              element={
+                <Suspense fallback={null}>
+                  <UiPreviewPage />
+                </Suspense>
+              }
+            />
+          )}
         </Route>
         <Route path={APP_ROUTES.monitor.path} element={<MonitorPage />} />
         <Route path="/tablet" element={<TabletDocumentPage />} />
-        {UiPreviewPage && (
-          <Route
-            path="/dev/ui"
-            element={
-              <Suspense fallback={null}>
-                <UiPreviewPage />
-              </Suspense>
-            }
-          />
-        )}
         <Route path="*" element={<Navigate to="/reception" replace />} />
       </Routes>
     </BrowserRouter>
