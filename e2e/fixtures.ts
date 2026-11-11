@@ -67,9 +67,9 @@ export async function sellToIdentifiedGuest(page: Page, templateName: RegExp, pa
   await expect(page.getByRole('heading', { name: SELL_MODAL_TITLE })).toBeHidden();
 }
 
-/** A jogosult vendégmonitor alapállapota (helyi csatorna él, üdvözlő képernyő). */
+/** A jogosult vendégmonitor alapállapota (szerver nélkül csak a helyi csatorna él, üdvözlő képernyő). */
 export async function expectMonitorIdle(page: Page) {
-  await expect(page.getByText('Helyi Broadcast Szinkron Aktív')).toBeVisible();
+  await expect(page.getByText('Csak helyi szinkron')).toBeVisible();
   await expect(page.getByText('Üdvözlünk! Kérjük, érintsd le a belépőkártyádat a recepción.')).toBeVisible();
 }
 

@@ -466,13 +466,18 @@ export class AuthService {
         throw appError('AUTH.DEVICE_TOKEN_INVALID');
       }
 
-      await this.prisma.displayDevice.update({
-        where: { id: device.id },
+      // A lekérdezés óta törölt vagy új tokent kapott eszköznél 0 sor frissül
+      // (az `update` itt P2025-öt dobna, és a kliens COMMON.INTERNAL-t kapna).
+      const { count } = await this.prisma.displayDevice.updateMany({
+        where: { id: device.id, deviceToken: token },
         data: {
           lastSeenAt: new Date(),
           lastActivityType: 'Kapcsolódva a szinkron-csatornára',
         },
       });
+      if (count === 0) {
+        throw appError('AUTH.DEVICE_TOKEN_INVALID');
+      }
 
       return {
         studioId: device.studioId,

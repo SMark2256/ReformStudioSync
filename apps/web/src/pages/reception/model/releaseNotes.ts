@@ -63,6 +63,16 @@ export const getJiraIssueUrl = (jiraKey: string): string =>
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    id: 'v0.3-fix-monitor-live-status',
+    version: '0.3',
+    date: '2026-11-11',
+    kind: 'FIX',
+    title: 'A Vendégmonitor valós kapcsolatállapotot mutat',
+    summary:
+      'A Vendégmonitor fejléce csak akkor írja, hogy „Élő Socket + Helyi Szinkron Aktív”, ha a szerver ténylegesen fogadta a kijelzőt; kapcsolódás közben „Kapcsolódás a szerverhez…”, kapcsolat nélkül „Csak helyi szinkron” látszik. Ha a párosítást a recepción bontod, vagy a szerver már nem ismeri a kijelzőt, a monitor azonnal újra a 6 jegyű párosító kódot kéri.',
+    jiraKey: 'TICKET-32',
+  },
+  {
     id: 'v0.3-fix-monitor-revoked-disconnect',
     version: '0.3',
     date: '2026-11-11',

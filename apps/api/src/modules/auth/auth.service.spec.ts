@@ -119,3 +119,54 @@ describe('AuthService — párosítás visszavonása bontja a kijelzőt (TICKET-
     expect(monitorGatewayMock.disconnectDevice).not.toHaveBeenCalled();
   });
 });
+
+describe('AuthService.validateSocketToken — közben törölt kijelző (TICKET-32)', () => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let prismaMock: any;
+  let service: AuthService;
+
+  beforeEach(() => {
+    prismaMock = {
+      displayDevice: {
+        findUnique: vi.fn().mockResolvedValue(deviceRecord()),
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+      },
+    };
+    // Nem munkatársi JWT: a kijelző-ágon próbálkozik.
+    const jwtServiceMock = {
+      verifyAsync: vi.fn().mockRejectedValue(new Error('jwt malformed')),
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    service = new AuthService(prismaMock, jwtServiceMock as any, {} as any);
+  });
+
+  it('érvényes eszköztokennél frissíti az utolsó aktivitást, és az eszközt adja', async () => {
+    await expect(service.validateSocketToken('old-token')).resolves.toEqual({
+      studioId: STUDIO_ID,
+      type: 'DEVICE',
+      name: 'Bejárati kijelző',
+      deviceId: 'device-1',
+    });
+    expect(prismaMock.displayDevice.updateMany).toHaveBeenCalledWith({
+      where: { id: 'device-1', deviceToken: 'old-token' },
+      data: expect.objectContaining({ lastSeenAt: expect.any(Date) }),
+    });
+  });
+
+  it('ha az eszközt a lekérdezés és a frissítés között törlik, DEVICE_TOKEN_INVALID (nem INTERNAL)', async () => {
+    prismaMock.displayDevice.updateMany.mockResolvedValue({ count: 0 });
+
+    await expect(service.validateSocketToken('old-token')).rejects.toMatchObject({
+      code: 'AUTH.DEVICE_TOKEN_INVALID',
+    });
+  });
+
+  it('ismeretlen tokennél DEVICE_TOKEN_INVALID, frissítés nélkül', async () => {
+    prismaMock.displayDevice.findUnique.mockResolvedValue(null);
+
+    await expect(service.validateSocketToken('unknown')).rejects.toMatchObject({
+      code: 'AUTH.DEVICE_TOKEN_INVALID',
+    });
+    expect(prismaMock.displayDevice.updateMany).not.toHaveBeenCalled();
+  });
+});

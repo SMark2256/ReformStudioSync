@@ -54,9 +54,13 @@ BroadcastChannel működik. Ahol a socket viselkedése a tét (pl. TICKET-29), a
 `e2e/socketio-stub.ts` `installSocketIoStub(context)` a `context.routeWebSocket`-tel
 elkapja a böngészőkontextus (a popupok is) socket.io kapcsolatait, és egy minimális
 engine.io v4 szervert játszik: számolja a kapcsolatokat (kijelző / munkatársi), és
-szerveroldali eseményt küld (`emit`). Csak az adott tesztben kapcsold be, a többi
-teszt a stub nélkül fut. Bekapcsolt stub mellett a monitor „Élő Socket + Helyi
-Szinkron Aktív” feliratot mutat, így az `expectMonitorIdle()` ott nem használható.
+szerveroldali eseményt küld (`emit`) vagy bont (`disconnect`). A valódi gatewayhez
+hasonlóan minden csatlakozás és bontás után `MONITOR_STATE`-et küld
+(`announceState: false`-szal nem), a `rejectWith` kóddal pedig minden csatlakozást
+elutasít (`MONITOR_AUTH_REJECTED`, majd bontás; TICKET-32). Csak az adott tesztben
+kapcsold be, a többi teszt a stub nélkül fut: ott a monitor „Csak helyi szinkron”
+feliratot mutat. Bekapcsolt stub mellett a monitor az állapotüzenet után „Élő Socket +
+Helyi Szinkron Aktív” feliratot mutat, így az `expectMonitorIdle()` ott nem használható.
 
 ## Regressziós tesztek (`test.fixme`)
 
@@ -70,8 +74,9 @@ kerülnek be, a nevük ugyanígy a ticketszámmal kezdődik.
 | Ticket | Fájl |
 |---|---|
 | TICKET-1 | `check-in.spec.ts` |
-| TICKET-2 | `monitor.spec.ts` |
+| TICKET-2 | `monitor.spec.ts` (a TICKET-32 óta `test`) |
 | TICKET-3 | `guests.spec.ts` |
 | TICKET-4 | `sell-pass.spec.ts` (a vendégválasztó szerepét a javítás dönti el, a lokátort ahhoz kell igazítani) |
 | TICKET-25 | `record-payment.spec.ts` |
 | TICKET-29 | `monitor.spec.ts` (socket.io stub) |
+| TICKET-32 | `monitor.spec.ts` (socket.io stub, párosított kijelző) |
