@@ -83,7 +83,8 @@ model User {
   id           String   @id @default(uuid())
   studioId     String   @default("default-studio") @map("studio_id")
   email        String   @unique
-  passwordHash String   @map("password_hash")
+  // TICKET-35 óta nincs jelszavas belépés; az oszlop csak a régi adatok miatt maradt.
+  passwordHash String?  @map("password_hash")
   name         String
   role         Role     @default(RECEPTIONIST)
   isActive     Boolean  @default(true) @map("is_active")
@@ -469,5 +470,22 @@ model DisplayDevice {
 
   @@unique([studioId, name])
   @@map("display_devices")
+}
+
+// E-mailben küldött belépőkód (TICKET-35). Címhez kötött, nem felhasználóhoz: ismeretlen
+// címre is készül (felhasználhatatlan) sor, így a korlátozás sem árulja el, ki munkatárs.
+model LoginCode {
+  id         String    @id @default(uuid())
+  email      String
+  // HMAC-SHA256(JWT_SECRET, kód), hexában; maga a kód nincs tárolva.
+  codeHash   String    @map("code_hash")
+  attempts   Int       @default(0)
+  expiresAt  DateTime  @map("expires_at")
+  consumedAt DateTime? @map("consumed_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  @@index([email, createdAt])
+  @@index([createdAt])
+  @@map("login_codes")
 }
 

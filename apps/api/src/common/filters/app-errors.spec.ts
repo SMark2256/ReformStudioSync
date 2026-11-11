@@ -40,7 +40,7 @@ describe('Hibakatalógus', () => {
   it('csak a lejárt munkamenet és az inaktív fiók vezet kijelentkeztetésre', () => {
     const loginCodes = codes.filter((c) => APP_ERROR_CATALOG[c].action === 'login');
     expect(loginCodes.sort()).toEqual(['AUTH.ACCOUNT_INACTIVE', 'AUTH.UNAUTHENTICATED']);
-    expect(APP_ERROR_CATALOG['AUTH.INVALID_CREDENTIALS'].action).toBe('notify');
+    expect(APP_ERROR_CATALOG['AUTH.CODE_INVALID'].action).toBe('notify');
   });
 });
 
