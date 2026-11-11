@@ -38,6 +38,7 @@ if [ -f e2e/tsconfig.json ]; then
   step "typecheck (e2e)"     npx tsc -p e2e
 fi
 step "api tesztek (vitest)"  npm --workspace=@reform/api run test
+step "web tesztek (vitest)"  npm --workspace=@reform/web run test
 step "ESLint"                npm run lint
 step "FSD lint (Steiger)"    npm run lint:fsd
 step "web build"             npm --workspace=@reform/web run build

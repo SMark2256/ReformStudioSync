@@ -47,6 +47,17 @@ belépés nélkül is működik. Segédfüggvény: `loginToReception()` az `e2e/
 | 100003 | Szabó Eszter | havi tagság + 10 alkalmas Reformer (2 alk.) |
 | 100005 | Varga Judit | nincs tagság, kimerült bérlet (0 alk.) |
 
+## Socket.io stub (élő kapcsolat API nélkül)
+
+Alapból a socket az elérhetetlen `VITE_WS_URL`-re csatlakozna, és csak a helyi
+BroadcastChannel működik. Ahol a socket viselkedése a tét (pl. TICKET-29), az
+`e2e/socketio-stub.ts` `installSocketIoStub(context)` a `context.routeWebSocket`-tel
+elkapja a böngészőkontextus (a popupok is) socket.io kapcsolatait, és egy minimális
+engine.io v4 szervert játszik: számolja a kapcsolatokat (kijelző / munkatársi), és
+szerveroldali eseményt küld (`emit`). Csak az adott tesztben kapcsold be, a többi
+teszt a stub nélkül fut. Bekapcsolt stub mellett a monitor „Élő Socket + Helyi
+Szinkron Aktív” feliratot mutat, így az `expectMonitorIdle()` ott nem használható.
+
 ## Regressziós tesztek (`test.fixme`)
 
 A TICKET-1–4 hibáira írt tesztek `test.fixme(...)`-vel vannak jelölve, és a nevük
@@ -63,3 +74,4 @@ kerülnek be, a nevük ugyanígy a ticketszámmal kezdődik.
 | TICKET-3 | `guests.spec.ts` |
 | TICKET-4 | `sell-pass.spec.ts` (a vendégválasztó szerepét a javítás dönti el, a lokátort ahhoz kell igazítani) |
 | TICKET-25 | `record-payment.spec.ts` |
+| TICKET-29 | `monitor.spec.ts` (socket.io stub) |

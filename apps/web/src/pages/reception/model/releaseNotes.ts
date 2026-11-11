@@ -63,6 +63,16 @@ export const getJiraIssueUrl = (jiraKey: string): string =>
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    id: 'v0.3-fix-monitor-stable-connection',
+    version: '0.3',
+    date: '2026-11-11',
+    kind: 'FIX',
+    title: 'A Vendégmonitor megbízhatóan megjeleníti a beléptetett vendéget',
+    summary:
+      'A Vendégmonitor és a recepció tartósan kapcsolódva marad a szerverhez, nem csatlakozik újra folyamatosan. A beléptetett vendég üdvözlése így nem vész el útközben, és a kapcsolat nem terheli feleslegesen a kijelzőt.',
+    jiraKey: 'TICKET-29',
+  },
+  {
     id: 'v0.3-sidebar-settings',
     version: '0.3',
     date: '2026-11-11',

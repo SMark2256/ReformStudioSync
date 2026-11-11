@@ -122,7 +122,7 @@ bash .claude/skills/reform-ticket/scripts/gate.sh
 ```
 
 Sorban futtatja: shared build, Prisma generate, typecheck (web + api, és az
-`e2e/`, ha van), api tesztek (vitest), `lint` (ESLint), `lint:fsd` (Steiger), web
+`e2e/`, ha van), api és web tesztek (vitest), `lint` (ESLint), `lint:fsd` (Steiger), web
 build. Az első hibánál megáll. Hibánál javítsd, és futtasd újra. Ne kapcsold ki a
 szabályt, és ne írd át a tesztet csak azért, hogy zöld legyen. Az ESLint
 warningjai nem állítják meg a gate-et.
