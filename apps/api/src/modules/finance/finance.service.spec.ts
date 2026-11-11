@@ -58,6 +58,13 @@ describe('FinanceService — havi tagdíj-esedékességek pótlása (TICKET-13)'
         findMany: vi.fn().mockResolvedValue([]),
         create: vi.fn().mockResolvedValue(membershipRow()),
       },
+      guest: {
+        findFirst: vi.fn().mockResolvedValue({ id: 'g1', gender: 'FEMALE' }),
+      },
+      service: {
+        findMany: vi.fn().mockResolvedValue([]),
+        findFirst: vi.fn().mockResolvedValue(null),
+      },
     };
     service = new FinanceService(prismaMock);
   });
@@ -152,6 +159,64 @@ describe('FinanceService — havi tagdíj-esedékességek pótlása (TICKET-13)'
         status: 'PENDING',
       }),
     ]);
+  });
+
+  describe('createMembership: a köredzés szolgáltatás és a csak nőknek szóló korlátozás (TICKET-42)', () => {
+    const circuit = {
+      id: 'srv-circuit',
+      category: 'CIRCUIT',
+      womenOnly: true,
+      isActive: true,
+      createdAt: day('2026-01-01'),
+    };
+    const newerCircuit = { ...circuit, id: 'srv-circuit-2', createdAt: day('2026-06-01') };
+
+    beforeEach(() => {
+      setNow('2026-11-05T10:00:00Z');
+      prismaMock.service.findMany.mockResolvedValue([newerCircuit, circuit]);
+    });
+
+    it('női vendég: a tagság a stúdió (legrégebbi aktív) köredzés szolgáltatásához kötődik', async () => {
+      await service.createMembership({ guestId: 'g1', monthlyFeeHuf: 22000 });
+
+      expect(prismaMock.membership.create.mock.calls[0][0].data.serviceId).toBe(
+        'srv-circuit',
+      );
+    });
+
+    it('férfi vendégnek csak nőknek szóló tagság nem adható el: PASS.WOMEN_ONLY', async () => {
+      prismaMock.guest.findFirst.mockResolvedValue({ id: 'g1', gender: 'MALE' });
+
+      await expect(
+        service.createMembership({ guestId: 'g1', monthlyFeeHuf: 22000 }),
+      ).rejects.toMatchObject({ code: 'PASS.WOMEN_ONLY' });
+      expect(prismaMock.membership.create).not.toHaveBeenCalled();
+    });
+
+    it('férfi vendégnek a nem csak nőknek szóló köredzés tagság eladható', async () => {
+      prismaMock.guest.findFirst.mockResolvedValue({ id: 'g1', gender: 'MALE' });
+      prismaMock.service.findMany.mockResolvedValue([{ ...circuit, womenOnly: false }]);
+
+      await service.createMembership({ guestId: 'g1', monthlyFeeHuf: 22000 });
+
+      expect(prismaMock.membership.create).toHaveBeenCalledTimes(1);
+    });
+
+    it('nincs megadva nemnél eladható (a felület figyelmeztet)', async () => {
+      prismaMock.guest.findFirst.mockResolvedValue({ id: 'g1', gender: 'UNSPECIFIED' });
+
+      await service.createMembership({ guestId: 'g1', monthlyFeeHuf: 22000 });
+
+      expect(prismaMock.membership.create).toHaveBeenCalledTimes(1);
+    });
+
+    it('ismeretlen vendégnél GUEST.NOT_FOUND', async () => {
+      prismaMock.guest.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.createMembership({ guestId: 'nincs', monthlyFeeHuf: 22000 }),
+      ).rejects.toMatchObject({ code: 'GUEST.NOT_FOUND' });
+    });
   });
 
   it('szüneteltetés: pótol, rögzíti a szünet napját és törli a szünet utáni érintetlen díjat', async () => {

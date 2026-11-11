@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { DocumentType, GuestStatus, Role } from '@reform/shared';
+import { DocumentType, Gender, GuestStatus, Role } from '@reform/shared';
 import {
   IsDateString,
   IsEmail,
@@ -51,6 +51,14 @@ export class CreateGuestDto {
   @IsString()
   nameDay?: string | null;
 
+  @ApiProperty({
+    enum: Gender,
+    description:
+      'Új vendégnél kötelező; a felület a keresztnévből előtölti (inferGenderFromFirstName).',
+  })
+  @IsEnum(Gender, { message: 'A vendég nemének megadása kötelező.' })
+  gender: Gender;
+
   @ApiPropertyOptional({ enum: GuestStatus, default: GuestStatus.ACTIVE })
   @IsOptional()
   @IsEnum(GuestStatus)
@@ -97,6 +105,11 @@ export class UpdateGuestDto {
   @IsOptional()
   @IsString()
   nameDay?: string | null;
+
+  @ApiPropertyOptional({ enum: Gender })
+  @IsOptional()
+  @IsEnum(Gender)
+  gender?: Gender;
 
   @ApiPropertyOptional({ enum: GuestStatus })
   @IsOptional()

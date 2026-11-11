@@ -4,6 +4,7 @@ import {
   PassStatus,
   PassType,
   ServiceDto,
+  womenOnlyAccess,
 } from '@reform/shared';
 import React, { useEffect, useId, useState } from 'react';
 import {
@@ -99,11 +100,19 @@ export const DeductTreatmentModal: React.FC<DeductTreatmentModalProps> = ({
 
   const selectedGuest = guests.find((g) => g.id === selectedGuestId) ?? null;
 
+  // Csak nőknek szóló kezelés és ilyen szolgáltatáshoz kötött bérlet férfi vendéggel nem választható
+  // (TICKET-42, a szerver is ellenőrzi).
+  const isWomenOnly = (serviceId: string | null | undefined) =>
+    !!services.find((s) => s.id === serviceId)?.womenOnly;
+  const isBlocked = (serviceId: string | null | undefined) =>
+    womenOnlyAccess(selectedGuest?.gender, isWomenOnly(serviceId)) === 'DENIED';
+
   // A szerver szabálya: csak aktív (számolt állapot) bérlet, és ha szolgáltatáshoz kötött, csak arra a kezelésre.
   const activePasses = (selectedGuest?.passes ?? []).filter(
     (p) =>
       p.status === PassStatus.ACTIVE &&
-      passCoversService(p.serviceId, selectedServiceId),
+      passCoversService(p.serviceId, selectedServiceId) &&
+      !isBlocked(p.serviceId),
   );
 
   useEffect(() => {
@@ -124,8 +133,14 @@ export const DeductTreatmentModal: React.FC<DeductTreatmentModalProps> = ({
 
   const selectedPass = activePasses.find((p) => p.id === selectedPassId);
   const selectedService = treatmentServices.find(
-    (s) => s.id === selectedServiceId,
+    (s) => s.id === selectedServiceId && !isBlocked(s.id),
   );
+  const genderMissing =
+    !!selectedGuest &&
+    womenOnlyAccess(
+      selectedGuest.gender,
+      isWomenOnly(selectedService?.id) || isWomenOnly(selectedPass?.serviceId),
+    ) === 'GENDER_MISSING';
 
   const filteredGuests = guests.filter((g) => {
     const q = guestSearch.trim().toLowerCase();
@@ -261,6 +276,7 @@ export const DeductTreatmentModal: React.FC<DeductTreatmentModalProps> = ({
                       key={srv.id}
                       variant="secondary"
                       aria-pressed={srv.id === selectedServiceId}
+                      disabled={isBlocked(srv.id)}
                       onClick={() => setSelectedServiceId(srv.id)}
                       className={`${optionClassName} flex-col items-start gap-0.5 p-3 text-left`}
                     >
@@ -268,8 +284,9 @@ export const DeductTreatmentModal: React.FC<DeductTreatmentModalProps> = ({
                         {srv.name}
                       </span>
                       <span className="text-xs font-normal text-muted-foreground">
-                        {srv.durationMinutes} perc,{' '}
-                        {srv.priceHuf.toLocaleString('hu-HU')} Ft
+                        {isBlocked(srv.id)
+                          ? 'Csak nőknek, férfi vendéggel nem választható'
+                          : `${srv.durationMinutes} perc, ${srv.priceHuf.toLocaleString('hu-HU')} Ft`}
                       </span>
                     </Button>
                   ))}
@@ -381,6 +398,15 @@ export const DeductTreatmentModal: React.FC<DeductTreatmentModalProps> = ({
                 placeholder="Pl. Hypoxi L250 gép, 30 perc"
               />
             </div>
+
+            {genderMissing && (
+              <Alert>
+                <AlertDescription>
+                  Ez a kezelés csak nőknek szól, de a vendég neme nincs
+                  megadva. Pótold a vendégadatlapon.
+                </AlertDescription>
+              </Alert>
+            )}
 
             {selectedGuest && selectedPass && selectedService && (
               <Alert>

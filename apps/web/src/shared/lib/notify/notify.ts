@@ -101,6 +101,12 @@ export const notify = {
         );
       }
 
+      if (payload.warnings?.includes('GENDER_MISSING')) {
+        warningMessages.push(
+          'A vendég neme nincs megadva: pótold az adatlapon (női köredzés)!',
+        );
+      }
+
       const description = [
         payload.serviceName
           ? `${payload.serviceName} • ${remainingText}`

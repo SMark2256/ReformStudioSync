@@ -7,6 +7,7 @@ import {
   DeductPassUsageRequestDto,
   DisplayDeviceDto,
   DocumentType,
+  Gender,
   GuestDocumentDto,
   GuestDto,
   GuestNoteDto,
@@ -133,6 +134,7 @@ export const api = {
     category: ServiceCategory;
     durationMinutes: number;
     priceHuf: number;
+    womenOnly?: boolean;
   }): Promise<ServiceDto> {
     return request(
       '/services',
@@ -169,6 +171,7 @@ export const api = {
     phone?: string;
     birthDate?: string | null;
     nameDay?: string | null;
+    gender: Gender;
     status?: GuestStatus;
     notes?: string;
   }): Promise<GuestDto> {
@@ -192,6 +195,7 @@ export const api = {
       phone: string;
       birthDate: string | null;
       nameDay: string | null;
+      gender: Gender;
       status: GuestStatus;
       notes: string;
     }>,
@@ -398,6 +402,7 @@ export const api = {
 
   createMembership(data: {
     guestId: string;
+    serviceId?: string;
     monthlyFeeHuf: number;
     startDate?: string;
     dueDay?: number;
