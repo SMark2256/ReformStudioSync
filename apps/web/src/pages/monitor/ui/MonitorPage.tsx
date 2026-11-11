@@ -1,4 +1,5 @@
 import {
+  MonitorAuthRejectedPayload,
   MonitorCheckInPayload,
   MonitorCheckInRevokedPayload,
   MonitorDeviceRevokedPayload,
@@ -20,7 +21,10 @@ import {
 } from 'lucide-react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useMonitorChannel } from '@/shared/lib/monitor-channel';
+import {
+  MonitorConnectionStatus,
+  useMonitorChannel,
+} from '@/shared/lib/monitor-channel';
 import { api } from '@/shared/api';
 import { mockStudioEngine } from '@/shared/api';
 import { notify } from '@/shared/lib/notify';
@@ -43,6 +47,28 @@ const monitorChipClassName = {
   on: `${chipBaseClassName} border-emerald-500/30 bg-emerald-500/15 text-emerald-300`,
   off: `${chipBaseClassName} border-slate-700 bg-slate-800 text-slate-400`,
   warn: `${chipBaseClassName} border-amber-500/30 bg-amber-500/15 text-amber-300`,
+};
+
+// Az „élő” felirat csak akkor látszik, ha a szerver ténylegesen beléptette a kijelzőt
+// a stúdió szobájába (TICKET-32); a helyi BroadcastChannel mindig működik.
+const localOnlyChip = {
+  className: monitorChipClassName.warn,
+  label: 'Csak helyi szinkron',
+};
+const connectionChip: Record<
+  MonitorConnectionStatus,
+  { className: string; label: string }
+> = {
+  live: {
+    className: monitorChipClassName.on,
+    label: 'Élő Socket + Helyi Szinkron Aktív',
+  },
+  connecting: {
+    className: monitorChipClassName.off,
+    label: 'Kapcsolódás a szerverhez…',
+  },
+  offline: localOnlyChip,
+  idle: localOnlyChip,
 };
 
 export const MonitorPage: React.FC = () => {
@@ -136,22 +162,46 @@ export const MonitorPage: React.FC = () => {
     }, 4500);
   }, []);
 
+  /** A párosítás helyi törlése: a monitor a kódbekérő képernyőre vált. */
+  const resetDevicePairing = useCallback(() => {
+    clearDeviceAuth();
+    setActiveResult(null);
+    setRevokedBanner(null);
+    setTestPingBanner(null);
+    setConfirmUnpair(false);
+  }, [clearDeviceAuth]);
+
+  /** A szerver vagy a recepció bontotta a párosítást (munkatársi munkamenetnél nem). */
+  const dropDevicePairing = useCallback(
+    (reason: string) => {
+      if (isStaffAuthenticated) return;
+      resetDevicePairing();
+      soundFeedback.playWarning();
+      notify.warning('Kijelző párosítása megszakadt', reason);
+    },
+    [isStaffAuthenticated, resetDevicePairing],
+  );
+
   const handleDeviceRevoked = useCallback(
     (payload: MonitorDeviceRevokedPayload) => {
-      if (isStaffAuthenticated) return;
-      clearDeviceAuth();
-      setActiveResult(null);
-      setRevokedBanner(null);
-      setTestPingBanner(null);
-      setConfirmUnpair(false);
-      soundFeedback.playWarning();
-      notify.warning(
-        'Kijelző párosítása megszakadt',
+      dropDevicePairing(
         payload.reason ??
           'A recepcióról bontották vagy törölték ennek a kijelzőnek a párosítását.',
       );
     },
-    [isStaffAuthenticated, clearDeviceAuth],
+    [dropDevicePairing],
+  );
+
+  // Munkatársi tokennél (pl. lejárt munkamenet) a szerver szintén DEVICE_TOKEN_INVALID-ot
+  // küldhet: ott a párosítás marad (`dropDevicePairing`), csak a kapcsolat szakad meg.
+  const handleAuthRejected = useCallback(
+    (payload: MonitorAuthRejectedPayload) => {
+      if (payload.code !== 'AUTH.DEVICE_TOKEN_INVALID') return;
+      dropDevicePairing(
+        'A szerver már nem ismeri ezt a kijelzőt. A további használathoz új 6 jegyű párosító kód szükséges.',
+      );
+    },
+    [dropDevicePairing],
   );
 
   useEffect(() => {
@@ -172,11 +222,12 @@ export const MonitorPage: React.FC = () => {
     };
   }, []);
 
-  const { isConnected, wakeLockActive } = useMonitorChannel({
+  const { connectionStatus, wakeLockActive } = useMonitorChannel({
     onMonitorCheckIn: handleCheckInResult,
     onMonitorCheckInRevoked: handleCheckInRevoked,
     onTestPing: handleTestPing,
     onDeviceRevoked: handleDeviceRevoked,
+    onAuthRejected: handleAuthRejected,
     enableWakeLock: isAuthorized,
     enabled: isAuthorized,
     displayOnly: true,
@@ -213,16 +264,15 @@ export const MonitorPage: React.FC = () => {
 
   const handleUnpairDevice = async () => {
     if (!deviceToken) return;
+    // Előbb a helyi leválasztás (akkor is, ha a szerver nem elérhető): a törölt `deviceId`
+    // után a szerver visszavonás-üzenetét a csatorna már elnyeli, így nincs dupla jelzés,
+    // akkor sem, ha az üzenet a HTTP-válasz előtt érkezik.
+    resetDevicePairing();
     try {
       await api.unpairSelfDevice(deviceToken);
     } catch {
-      // Helyi leválasztást akkor is végrehajtjuk, ha a szerver nem elérhető
+      // A helyi leválasztás már megtörtént.
     }
-    clearDeviceAuth();
-    setConfirmUnpair(false);
-    setActiveResult(null);
-    setRevokedBanner(null);
-    setTestPingBanner(null);
     notify.info(
       'Párosítás megszakítva',
       'Az eszköz le lett választva. A további használathoz új 6 jegyű párosító kód szükséges.',
@@ -446,17 +496,9 @@ export const MonitorPage: React.FC = () => {
                 : 'QR Szkenner Szünetel'}
             </span>
 
-            <span
-              className={
-                isConnected
-                  ? monitorChipClassName.on
-                  : monitorChipClassName.warn
-              }
-            >
+            <span className={connectionChip[connectionStatus].className}>
               <Wifi aria-hidden strokeWidth={1.75} className="size-3.5" />
-              {isConnected
-                ? 'Élő Socket + Helyi Szinkron Aktív'
-                : 'Helyi Broadcast Szinkron Aktív'}
+              {connectionChip[connectionStatus].label}
             </span>
 
             {wakeLockActive && (

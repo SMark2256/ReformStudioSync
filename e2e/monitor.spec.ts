@@ -1,6 +1,14 @@
 import type { Page } from '@playwright/test';
 import { SOCKET_EVENTS } from '@reform/shared';
-import { deductTreatment, expect, expectMonitorIdle, loginToReception, scanBarcode, test } from './fixtures';
+import {
+  deductTreatment,
+  expect,
+  expectMonitorIdle,
+  loginToReception,
+  scanBarcode,
+  test,
+  toasts,
+} from './fixtures';
 import { installSocketIoStub } from './socketio-stub';
 
 /** Belépés a recepcióra, és a „Vendégmonitor” menüponttal a monitor megnyitása külön ablakban. */
@@ -32,8 +40,9 @@ test.describe('Vendégmonitor azonos böngészőben', () => {
 
 test.describe('Regresszió: TICKET-2', () => {
   // Megfigyelés (TICKET-11): a CHECKIN_RESULT üzenet a BroadcastChannelen megérkezik a
-  // monitorablakba, és a monitor jogosult („Helyi Broadcast Szinkron Aktív”), a kijelző mégsem vált.
-  test.fixme(
+  // monitorablakba, és a monitor jogosult, a kijelző mégsem vált. Valószínű gyökérok: a monitor
+  // BroadcastChannelje minden rendernél bezárt és újranyílt (TICKET-29), az üzenet a résbe esett.
+  test(
     'TICKET-2: azonos gépen nyitott monitor mock-módban üdvözli a köredzésre belépő vendéget (<1 mp)',
     async ({ page }) => {
       const monitor = await openReceptionWithMonitor(page);
@@ -44,7 +53,7 @@ test.describe('Regresszió: TICKET-2', () => {
     },
   );
 
-  test.fixme(
+  test(
     'TICKET-2: azonos gépen nyitott monitor kezeléslevonás után a hátralévő alkalmakat mutatja',
     async ({ page }) => {
       const monitor = await openReceptionWithMonitor(page);
@@ -114,5 +123,97 @@ test.describe('Monitor kapcsolat: TICKET-29', () => {
     expect(server.countByKind(false)).toBe(2);
     expect(server.openedCount()).toBe(3);
     expect(server.closedCount()).toBe(0);
+  });
+});
+
+const PAIRED_DEVICE = {
+  deviceId: 'device-e2e',
+  deviceToken: 'device-token-e2e',
+  deviceName: 'Bejárati TV',
+};
+
+const PAIRING_HEADING = 'Írd be a 6 jegyű párosító kódot';
+const LIVE_CHIP = 'Élő Socket + Helyi Szinkron Aktív';
+
+/**
+ * Párosított önálló kijelző: eszköztoken a perzisztált auth store-ban (`reform-studio-auth`),
+ * munkatársi munkamenet nélkül. Csak az első betöltéskor írjuk, hogy a monitor saját
+ * párosítás-törlését egy újratöltés se írja felül.
+ */
+async function openPairedMonitor(page: Page) {
+  await page.addInitScript((device) => {
+    if (sessionStorage.getItem('e2e-auth-seeded')) return;
+    sessionStorage.setItem('e2e-auth-seeded', '1');
+    localStorage.setItem(
+      'reform-studio-auth',
+      JSON.stringify({ state: { accessToken: null, user: null, ...device }, version: 0 }),
+    );
+  }, PAIRED_DEVICE);
+  await page.goto('/monitor');
+  await expect(page.getByText(`Párosított Önálló Kijelző (${PAIRED_DEVICE.deviceName})`)).toBeVisible();
+}
+
+test.describe('Vendégmonitor párosítás: TICKET-32', () => {
+  test('TICKET-32: a párosított kijelző a szerver állapotüzenete után élőnek látszik', async ({ page, context }) => {
+    const server = await installSocketIoStub(context);
+    await openPairedMonitor(page);
+
+    await expect(page.getByText(LIVE_CHIP)).toBeVisible();
+    expect(server.countByKind(true)).toBe(1);
+  });
+
+  test('TICKET-32: MONITOR_STATE nélkül nem írja, hogy él', async ({ page, context }) => {
+    const server = await installSocketIoStub(context, { announceState: false });
+    await openPairedMonitor(page);
+
+    // A socket kapcsolódott, de a szerver még nem léptette be a szobába.
+    await expect.poll(() => server.countByKind(true)).toBe(1);
+    await expect(page.getByText('Kapcsolódás a szerverhez…')).toBeVisible();
+    await expect(page.getByText(LIVE_CHIP)).toHaveCount(0);
+
+    server.emit(SOCKET_EVENTS.MONITOR_STATE, { studioId: 'default-studio', connectedDisplays: 1 }, true);
+    await expect(page.getByText(LIVE_CHIP)).toBeVisible();
+  });
+
+  test('TICKET-32: a recepción bontott párosítás után a kijelző a párosító kódot kéri', async ({ page, context }) => {
+    const server = await installSocketIoStub(context);
+    await openPairedMonitor(page);
+    await expect(page.getByText(LIVE_CHIP)).toBeVisible();
+
+    // A gateway `disconnectDevice`-a: közvetlen visszavonás-üzenet, majd szerveroldali bontás.
+    server.emit(
+      SOCKET_EVENTS.MONITOR_DEVICE_REVOKED,
+      {
+        deviceId: PAIRED_DEVICE.deviceId,
+        reason: 'A kijelző párosítása törlésre került a recepcióról.',
+        timestamp: new Date().toISOString(),
+      },
+      true,
+    );
+    server.disconnect(true);
+
+    await expect(page.getByRole('heading', { name: PAIRING_HEADING })).toBeVisible();
+    await expect(toasts(page)).toContainText('Kijelző párosítása megszakadt');
+    await expect(page.getByText(LIVE_CHIP)).toHaveCount(0);
+  });
+
+  test('TICKET-32: elutasított eszköztokennél a kijelző a párosító kódot kéri', async ({ page, context }) => {
+    await installSocketIoStub(context, { rejectWith: 'AUTH.DEVICE_TOKEN_INVALID' });
+    await page.addInitScript((device) => {
+      if (sessionStorage.getItem('e2e-auth-seeded')) return;
+      sessionStorage.setItem('e2e-auth-seeded', '1');
+      localStorage.setItem(
+        'reform-studio-auth',
+        JSON.stringify({ state: { accessToken: null, user: null, ...device }, version: 0 }),
+      );
+    }, PAIRED_DEVICE);
+    // Az elutasítás azonnal jön, a párosított nézet ezért csak egy pillanatig látszhat.
+    await page.goto('/monitor');
+
+    await expect(page.getByRole('heading', { name: PAIRING_HEADING })).toBeVisible();
+    await expect(toasts(page)).toContainText('Kijelző párosítása megszakadt');
+    // A párosítás a tárolóból is törlődött.
+    const stored = await page.evaluate(() => localStorage.getItem('reform-studio-auth') ?? '');
+    expect(stored).not.toContain(PAIRED_DEVICE.deviceToken);
   });
 });

@@ -2,6 +2,7 @@ import {
   CheckInResultPayload,
   CheckInRevokedPayload,
   MONITOR_BROADCAST_CHANNEL,
+  MonitorAuthRejectedPayload,
   MonitorCheckInPayload,
   MonitorCheckInRevokedPayload,
   MonitorDeviceRevokedPayload,
@@ -90,7 +91,10 @@ interface UseMonitorChannelOptions {
   /** Szűkített sztornó a Vendégmonitornak (socket + helyi BroadcastChannel). */
   onMonitorCheckInRevoked?: (payload: MonitorCheckInRevokedPayload) => void;
   onTestPing?: (payload: MonitorTestPingPayload) => void;
+  /** Csak a saját (`deviceId`) kijelző visszavonása. */
   onDeviceRevoked?: (payload: MonitorDeviceRevokedPayload) => void;
+  /** A szerver elutasította a socket tokenjét; utána bont. */
+  onAuthRejected?: (payload: MonitorAuthRejectedPayload) => void;
   enableWakeLock?: boolean;
   enabled?: boolean;
   /**
@@ -100,12 +104,30 @@ interface UseMonitorChannelOptions {
   displayOnly?: boolean;
 }
 
+/**
+ * A szerverkapcsolat valós állapota (TICKET-32):
+ * - `idle`: nincs socket (nincs jogosultság, vagy a csatorna ki van kapcsolva)
+ * - `connecting`: a socket nyílik, vagy nyitva van, de a szerver még nem léptette a stúdió szobájába
+ * - `live`: a szerver beléptette a szobába (megjött a `MONITOR_STATE`)
+ * - `offline`: hiba, bontás vagy elutasított token
+ */
+export type MonitorConnectionStatus = 'idle' | 'connecting' | 'live' | 'offline';
+
+/**
+ * Átmeneti szerverhiba (`COMMON.INTERNAL`) miatti elutasítás után a szerveroldali
+ * bontásból a socket.io magától nem csatlakozik újra, ezért ennyi idő múlva, legfeljebb
+ * ennyiszer próbáljuk újra. A számláló az élő kapcsolattal nullázódik.
+ */
+const INTERNAL_RETRY_DELAY_MS = 5_000;
+const INTERNAL_RETRY_LIMIT = 5;
+
 export function useMonitorChannel(options: UseMonitorChannelOptions = {}) {
   const { accessToken, deviceToken, deviceId } = useAuthStore();
   const isAuthorized = Boolean(accessToken || deviceToken);
   const channelEnabled = (options.enabled ?? true) && isAuthorized;
 
-  const [isConnected, setIsConnected] = useState<boolean>(false);
+  const [connectionStatus, setConnectionStatus] =
+    useState<MonitorConnectionStatus>('idle');
   const [connectedDisplays, setConnectedDisplays] = useState<number>(0);
   const [wakeLockActive, setWakeLockActive] = useState<boolean>(false);
 
@@ -152,10 +174,19 @@ export function useMonitorChannel(options: UseMonitorChannelOptions = {}) {
 
   const handleDeviceRevoked = useCallback(
     (payload: MonitorDeviceRevokedPayload) => {
-      const { options, deviceId } = latestRef.current;
+      // A store-ból, nem a ref-ből: a helyi bontás (`clearDeviceAuth`) után még a
+      // következő render előtt érkező visszavonás se jusson el a hívóhoz.
+      const { deviceId } = useAuthStore.getState();
       if (deviceId && payload.deviceId === deviceId) {
-        options.onDeviceRevoked?.(payload);
+        latestRef.current.options.onDeviceRevoked?.(payload);
       }
+    },
+    [],
+  );
+
+  const handleAuthRejected = useCallback(
+    (payload: MonitorAuthRejectedPayload) => {
+      latestRef.current.options.onAuthRejected?.(payload);
     },
     [],
   );
@@ -195,7 +226,8 @@ export function useMonitorChannel(options: UseMonitorChannelOptions = {}) {
   const displayOnly = options.displayOnly === true;
   useEffect(() => {
     if (!channelEnabled || !token) {
-      setIsConnected(false);
+      setConnectionStatus('idle');
+      setConnectedDisplays(0);
       return;
     }
 
@@ -210,18 +242,47 @@ export function useMonitorChannel(options: UseMonitorChannelOptions = {}) {
       reconnectionAttempts: 10,
       reconnectionDelay: 2000,
     });
+    setConnectionStatus('connecting');
 
+    let internalRetries = 0;
+    let retryTimer: number | undefined;
+
+    const goOffline = () => {
+      setConnectionStatus('offline');
+      setConnectedDisplays(0);
+    };
+
+    // A `connect` csak a socket.io-kapcsolat: élő csak akkor, ha a szerver a
+    // hitelesítés után beléptetett a szobába, amit a `MONITOR_STATE` jelez.
     socket.on('connect', () => {
-      setIsConnected(true);
+      setConnectionStatus('connecting');
     });
-
-    socket.on('disconnect', () => {
-      setIsConnected(false);
-    });
+    socket.on('connect_error', goOffline);
+    socket.on('disconnect', goOffline);
 
     socket.on(SOCKET_EVENTS.MONITOR_STATE, (state: MonitorStatePayload) => {
+      internalRetries = 0;
+      setConnectionStatus('live');
       setConnectedDisplays(state.connectedDisplays);
     });
+
+    socket.on(
+      SOCKET_EVENTS.MONITOR_AUTH_REJECTED,
+      (payload: MonitorAuthRejectedPayload) => {
+        goOffline();
+        if (
+          payload.code === 'COMMON.INTERNAL' &&
+          internalRetries < INTERNAL_RETRY_LIMIT
+        ) {
+          internalRetries += 1;
+          retryTimer = window.setTimeout(() => {
+            setConnectionStatus('connecting');
+            socket.connect();
+          }, INTERNAL_RETRY_DELAY_MS);
+        }
+        handleAuthRejected(payload);
+      },
+    );
 
     // Kijelzőként csak a szűkített, recepcióként csak a teljes eseményekre figyelünk.
     if (displayOnly) {
@@ -274,6 +335,7 @@ export function useMonitorChannel(options: UseMonitorChannelOptions = {}) {
 
     return () => {
       window.clearInterval(heartbeatInterval);
+      window.clearTimeout(retryTimer);
       socket.disconnect();
     };
   }, [
@@ -286,6 +348,7 @@ export function useMonitorChannel(options: UseMonitorChannelOptions = {}) {
     handleMonitorRevoked,
     handleTestPing,
     handleDeviceRevoked,
+    handleAuthRejected,
   ]);
 
   // 3. Screen Wake Lock API (hogy a Tablet / Monitor ne aludjon el)
@@ -327,7 +390,7 @@ export function useMonitorChannel(options: UseMonitorChannelOptions = {}) {
   }, [options.enableWakeLock, channelEnabled]);
 
   return {
-    isConnected,
+    connectionStatus,
     connectedDisplays,
     wakeLockActive,
     isAuthorized,

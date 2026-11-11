@@ -1,5 +1,6 @@
 import {
   CheckInResultPayload,
+  MonitorAuthRejectedPayload,
   MonitorCheckInPayload,
   SOCKET_EVENTS,
 } from '@reform/shared';
@@ -25,6 +26,9 @@ const { io, sockets } = vi.hoisted(() => {
     }
 
     emit = vi.fn();
+
+    /** Kézi újracsatlakozás (szerveroldali bontás után a socket.io magától nem próbálkozik). */
+    connect = vi.fn(() => this);
 
     disconnect = vi.fn(() => {
       this.connected = false;
@@ -90,6 +94,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  vi.useRealTimers();
   vi.unstubAllGlobals();
   io.mockClear();
   sockets.length = 0;
@@ -111,10 +116,11 @@ describe('useMonitorChannel: TICKET-29', () => {
     const { result } = renderChannel({ onCheckInResult: () => {} });
 
     fire('connect');
-    expect(result.current.isConnected).toBe(true);
+    fire(SOCKET_EVENTS.MONITOR_STATE, { studioId: 'default-studio', connectedDisplays: 1 });
+    expect(result.current.connectionStatus).toBe('live');
 
     fire('disconnect', 'transport close');
-    expect(result.current.isConnected).toBe(false);
+    expect(result.current.connectionStatus).toBe('offline');
 
     expect(io).toHaveBeenCalledTimes(1);
   });
@@ -190,5 +196,182 @@ describe('useMonitorChannel: TICKET-29', () => {
     expect(channel.close).not.toHaveBeenCalled();
     expect(first).not.toHaveBeenCalled();
     expect(latest).toHaveBeenCalledWith(monitorCheckIn);
+  });
+});
+
+const rejection = (code: string): MonitorAuthRejectedPayload => ({
+  code,
+  message: 'Elutasítva.',
+  timestamp: '2026-11-11T10:00:00.000Z',
+});
+
+/** A gateway elutasítása: az ok, majd szerveroldali bontás. */
+const reject = (code: string) => {
+  fire(SOCKET_EVENTS.MONITOR_AUTH_REJECTED, rejection(code));
+  fire('disconnect', 'io server disconnect');
+};
+
+const revoked = (deviceId: string) => ({
+  deviceId,
+  timestamp: '2026-11-11T10:00:00.000Z',
+});
+
+describe('useMonitorChannel: valós kapcsolatállapot (TICKET-32)', () => {
+  it('csak a MONITOR_STATE után élő, a socket connect eseménye még nem', () => {
+    const { result } = renderChannel({ displayOnly: true });
+    expect(result.current.connectionStatus).toBe('connecting');
+
+    fire('connect');
+    expect(result.current.connectionStatus).toBe('connecting');
+
+    fire(SOCKET_EVENTS.MONITOR_STATE, { studioId: 'default-studio', connectedDisplays: 2 });
+    expect(result.current.connectionStatus).toBe('live');
+    expect(result.current.connectedDisplays).toBe(2);
+  });
+
+  it('bontáskor nem élő, és a kijelzőszám sem marad a régi', () => {
+    const { result } = renderChannel({});
+    fire('connect');
+    fire(SOCKET_EVENTS.MONITOR_STATE, { studioId: 'default-studio', connectedDisplays: 2 });
+
+    fire('disconnect', 'transport close');
+
+    expect(result.current.connectionStatus).toBe('offline');
+    expect(result.current.connectedDisplays).toBe(0);
+  });
+
+  it('elérhetetlen szervernél (connect_error) nem élő', () => {
+    const { result } = renderChannel({ displayOnly: true });
+
+    fire('connect_error', new Error('xhr poll error'));
+
+    expect(result.current.connectionStatus).toBe('offline');
+  });
+
+  it('jogosultság nélkül nincs socket, az állapot idle', () => {
+    useAuthStore.setState({ accessToken: null, deviceToken: null, deviceId: null });
+    const { result } = renderChannel({ displayOnly: true });
+
+    expect(io).not.toHaveBeenCalled();
+    expect(result.current.connectionStatus).toBe('idle');
+  });
+
+  it('MONITOR_AUTH_REJECTED a legutóbbi onAuthRejected-et hívja a payloaddal, és nem élő', () => {
+    const first = vi.fn();
+    const latest = vi.fn();
+    const { result, rerender } = renderChannel({ displayOnly: true, onAuthRejected: first });
+    rerender({ displayOnly: true, onAuthRejected: latest });
+    fire('connect');
+    fire(SOCKET_EVENTS.MONITOR_STATE, { studioId: 'default-studio', connectedDisplays: 1 });
+
+    fire(SOCKET_EVENTS.MONITOR_AUTH_REJECTED, rejection('AUTH.DEVICE_TOKEN_INVALID'));
+
+    expect(first).not.toHaveBeenCalled();
+    expect(latest).toHaveBeenCalledWith(rejection('AUTH.DEVICE_TOKEN_INVALID'));
+    expect(result.current.connectionStatus).toBe('offline');
+  });
+
+  it('átmeneti szerverhibánál (COMMON.INTERNAL) késleltetve újracsatlakozik', () => {
+    vi.useFakeTimers();
+    const { result } = renderChannel({ displayOnly: true });
+    fire('connect');
+
+    reject('COMMON.INTERNAL');
+    expect(result.current.connectionStatus).toBe('offline');
+
+    act(() => {
+      vi.advanceTimersByTime(4_999);
+    });
+    expect(sockets[0].connect).not.toHaveBeenCalled();
+
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
+    expect(sockets[0].connect).toHaveBeenCalledTimes(1);
+    expect(result.current.connectionStatus).toBe('connecting');
+    // Ugyanaz a socket próbálkozik újra, új kapcsolat nem nyílik.
+    expect(io).toHaveBeenCalledTimes(1);
+  });
+
+  it('a COMMON.INTERNAL újrapróbálás korlátozott, élő kapcsolat után újraindul', () => {
+    vi.useFakeTimers();
+    renderChannel({ displayOnly: true });
+    const attempt = () => {
+      fire('connect');
+      reject('COMMON.INTERNAL');
+      act(() => {
+        vi.advanceTimersByTime(5_000);
+      });
+    };
+
+    for (let i = 0; i < 7; i += 1) attempt();
+    expect(sockets[0].connect).toHaveBeenCalledTimes(5);
+
+    fire('connect');
+    fire(SOCKET_EVENTS.MONITOR_STATE, { studioId: 'default-studio', connectedDisplays: 1 });
+    attempt();
+    expect(sockets[0].connect).toHaveBeenCalledTimes(6);
+  });
+
+  it.each(['AUTH.DEVICE_TOKEN_INVALID', 'AUTH.UNAUTHENTICATED'])(
+    '%s elutasítás után nem csatlakozik újra',
+    (code) => {
+      vi.useFakeTimers();
+      const { result } = renderChannel({ displayOnly: true });
+      fire('connect');
+
+      reject(code);
+      act(() => {
+        vi.advanceTimersByTime(60_000);
+      });
+
+      expect(sockets[0].connect).not.toHaveBeenCalled();
+      expect(io).toHaveBeenCalledTimes(1);
+      expect(result.current.connectionStatus).toBe('offline');
+    },
+  );
+
+  it('lebontáskor a függő újrapróbálás elmarad', () => {
+    vi.useFakeTimers();
+    const { unmount } = renderChannel({ displayOnly: true });
+    fire('connect');
+    reject('COMMON.INTERNAL');
+
+    unmount();
+    act(() => {
+      vi.advanceTimersByTime(5_000);
+    });
+
+    expect(sockets[0].connect).not.toHaveBeenCalled();
+  });
+
+  it('MONITOR_DEVICE_REVOKED csak a saját deviceId-re hívja az onDeviceRevoked-et', () => {
+    useAuthStore.setState({ accessToken: null, deviceToken: 'device-token', deviceId: 'device-1' });
+    const onDeviceRevoked = vi.fn();
+    renderChannel({ displayOnly: true, onDeviceRevoked });
+    fire('connect');
+
+    fire(SOCKET_EVENTS.MONITOR_DEVICE_REVOKED, revoked('device-2'));
+    expect(onDeviceRevoked).not.toHaveBeenCalled();
+
+    fire(SOCKET_EVENTS.MONITOR_DEVICE_REVOKED, revoked('device-1'));
+    expect(onDeviceRevoked).toHaveBeenCalledTimes(1);
+    expect(onDeviceRevoked).toHaveBeenCalledWith(revoked('device-1'));
+  });
+
+  it('a helyi párosítás-törlés után érkező visszavonás már nem jut el a hívóhoz', () => {
+    useAuthStore.setState({ accessToken: null, deviceToken: 'device-token', deviceId: 'device-1' });
+    const onDeviceRevoked = vi.fn();
+    renderChannel({ displayOnly: true, onDeviceRevoked });
+    const [socket] = sockets;
+    fire('connect');
+
+    act(() => {
+      useAuthStore.getState().clearDeviceAuth();
+    });
+    // A régi socket kezelője még a bontás előtt kapja meg az üzenetet.
+    socket.fire(SOCKET_EVENTS.MONITOR_DEVICE_REVOKED, revoked('device-1'));
+
+    expect(onDeviceRevoked).not.toHaveBeenCalled();
   });
 });
