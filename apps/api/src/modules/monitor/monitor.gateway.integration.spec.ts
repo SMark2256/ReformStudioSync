@@ -1,4 +1,11 @@
-import { SOCKET_NAMESPACE } from '@reform/shared';
+import {
+  APP_ERROR_CATALOG,
+  appError,
+  MonitorAuthRejectedPayload,
+  MonitorDeviceRevokedPayload,
+  SOCKET_EVENTS,
+  SOCKET_NAMESPACE,
+} from '@reform/shared';
 import { createServer } from 'http';
 import { AddressInfo } from 'net';
 import { Namespace, Server, Socket } from 'socket.io';
@@ -51,7 +58,7 @@ describe('MonitorGateway — valódi socket.io kapcsolat (TICKET-30)', () => {
     ioServer = new Server(httpServer);
     nsp = ioServer.of(SOCKET_NAMESPACE);
     // Namespace-es gatewaynél a Nest is a namespace-t adja `server`-ként.
-    gateway.server = nsp as unknown as Server;
+    gateway.server = nsp;
     nsp.on('connection', (socket: Socket) => {
       const disconnected = new Promise<void>((resolve) => {
         socket.on('disconnect', () => {
@@ -75,15 +82,20 @@ describe('MonitorGateway — valódi socket.io kapcsolat (TICKET-30)', () => {
     await new Promise<void>((resolve) => ioServer.close(() => resolve()));
   });
 
-  /** Csatlakozik, és megvárja, hogy a szerver is lássa a kapcsolatot. */
-  async function connectClient() {
+  function createClient(token = 'device-token') {
     const client = io(baseUrl, {
-      auth: { token: 'device-token' },
+      auth: { token },
       transports: ['websocket'],
       forceNew: true,
       reconnection: false,
     });
     clients.push(client);
+    return client;
+  }
+
+  /** Csatlakozik, és megvárja, hogy a szerver is lássa a kapcsolatot. */
+  async function connectClient() {
+    const client = createClient();
     await new Promise<void>((resolve, reject) => {
       client.once('connect', () => resolve());
       client.once('connect_error', reject);
@@ -126,5 +138,78 @@ describe('MonitorGateway — valódi socket.io kapcsolat (TICKET-30)', () => {
 
     expect(gateway.isDeviceOnline('device-1')).toBe(false);
     expect(nsp.adapter.rooms.has(MONITOR_ROOM)).toBe(false);
+  });
+
+  /** Az esemény és a bontás sorrendjét is rögzíti a kliensoldalon. */
+  function watchUntilDisconnect<T>(client: ClientSocket, event: string) {
+    const order: string[] = [];
+    const received = new Promise<T>((resolve) => {
+      client.once(event, (payload: T) => {
+        order.push(event);
+        resolve(payload);
+      });
+    });
+    const disconnectReason = new Promise<string>((resolve) => {
+      client.once('disconnect', (reason: string) => {
+        order.push('disconnect');
+        resolve(reason);
+      });
+    });
+    return { order, received, disconnectReason };
+  }
+
+  it('visszavonáskor a kijelző megkapja az okot, majd a szerver bontja (TICKET-31)', async () => {
+    authServiceMock.validateSocketToken.mockResolvedValue(DEVICE_AUTH);
+    const { client, server } = await connectClient();
+    await server.connected;
+    expect(gateway.isDeviceOnline('device-1')).toBe(true);
+    const watched = watchUntilDisconnect<MonitorDeviceRevokedPayload>(
+      client,
+      SOCKET_EVENTS.MONITOR_DEVICE_REVOKED,
+    );
+    const revoked: MonitorDeviceRevokedPayload = {
+      deviceId: 'device-1',
+      reason: 'A kijelző párosítása törlésre került a recepcióról.',
+      timestamp: '2026-11-11T10:00:00.000Z',
+    };
+
+    gateway.disconnectDevice(revoked);
+    expect(gateway.isDeviceOnline('device-1')).toBe(false);
+    expect(displays()).toBe(0);
+
+    await expect(watched.received).resolves.toEqual(revoked);
+    await expect(watched.disconnectReason).resolves.toBe('io server disconnect');
+    expect(watched.order).toEqual([
+      SOCKET_EVENTS.MONITOR_DEVICE_REVOKED,
+      'disconnect',
+    ]);
+    await server.disconnected;
+    expect(nsp.sockets.size).toBe(0);
+    expect(nsp.adapter.rooms.has(MONITOR_ROOM)).toBe(false);
+  });
+
+  it('érvénytelen tokennél a kliens a bontás előtt megkapja az okot (TICKET-31)', async () => {
+    authServiceMock.validateSocketToken.mockRejectedValue(
+      appError('AUTH.DEVICE_TOKEN_INVALID'),
+    );
+    const client = createClient('stale-token');
+    const watched = watchUntilDisconnect<MonitorAuthRejectedPayload>(
+      client,
+      SOCKET_EVENTS.MONITOR_AUTH_REJECTED,
+    );
+
+    await expect(watched.received).resolves.toEqual({
+      code: 'AUTH.DEVICE_TOKEN_INVALID',
+      message: APP_ERROR_CATALOG['AUTH.DEVICE_TOKEN_INVALID'].message,
+      timestamp: expect.any(String),
+    });
+    await expect(watched.disconnectReason).resolves.toBe('io server disconnect');
+    expect(watched.order).toEqual([
+      SOCKET_EVENTS.MONITOR_AUTH_REJECTED,
+      'disconnect',
+    ]);
+    await serverSides[serverSides.length - 1].disconnected;
+    expect(displays()).toBe(0);
+    expect(nsp.sockets.size).toBe(0);
   });
 });

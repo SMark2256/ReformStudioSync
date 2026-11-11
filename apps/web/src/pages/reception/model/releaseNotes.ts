@@ -63,6 +63,16 @@ export const getJiraIssueUrl = (jiraKey: string): string =>
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    id: 'v0.3-fix-monitor-revoked-disconnect',
+    version: '0.3',
+    date: '2026-11-11',
+    kind: 'FIX',
+    title: 'A törölt kijelző azonnal lekapcsolódik',
+    summary:
+      'Ha egy Vendégmonitort törölsz, vagy új párosító kódot kérsz hozzá, a kijelző kapcsolata azonnal megszűnik: a recepción már nem látszik online-nak, és nem számít bele az „Online (N kijelző)” számba.',
+    jiraKey: 'TICKET-31',
+  },
+  {
     id: 'v0.3-fix-monitor-display-count',
     version: '0.3',
     date: '2026-11-11',

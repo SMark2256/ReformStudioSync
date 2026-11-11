@@ -1,7 +1,10 @@
 import {
+  APP_ERROR_CATALOG,
+  appError,
   CheckInResultPayload,
   CheckInRevokedPayload,
   CheckInStatus,
+  MonitorDeviceRevokedPayload,
   MonitorStatePayload,
   SOCKET_EVENTS,
   toMonitorPayload,
@@ -255,6 +258,7 @@ function mockClient(id: string, displayOnly = false) {
     leave: vi.fn(async (room: string) => {
       rooms.delete(room);
     }),
+    emit: vi.fn(),
     disconnect: vi.fn(),
   };
 }
@@ -388,6 +392,184 @@ describe('MonitorGateway — kapcsolatnyilvántartás és kijelzőszám (TICKET-
     expect(client.disconnect).toHaveBeenCalledWith(true);
     expect(client.join).not.toHaveBeenCalled();
     expect(displays()).toBe(0);
+  });
+});
+
+const OTHER_DEVICE_AUTH: ValidatedSocket = { ...DEVICE_AUTH, deviceId: 'device-2' };
+
+const REVOKED: MonitorDeviceRevokedPayload = {
+  deviceId: 'device-1',
+  reason: 'A kijelző párosítása törlésre került a recepcióról.',
+  timestamp: '2026-11-11T10:00:00.000Z',
+};
+
+describe('MonitorGateway — visszavonás és elutasítás (TICKET-31)', () => {
+  type Client = ReturnType<typeof mockClient>;
+
+  let gateway: MonitorGateway;
+  let states: MonitorStatePayload[];
+  let sockets: Map<string, Client>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let authServiceMock: any;
+
+  beforeEach(() => {
+    states = [];
+    sockets = new Map();
+    authServiceMock = {
+      validateSocketToken: vi.fn(),
+      recordDeviceActivity: vi.fn().mockResolvedValue(undefined),
+    };
+    gateway = new MonitorGateway(authServiceMock);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (gateway as any).server = {
+      sockets,
+      to: () => ({
+        emit: (event: string, payload: MonitorStatePayload) => {
+          if (event === SOCKET_EVENTS.MONITOR_STATE) states.push(payload);
+        },
+      }),
+    };
+  });
+
+  /** A valódihoz hasonlóan a szerveroldali bontás is lefuttatja a `handleDisconnect`-et. */
+  function serverClient(id: string) {
+    const client = mockClient(id);
+    client.disconnect.mockImplementation(() => {
+      client.disconnected = true;
+      client.rooms.clear();
+      sockets.delete(id);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      gateway.handleDisconnect(client as any);
+    });
+    sockets.set(id, client);
+    return client;
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const connect = (client: Client) => gateway.handleConnection(client as any);
+  const displays = () => gateway.getMonitorState(STUDIO_ID).connectedDisplays;
+  const expectEmittedBeforeDisconnect = (client: Client) => {
+    expect(client.disconnect).toHaveBeenCalledWith(true);
+    expect(client.emit.mock.invocationCallOrder[0]).toBeLessThan(
+      client.disconnect.mock.invocationCallOrder[0],
+    );
+  };
+
+  it('visszavonáskor az eszköz minden socketje megkapja az okot és bontódik, más kliens érintetlen', async () => {
+    authServiceMock.validateSocketToken
+      .mockResolvedValueOnce(DEVICE_AUTH)
+      .mockResolvedValueOnce(DEVICE_AUTH)
+      .mockResolvedValueOnce(OTHER_DEVICE_AUTH)
+      .mockResolvedValue(STAFF_AUTH);
+    const first = serverClient('device-1-a');
+    const second = serverClient('device-1-b');
+    const other = serverClient('device-2');
+    const desk = serverClient('desk');
+    for (const client of [first, second, other, desk]) await connect(client);
+    expect(displays()).toBe(3);
+    states = [];
+
+    gateway.disconnectDevice(REVOKED);
+
+    for (const client of [first, second]) {
+      expect(client.emit.mock.calls).toEqual([
+        [SOCKET_EVENTS.MONITOR_DEVICE_REVOKED, REVOKED],
+      ]);
+      expectEmittedBeforeDisconnect(client);
+    }
+    for (const client of [other, desk]) {
+      expect(client.emit).not.toHaveBeenCalled();
+      expect(client.disconnect).not.toHaveBeenCalled();
+    }
+    expect(gateway.isDeviceOnline('device-1')).toBe(false);
+    expect(gateway.getOnlineDeviceIds()).toEqual(new Set(['device-2']));
+    expect(displays()).toBe(1);
+    // Egyetlen állapotüzenet a stúdiónak, a bontáskori takarítás nem küld újat.
+    expect(states.map((s) => s.connectedDisplays)).toEqual([1]);
+  });
+
+  it('kapcsolódó socket nélküli eszköz visszavonása nem küld állapotot', () => {
+    gateway.disconnectDevice(REVOKED);
+
+    expect(states).toEqual([]);
+  });
+
+  it.each([
+    ['érvénytelen kijelző token', appError('AUTH.DEVICE_TOKEN_INVALID'), 'AUTH.DEVICE_TOKEN_INVALID'],
+    // Idegen hiba szövege nem juthat a kliensre, csak a katalógusé.
+    ['váratlan hiba', new Error('belső részlet'), 'COMMON.INTERNAL'],
+  ] as const)(
+    'elutasításnál (%s) a kliens a bontás előtt megkapja az okot',
+    async (_label, error, code) => {
+      authServiceMock.validateSocketToken.mockRejectedValue(error);
+      const client = serverClient('socket-1');
+
+      await connect(client);
+
+      expect(client.emit.mock.calls).toEqual([
+        [
+          SOCKET_EVENTS.MONITOR_AUTH_REJECTED,
+          {
+            code,
+            message: APP_ERROR_CATALOG[code].message,
+            timestamp: expect.any(String),
+          },
+        ],
+      ]);
+      expectEmittedBeforeDisconnect(client);
+      expect(client.join).not.toHaveBeenCalled();
+      expect(displays()).toBe(0);
+      expect(states).toEqual([]);
+    },
+  );
+
+  it('hiányzó tokennél a kód AUTH.UNAUTHENTICATED, hitelesítés nincs', async () => {
+    const client = serverClient('socket-1');
+    client.handshake.auth.token = '';
+
+    await connect(client);
+
+    expect(authServiceMock.validateSocketToken).not.toHaveBeenCalled();
+    expect(client.emit).toHaveBeenCalledWith(
+      SOCKET_EVENTS.MONITOR_AUTH_REJECTED,
+      expect.objectContaining({
+        code: 'AUTH.UNAUTHENTICATED',
+        message: APP_ERROR_CATALOG['AUTH.UNAUTHENTICATED'].message,
+      }),
+    );
+    expectEmittedBeforeDisconnect(client);
+  });
+
+  it('a hitelesítés alatt visszavont eszköz nem regisztrál, az újrapárosított igen', async () => {
+    const auth = deferred<ValidatedSocket>();
+    authServiceMock.validateSocketToken.mockReturnValueOnce(auth.promise);
+    const stale = serverClient('stale');
+
+    // A régi tokennel a visszavonás előtt hitelesült, de csak utána regisztrálna.
+    const connecting = connect(stale);
+    gateway.disconnectDevice(REVOKED);
+    auth.resolve(DEVICE_AUTH);
+    await connecting;
+
+    expect(stale.emit.mock.calls).toEqual([
+      [
+        SOCKET_EVENTS.MONITOR_AUTH_REJECTED,
+        expect.objectContaining({ code: 'AUTH.DEVICE_TOKEN_INVALID' }),
+      ],
+    ]);
+    expectEmittedBeforeDisconnect(stale);
+    expect(stale.rooms.size).toBe(0);
+    expect(gateway.isDeviceOnline('device-1')).toBe(false);
+    expect(states).toEqual([]);
+
+    // Újrapárosítás után (új token, ugyanaz az eszköz) a kapcsolat érvényes.
+    authServiceMock.validateSocketToken.mockResolvedValue(DEVICE_AUTH);
+    const fresh = serverClient('fresh');
+    await connect(fresh);
+
+    expect(fresh.disconnect).not.toHaveBeenCalled();
+    expect(gateway.isDeviceOnline('device-1')).toBe(true);
+    expect(displays()).toBe(1);
   });
 });
 
