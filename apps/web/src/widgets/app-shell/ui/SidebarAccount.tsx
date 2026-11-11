@@ -75,15 +75,18 @@ const ThemeSwitch: React.FC = () => {
   );
 };
 
-// Monitorok oldal; jobbra a jelenleg aktív kijelzők száma. A lista csak nyitott panelnél frissül.
+// Monitorok oldal; jobbra a jelenleg aktív kijelzők száma. A lista csak nyitott panelnél és
+// bejelentkezve frissül: munkamenet nélkül (pl. `/demo`) a 401 a bejelentkezésre dobna.
 const MonitorsLink: React.FC<{ isOpen: boolean; onSelect?: () => void }> = ({
   isOpen,
   onSelect,
 }) => {
-  const devicesQuery = useDisplayDevices({ enabled: isOpen });
-  const activeCount = devicesQuery.data
-    ? countActiveDisplayDevices(devicesQuery.data)
-    : null;
+  const isSignedIn = useAuthStore((state) => Boolean(state.accessToken));
+  const devicesQuery = useDisplayDevices({ enabled: isOpen && isSignedIn });
+  const activeCount =
+    isSignedIn && devicesQuery.data
+      ? countActiveDisplayDevices(devicesQuery.data)
+      : null;
 
   return (
     <SidebarItem asChild>
