@@ -78,7 +78,8 @@ test.describe('Regresszió: TICKET-1, TICKET-39', () => {
         'aria-pressed',
         'true',
       );
-      await expect(row).toContainText('10 Alkalmas Hypoxi Bérlet (10 alk.)');
+      // A beolvasás nem vont le: az ablak a teljes egyenleget mutatja (a háttérlista ilyenkor aria-hidden).
+      await expect(dialog.getByRole('button', { name: /Jelenlegi egyenleg 10 \/ 10/ })).toBeVisible();
 
       await dialog.getByRole('button', { name: '1 Alkalom Levonása & Üdvözlés' }).click();
       await expect(toasts(page)).toContainText('Kezelés levonva: Varga Judit');
