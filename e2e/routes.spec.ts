@@ -41,6 +41,6 @@ test.describe('Közvetlen linkek frissítéskor', () => {
     await loginToReception(page);
     await page.reload();
     await expect(page.getByRole('heading', { name: 'Vonalkódos beléptetés' })).toBeVisible();
-    await expect(page.getByRole('region', { name: 'Bejelentkezett felhasználó' })).toContainText('ReformStudio Adminisztrátor');
+    await expect(page.getByRole('region', { name: 'Bejelentkezett felhasználó' })).toContainText('Demó Munkatárs');
   });
 });
