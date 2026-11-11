@@ -63,6 +63,16 @@ export const getJiraIssueUrl = (jiraKey: string): string =>
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    id: 'v0.3-fix-deduct-treatment-feedback',
+    version: '0.3',
+    date: '2026-11-11',
+    kind: 'FIX',
+    title: 'A kezeléslevonás jelzi, ha valami hiányzik',
+    summary:
+      'Az „1 Alkalom Levonása & Üdvözlés” gomb már nem marad csendben: ha nincs kiválasztott vendég, kezelés vagy bérlet, a mező alatt megjelenik, mi hiányzik. Ha még egyetlen kezelés sincs felvéve, az ablak ezt külön jelzi, és megmondja, hol lehet kezelést felvenni.',
+    jiraKey: 'TICKET-27',
+  },
+  {
     id: 'v0.3-fix-payment-round-amount',
     version: '0.3',
     date: '2026-11-11',
