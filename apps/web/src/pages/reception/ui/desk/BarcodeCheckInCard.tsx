@@ -1,8 +1,8 @@
 import { DUPLICATE_SCAN_COOLDOWN_SECONDS } from '@reform/shared';
-import { CircleHelp } from 'lucide-react';
+import { CircleHelp, ScanBarcode } from 'lucide-react';
 import React, { useId, useState } from 'react';
 import { useScannerChannelStore } from '@/entities/check-in';
-import { isDemoMode } from '@/shared/api';
+import { isTestEnvironment } from '@/shared/api';
 import {
   Badge,
   Button,
@@ -20,20 +20,41 @@ import {
   TooltipTrigger,
 } from '@/shared/ui';
 
-const QUICK_TEST_CODES = [
-  { code: '100001', label: 'Kovács Anna (Havi tagság + Hypoxi)' },
-  { code: '100002', label: 'Nagy Péter (1–5 nap késés + 1 alk.)' },
-  { code: '100003', label: 'Szabó Eszter (Érvényes)' },
-  { code: '100004', label: 'Tóth Gábor (15+ nap tartozás)' },
-  { code: '100005', label: 'Varga Zsófia (6–15 nap részfiz.)' },
-  { code: '100006', label: 'Horváth Dóra (Szüneteltetett)' },
+// A demó seed (`apps/api/prisma/seed.ts`) tesztvendégei; a nevek a seed szerint.
+const TEST_CARDS = [
+  {
+    code: '100001',
+    name: 'Kovács Anna',
+    scenario: 'Havi tagság + Hypoxi bérlet',
+  },
+  {
+    code: '100002',
+    name: 'Nagy Péter',
+    scenario: '1–5 nap késés, 1 alkalom maradt',
+  },
+  {
+    code: '100003',
+    name: 'Szabó Eszter',
+    scenario: 'Érvényes bérlet, nincs tartozás',
+  },
+  {
+    code: '100004',
+    name: 'Tóth Gábor',
+    scenario: '15+ nap tartozás, lejárt bérlet',
+  },
+  {
+    code: '100005',
+    name: 'Varga Zsófia',
+    scenario: '6–15 nap részfizetés, elfogyott bérlet',
+  },
+  { code: '100006', name: 'Horváth Dóra', scenario: 'Szüneteltetett tagság' },
 ];
 
 interface BarcodeCheckInCardProps {
   onScan: (barcode: string) => void;
 }
 
-// Kézi vonalkódos beléptetés (a szkenner mellett); a gyors tesztkódok csak Demó módban.
+// Kézi vonalkódos beléptetés (a szkenner mellett); a tesztkártyák csak tesztkörnyezetben (TICKET-49).
 export const BarcodeCheckInCard: React.FC<BarcodeCheckInCardProps> = ({
   onScan,
 }) => {
@@ -42,6 +63,7 @@ export const BarcodeCheckInCard: React.FC<BarcodeCheckInCardProps> = ({
   // Érintőn nincs hover: a súgó koppintásra is nyílik, és kívülre koppintva csukódik.
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const barcodeInputId = useId();
+  const testCardsTitleId = useId();
 
   return (
     <Card>
@@ -109,21 +131,49 @@ export const BarcodeCheckInCard: React.FC<BarcodeCheckInCardProps> = ({
           </Button>
         </form>
 
-        {isDemoMode() && (
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className="mr-1 text-xs text-muted-foreground">
-              Gyors tesztkódok:
-            </span>
-            {QUICK_TEST_CODES.map((item) => (
-              <Button
-                key={item.code}
-                size="sm"
-                onClick={() => onScan(item.code)}
+        {isTestEnvironment() && (
+          <section
+            aria-labelledby={testCardsTitleId}
+            className="rounded-md border border-dashed border-primary/40 bg-primary/10 p-4"
+          >
+            <div className="flex flex-wrap items-center gap-2">
+              <h3
+                id={testCardsTitleId}
+                className="text-sm font-semibold text-foreground"
               >
-                {item.label}
-              </Button>
-            ))}
-          </div>
+                Tesztkártyák
+              </h3>
+              <Badge variant="warning">Teszt</Badge>
+            </div>
+            <p className="mt-1 text-[13px] text-foreground">
+              Ezekkel a kártyákkal a beléptetés próbálható ki: kattints egyre, és
+              úgy működik, mintha a vendég kártyáját olvastad volna be. Élesben
+              nem jelennek meg.
+            </p>
+            <ul className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
+              {TEST_CARDS.map((card) => (
+                <li key={card.code} className="min-w-0">
+                  {/* Kártyaszerű `secondary` gomb: több soros tartalom, balra igazítva. */}
+                  <Button
+                    className="flex h-auto w-full flex-col items-start justify-start gap-1 whitespace-normal px-3 py-3 text-left coarse:h-auto"
+                    aria-label={`Tesztkártya beolvasása: ${card.name}, ${card.scenario}`}
+                    onClick={() => onScan(card.code)}
+                  >
+                    <span className="text-sm font-semibold text-foreground">
+                      {card.name}
+                    </span>
+                    <span className="text-xs font-normal text-muted-foreground">
+                      {card.scenario}
+                    </span>
+                    <span className="flex items-center gap-1.5 font-mono text-xs font-normal text-muted-foreground">
+                      <ScanBarcode aria-hidden strokeWidth={1.75} />
+                      {`#${card.code}`}
+                    </span>
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          </section>
         )}
       </CardContent>
     </Card>

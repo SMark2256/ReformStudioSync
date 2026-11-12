@@ -97,6 +97,19 @@ export const getJiraIssueUrl = (jiraKey: string): string =>
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    id: 'v0.3-test-cards',
+    version: '0.3',
+    date: '2026-11-12',
+    kind: 'IMPROVEMENT',
+    title: 'Tesztkártyák a beléptetés kipróbálásához',
+    summary:
+      'A tesztkörnyezetben a Vonalkódos beléptetés alatt kiemelt tesztkártyák vannak: egy kártyára kattintva a beléptetés úgy működik, mintha a vendég kártyáját olvastad volna be. Élesben nem jelennek meg.',
+    details: [
+      'Minden kártyán a vendég neve, a kipróbálható eset (például „15+ nap tartozás, lejárt bérlet”) és a kártyaszám látszik.',
+    ],
+    jiraKey: 'TICKET-49',
+  },
+  {
     id: 'v0.3-passes-dialogs',
     version: '0.3',
     date: '2026-11-12',
@@ -138,7 +151,7 @@ export const RELEASE_NOTES: ReleaseNote[] = [
     details: [
       'A Vendégkeresőben a Kezelés -1, az Adatlap és a digitális kártya a sor végi „⋯” gombbal nyíló menüben van; a vendég nevére kattintva továbbra is az adatlap nyílik meg.',
       'A Vonalkódos beléptetés kártyán egy rövid sor maradt, a részletes magyarázat a kérdőjel gombra kattintva olvasható.',
-      'A gyors tesztkódok csak Demó módban látszanak.',
+      'A tesztkártyák csak tesztkörnyezetben (demó, helyi fejlesztés) látszanak, élesben nem.',
       'Felül az összesítő és az ünnepi sáv, alatta bal oldalon a beléptetés, az utoljára azonosított vendég és a kereső, jobb oldalon a mai kassza és a mai érkezések, egyenletes résekkel.',
     ],
     jiraKey: 'TICKET-46',
