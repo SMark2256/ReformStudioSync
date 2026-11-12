@@ -55,15 +55,20 @@ export async function scanBarcode(page: Page, barcode: string) {
 /** A recepció „Vendégkereső” listájának egy vendégsora (vonalkód alapján). */
 export function quickSearchRow(page: Page, barcode: string) {
   return page
-    .locator('div')
-    .filter({ hasText: `#${barcode}` })
-    .filter({ has: page.getByRole('button', { name: 'Kezelés -1', exact: true }) })
-    .last();
+    .getByRole('list', { name: 'Vendégkereső találatai' })
+    .getByRole('listitem')
+    .filter({ hasText: `#${barcode}` });
+}
+
+/** A gyorskereső sorának „⋯” menüjéből választ műveletet (Kezelés -1, Adatlap, Digitális kártya (QR)). */
+export async function quickSearchRowAction(page: Page, barcode: string, action: string) {
+  await quickSearchRow(page, barcode).getByRole('button', { name: /^További műveletek: / }).click();
+  await page.getByRole('menuitem', { name: action, exact: true }).click();
 }
 
 /** Kezelés levonása a gyorskereső sorából (Hypoxi 30 perc, a vendég első megfelelő bérletéről). */
 export async function deductTreatment(page: Page, barcode: string) {
-  await quickSearchRow(page, barcode).getByRole('button', { name: 'Kezelés -1', exact: true }).click();
+  await quickSearchRowAction(page, barcode, 'Kezelés -1');
   await expect(page.getByRole('heading', { name: 'Alkalmas Kezelés Kiválasztása & Bérlet Levonás' })).toBeVisible();
   await page.getByRole('button', { name: /^Hypoxi 30 perc/ }).click();
   await page.getByRole('button', { name: '1 Alkalom Levonása & Üdvözlés' }).click();
