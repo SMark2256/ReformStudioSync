@@ -139,6 +139,22 @@ export const SURFACE_COLORS = [
 - A Vendégmonitorra (`.monitor-invariant`) a felületszín nem hat: ott a komponensek
   fix színeket használnak, nem a `--primary`-t.
 
+## Térközök és betűméretek
+
+A színek mellett a méretek is egy helyen vannak: a `SKILL.md` 3.6 (térközök) és 3.7
+(betűk) táblázata, a `shared/ui` alapelemei ezeket adják. A legfontosabbak:
+
+| Mi | Érték |
+| --- | --- |
+| Oldal belső margója | `px-4 pt-5`, `md:` `px-8 pt-8` |
+| Blokkok között | `gap-4 md:gap-6` / `space-y-4 md:space-y-6` |
+| `PageHeader` alatt | `mb-6 md:mb-8`, leírás `text-sm` |
+| Kártya | fejléc / lábléc `px-4 py-4 md:px-5`, törzs `p-4 md:p-5` |
+| Táblázat | `text-sm`, cella `px-4 py-3`, fejléc `px-4 py-2.5` |
+| Űrlap | mezők között `space-y-4`, címke és mező között `gap-1.5` |
+
+Új komponensben ezeket kövesd; ne sűríts vissza kisebb résre vagy 13 px-es táblaszövegre.
+
 ## Mire figyelj
 
 - Nyers Tailwind színt (`bg-white`, `bg-slate-50`, `text-emerald-700`) új vagy

@@ -14,12 +14,16 @@ interface StatCardProps extends React.HTMLAttributes<HTMLDivElement> {
 // A blokkot a hívó teszi `section aria-labelledby`-be `sr-only` `h2`-vel.
 const StatCard = React.forwardRef<HTMLDivElement, StatCardProps>(
   ({ label, value, hint, className, ...props }, ref) => (
-    <Card ref={ref} className={cn('px-4 py-3.5', className)} {...props}>
+    <Card
+      ref={ref}
+      className={cn('px-4 py-3.5 md:px-5 md:py-4', className)}
+      {...props}
+    >
       <p className="text-xs font-semibold text-muted-foreground">{label}</p>
-      <p className="mt-1 text-xl font-semibold tabular-nums text-foreground md:text-2xl">
+      <p className="mt-1.5 text-xl font-semibold tabular-nums text-foreground md:text-2xl">
         {value}
       </p>
-      {hint && <p className="mt-0.5 text-xs text-faint">{hint}</p>}
+      {hint && <p className="mt-1 text-xs text-faint">{hint}</p>}
     </Card>
   ),
 );

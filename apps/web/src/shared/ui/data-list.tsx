@@ -10,7 +10,7 @@ const DataList = React.forwardRef<
   <dl
     ref={ref}
     className={cn(
-      'grid grid-cols-[110px_minmax(0,1fr)] text-[13px] md:grid-cols-[130px_minmax(0,1fr)]',
+      'grid grid-cols-[110px_minmax(0,1fr)] text-sm md:grid-cols-[130px_minmax(0,1fr)]',
       className,
     )}
     {...props}
@@ -27,10 +27,10 @@ interface DataListItemProps {
 function DataListItem({ label, children }: DataListItemProps) {
   return (
     <>
-      <dt className="border-b border-border py-1.5 text-muted-foreground">
+      <dt className="border-b border-border py-2 text-muted-foreground">
         {label}
       </dt>
-      <dd className="min-w-0 border-b border-border py-1.5 font-medium text-foreground">
+      <dd className="min-w-0 border-b border-border py-2 font-medium text-foreground">
         {children}
       </dd>
     </>

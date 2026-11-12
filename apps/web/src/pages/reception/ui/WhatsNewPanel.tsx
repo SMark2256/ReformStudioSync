@@ -130,7 +130,7 @@ export const WhatsNewPanel: React.FC<WhatsNewPanelProps> = ({
               </span>
             </div>
 
-            <ul className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <ul className="grid grid-cols-1 gap-4 md:gap-6 lg:grid-cols-2">
               {notes.map((note) => {
                 const detailsId = `release-note-details-${note.id}`;
                 const details = note.details ?? [];

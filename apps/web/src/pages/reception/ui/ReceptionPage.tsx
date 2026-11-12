@@ -21,6 +21,7 @@ import { useOfflineQueueStore } from '@/entities/check-in';
 import { useScannerChannelStore } from '@/entities/check-in';
 import { DISPLAY_DEVICES_QUERY_KEY } from '@/entities/display-device';
 import { DigitalPassCardModal } from '@/entities/guest';
+import { AppHeaderStatus } from '@/widgets/app-shell';
 import { GuestModal } from '@/widgets/guest-profile';
 import {
   DeductTreatmentModal,
@@ -34,7 +35,8 @@ import {
   type ReceptionTab,
 } from '../model/receptionTabs';
 import { ReceptionDeskTab } from './desk/ReceptionDeskTab';
-import { ReceptionToolbar } from './desk/ReceptionToolbar';
+import { OfflineQueueNotice } from './desk/OfflineQueueNotice';
+import { ReceptionHeaderStatus } from './desk/ReceptionHeaderStatus';
 import { GuestsTab } from './guests/GuestsTab';
 import { FinanceTab } from './finance/FinanceTab';
 import { PassesTab } from './passes/PassesTab';
@@ -494,27 +496,28 @@ export const ReceptionPage: React.FC = () => {
     }
   }, [location.key, location.state]);
 
-  const receptionToolbar = (
-    <ReceptionToolbar
-      connectedDisplays={connectedDisplays}
-      onSyncOfflineQueue={() => void syncOfflineQueue()}
-    />
+  const offlineQueueNotice = (
+    <OfflineQueueNotice onSyncOfflineQueue={() => void syncOfflineQueue()} />
   );
-  // Az átállított recepció a saját `PageHeader`-ében adja a `h1`-et, alatta az eszközsort.
+  // Az átállított recepció a saját `PageHeader`-ében adja a `h1`-et, alatta az offline sávot.
   const deskOwnsHeader = activeTab === 'desk' && !guestModalState.isOpen;
   // A Pénzügy, a Bérletek és az Újdonságok fül is saját `PageHeader`-t ad.
   const tabOwnsTitle = !guestModalState.isOpen;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 md:space-y-6">
+      {/* A kapcsolatjelzők (QR csatorna, kijelzők, hang, tablet) a fejlécben, minden fülön. */}
+      <AppHeaderStatus>
+        <ReceptionHeaderStatus connectedDisplays={connectedDisplays} />
+      </AppHeaderStatus>
       {/* Az átállított fülek saját, látható `h1`-et adnak (PageHeader); a vendég adatlapja nem. */}
       {!tabOwnsTitle && (
         <h1 className="sr-only">{RECEPTION_TAB_ROUTES[activeTab].title}</h1>
       )}
-      {!deskOwnsHeader && receptionToolbar}
+      {!deskOwnsHeader && offlineQueueNotice}
 
       {/* Main Content */}
-      <div className="space-y-4">
+      <div className="space-y-4 md:space-y-6">
         {guestModalState.isOpen ? (
           <GuestModal
             isOpen={guestModalState.isOpen}
@@ -545,7 +548,7 @@ export const ReceptionPage: React.FC = () => {
             todayCheckIns={todayCheckInsQuery.data ?? []}
             lastCheckIn={lastCheckIn}
             lastIdentifiedGuest={lastIdentifiedGuest}
-            toolbar={receptionToolbar}
+            offlineQueueNotice={offlineQueueNotice}
             onScan={handleBarcodeScan}
             onForceDuplicate={(barcode) =>
               scanMutation.mutate({ barcode, forceDuplicate: true })

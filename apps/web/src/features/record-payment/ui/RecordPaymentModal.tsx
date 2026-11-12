@@ -156,7 +156,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
           onSubmit={handleSubmit}
           noValidate
           className="flex min-h-0 flex-1 flex-col">
-          <DialogBody className="space-y-3.5">
+          <DialogBody className="space-y-4">
             <div className={fieldGroupClassName}>
               <Label htmlFor={`${fieldId}-guest`}>Vendég</Label>
               <Select

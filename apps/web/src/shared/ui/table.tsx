@@ -2,7 +2,7 @@ import * as React from 'react';
 
 import { cn } from '@/shared/lib/utils';
 
-// Táblázat (UI-specifikáció 5.6): 13 px, `bg-muted` fejléc 12 px 600, cella `px-3 py-2.5`,
+// Táblázat (UI-specifikáció 5.6): 14 px, `bg-muted` fejléc 12 px 600 `px-4 py-2.5`, cella `px-4 py-3`,
 // alsó 1 px `border-border` (az utolsó soron nincs). Listákhoz a `ResponsiveTable` kell.
 const Table = React.forwardRef<
   HTMLTableElement,
@@ -11,7 +11,7 @@ const Table = React.forwardRef<
   <div className="relative w-full overflow-x-auto">
     <table
       ref={ref}
-      className={cn('w-full border-collapse text-[13px]', className)}
+      className={cn('w-full border-collapse text-sm', className)}
       {...props}
     />
   </div>
@@ -74,7 +74,7 @@ const TableHead = React.forwardRef<
     ref={ref}
     scope={scope}
     className={cn(
-      'border-b border-border px-3 py-2 text-left align-middle text-xs font-semibold text-muted-foreground',
+      'border-b border-border px-4 py-2.5 text-left align-middle text-xs font-semibold text-muted-foreground',
       className,
     )}
     {...props}
@@ -88,7 +88,7 @@ const TableCell = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <td
     ref={ref}
-    className={cn('px-3 py-2.5 align-middle text-foreground', className)}
+    className={cn('px-4 py-3 align-middle text-foreground', className)}
     {...props}
   />
 ));
@@ -103,7 +103,7 @@ const TableRowHeader = React.forwardRef<
     ref={ref}
     scope="row"
     className={cn(
-      'px-3 py-2.5 text-left align-middle font-normal text-foreground',
+      'px-4 py-3 text-left align-middle font-normal text-foreground',
       className,
     )}
     {...props}

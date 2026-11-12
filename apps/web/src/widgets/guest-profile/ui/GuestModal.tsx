@@ -787,7 +787,7 @@ export const GuestModal: React.FC<GuestModalProps> = ({
         {/* ÁTTEKINTÉS ÉS BELSŐ FELJEGYZÉSEK */}
         {activeTab === 'overview' && (
           <div className="space-y-6">
-            <form onSubmit={handleSubmitBasic} className="space-y-3.5">
+            <form onSubmit={handleSubmitBasic} className="space-y-4">
               {guest?.gender === Gender.UNSPECIFIED && (
                 <Alert>
                   <AlertDescription>
@@ -995,7 +995,7 @@ export const GuestModal: React.FC<GuestModalProps> = ({
           <div className="space-y-5">
             <form
               onSubmit={handleCreateMembership}
-              className="space-y-3.5 rounded-lg border border-border p-4"
+              className="space-y-4 rounded-lg border border-border p-4"
             >
               <SectionTitle>Új havi tagság</SectionTitle>
               {membershipAccess === 'DENIED' && (
@@ -1401,7 +1401,7 @@ export const GuestModal: React.FC<GuestModalProps> = ({
           <div className="space-y-5">
             <form
               onSubmit={handleAddMeasurement}
-              className="space-y-3.5 rounded-lg border border-border p-4"
+              className="space-y-4 rounded-lg border border-border p-4"
             >
               <SectionTitle>Új testösszetétel- és körméretmérés</SectionTitle>
               <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-3 lg:grid-cols-5">
@@ -1440,7 +1440,7 @@ export const GuestModal: React.FC<GuestModalProps> = ({
         {/* FÉNYKÉPEK AUTOMATIKUS TÖMÖRÍTÉSSEL (6.2) */}
         {guest && activeTab === 'photos' && (
           <div className="space-y-5">
-            <div className="space-y-3.5 rounded-lg border border-border p-4">
+            <div className="space-y-4 rounded-lg border border-border p-4">
               <div className="space-y-1">
                 <SectionTitle>Kezelési állapotfotó feltöltése</SectionTitle>
                 <p className="text-xs text-muted-foreground">
@@ -1576,7 +1576,7 @@ export const GuestModal: React.FC<GuestModalProps> = ({
         {/* DOKUMENTUMOK, TABLET ALÁÍRÁS ÉS E-MAIL NAPLÓ (6.3, 6.4) */}
         {guest && activeTab === 'documents' && (
           <div className="space-y-5">
-            <div className="space-y-3.5 rounded-lg border border-border p-4">
+            <div className="space-y-4 rounded-lg border border-border p-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <SectionTitle>
                   Dokumentum kiküldése tabletre aláírásra
@@ -1655,7 +1655,7 @@ export const GuestModal: React.FC<GuestModalProps> = ({
             </div>
 
             {/* E-mail kommunikációs napló */}
-            <div className="space-y-3.5 rounded-lg border border-border p-4">
+            <div className="space-y-4 rounded-lg border border-border p-4">
               <SectionTitle>Kimenő e-mail-értesítés és napló</SectionTitle>
               <form
                 onSubmit={handleSendEmailLog}

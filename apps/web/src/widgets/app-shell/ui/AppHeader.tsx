@@ -55,21 +55,25 @@ interface AppHeaderProps {
   /** Mobilon a kihúzható menü nyitva van. */
   menuOpen: boolean;
   onOpenMenu: () => void;
+  /** Az oldal állapotjelzőinek helye a dátum előtt (`AppHeaderStatus`). */
+  statusRef: React.Ref<HTMLDivElement>;
 }
 
-// Fejléc (UI-specifikáció 4.3): mobilon menü gomb, morzsamenü, dátum (mobilon rejtve), téma gomb.
+// Fejléc (UI-specifikáció 4.3): mobilon menü gomb, morzsamenü, az oldal állapotjelzői, dátum
+// (mobilon rejtve), téma gomb.
 // A háttere a lebegő oldalsáv alatt a teljes szélességen fut, a tartalma a kártya mellett indul.
 export const AppHeader: React.FC<AppHeaderProps> = ({
   title,
   menuOpen,
   onOpenMenu,
+  statusRef,
 }) => {
   const theme = useThemeStore((state) => state.theme);
   const now = useCurrentMinute();
 
   return (
     <header className="sticky top-0 z-10 h-14 shrink-0 border-b border-border bg-card pl-[var(--sidebar-offset)] transition-[padding] duration-200 ease-in-out motion-reduce:transition-none">
-      <div className="mx-auto flex h-full max-w-content items-center gap-3 px-3 md:px-6">
+      <div className="mx-auto flex h-full max-w-content items-center gap-3 px-4 md:px-8">
         <Button
           variant="secondary"
           size="icon"
@@ -92,6 +96,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
           </BreadcrumbList>
         </Breadcrumb>
         <div className="ml-auto flex items-center gap-3">
+          <div ref={statusRef} className="flex items-center gap-2 empty:hidden" />
           <time
             dateTime={now.toISOString()}
             className="text-xs text-muted-foreground max-md:hidden"
