@@ -197,14 +197,27 @@ const SectionTitle: React.FC<{ id?: string; children: React.ReactNode }> = ({
   </h3>
 );
 
-/** Címkézett mező: a címke a mező fölött, 5 px réssel (UI-specifikáció 5.2). */
+/** Űrlapszakasz alcímmel (`h3`); a cím és a mezők között 16 px. */
+const FormSection: React.FC<{
+  id: string;
+  title: string;
+  className?: string;
+  children: React.ReactNode;
+}> = ({ id, title, className, children }) => (
+  <section aria-labelledby={id} className={cn('min-w-0 space-y-4', className)}>
+    <SectionTitle id={id}>{title}</SectionTitle>
+    {children}
+  </section>
+);
+
+/** Címkézett mező: a címke a mező fölött, 6 px réssel (UI-specifikáció 5.2). */
 const Field: React.FC<{
   id: string;
   label: string;
   className?: string;
   children: React.ReactNode;
 }> = ({ id, label, className, children }) => (
-  <div className={cn('flex min-w-0 flex-col gap-[5px]', className)}>
+  <div className={cn('flex min-w-0 flex-col gap-1.5', className)}>
     <Label htmlFor={id}>{label}</Label>
     {children}
   </div>
@@ -229,7 +242,7 @@ const ListRow: React.FC<{ children: React.ReactNode; className?: string }> = ({
 }) => (
   <li
     className={cn(
-      'flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-3 py-2.5 text-[13px]',
+      'flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-3 text-[13px]',
       className,
     )}
   >
@@ -726,19 +739,19 @@ export const GuestModal: React.FC<GuestModalProps> = ({
 
   return (
     <Card>
-      <CardHeader className="gap-y-3">
+      <CardHeader className="gap-x-5 gap-y-4 md:py-5">
         <Button variant="secondary" size="sm" onClick={onClose}>
           <ArrowLeft aria-hidden strokeWidth={1.75} />
           {backLabel}
         </Button>
-        <div className="flex min-w-0 items-center gap-3">
+        <div className="flex min-w-0 items-center gap-3.5">
           {guest && <Avatar name={guestName} size="lg" />}
           <div className="min-w-0">
             <CardTitle>
               {guest ? `Vendégadatlap: ${guestName}` : 'Új vendég felvétele'}
             </CardTitle>
             {guest && (
-              <p className="font-mono text-xs text-muted-foreground">
+              <p className="mt-1 font-mono text-xs text-muted-foreground">
                 {guest.barcode}
                 {guest.phone && ` · ${guest.phone}`}
               </p>
@@ -758,9 +771,9 @@ export const GuestModal: React.FC<GuestModalProps> = ({
         )}
       </CardHeader>
 
-      {/* Fülek (csak meglévő vendégnél) */}
+      {/* Fülek (csak meglévő vendégnél): egy sorban, ami nem fér ki, vízszintesen görgethető. */}
       {guest && (
-        <div className="border-b border-border px-4 py-3">
+        <div className="overflow-x-auto border-b border-border px-4 py-4 md:px-5">
           <ToggleGroup
             type="single"
             aria-label="Az adatlap részei"
@@ -768,9 +781,10 @@ export const GuestModal: React.FC<GuestModalProps> = ({
             onValueChange={(value) => {
               if (value) handleSelectTab(value as GuestSheetTab);
             }}
+            className="max-w-none flex-nowrap"
           >
             {tabs.map((t) => (
-              <ToggleGroupItem key={t.id} value={t.id}>
+              <ToggleGroupItem key={t.id} value={t.id} className="flex-none">
                 {t.label}
                 {typeof t.count === 'number' && t.count > 0 && (
                   <span className="rounded-full border border-border bg-muted px-1.5 text-[11px] tabular-nums text-muted-foreground">
@@ -783,11 +797,11 @@ export const GuestModal: React.FC<GuestModalProps> = ({
         </div>
       )}
 
-      <div className="space-y-6 p-3.5 md:p-4">
+      <div className="space-y-6 p-4 md:p-5">
         {/* ÁTTEKINTÉS ÉS BELSŐ FELJEGYZÉSEK */}
         {activeTab === 'overview' && (
           <div className="space-y-6">
-            <form onSubmit={handleSubmitBasic} className="space-y-4">
+            <form onSubmit={handleSubmitBasic} className="space-y-6">
               {guest?.gender === Gender.UNSPECIFIED && (
                 <Alert>
                   <AlertDescription>
@@ -796,139 +810,153 @@ export const GuestModal: React.FC<GuestModalProps> = ({
                   </AlertDescription>
                 </Alert>
               )}
-              <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
-                <Field id={id('lastName')} label="Vezetéknév *">
-                  <Input
-                    id={id('lastName')}
-                    required
-                    value={lastName}
-                    onChange={(e) => setLastName(e.target.value)}
-                    placeholder="Pl. Kovács"
-                    autoComplete="family-name"
-                  />
-                </Field>
-                <Field id={id('firstName')} label="Keresztnév *">
-                  <Input
-                    id={id('firstName')}
-                    required
-                    value={firstName}
-                    onChange={(e) => handleFirstNameChange(e.target.value)}
-                    placeholder="Pl. Anna"
-                    autoComplete="given-name"
-                  />
-                </Field>
-                <Field id={id('gender')} label={guest ? 'Nem' : 'Nem *'}>
-                  <Select
-                    value={gender}
-                    onValueChange={(value) => {
-                      setGender(value as Gender);
-                      setGenderPicked(true);
-                      setShowGenderError(false);
-                    }}
-                  >
-                    <SelectTrigger
-                      id={id('gender')}
-                      aria-invalid={showGenderError && !gender}
-                      aria-describedby={
-                        showGenderError && !gender
-                          ? id('gender-error')
-                          : !guest && gender && !genderPicked
-                            ? id('gender-hint')
-                            : undefined
-                      }
+              <FormSection id={id('personalTitle')} title="Személyes adatok">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  <Field id={id('lastName')} label="Vezetéknév *">
+                    <Input
+                      id={id('lastName')}
+                      required
+                      value={lastName}
+                      onChange={(e) => setLastName(e.target.value)}
+                      placeholder="Pl. Kovács"
+                      autoComplete="family-name"
+                    />
+                  </Field>
+                  <Field id={id('firstName')} label="Keresztnév *">
+                    <Input
+                      id={id('firstName')}
+                      required
+                      value={firstName}
+                      onChange={(e) => handleFirstNameChange(e.target.value)}
+                      placeholder="Pl. Anna"
+                      autoComplete="given-name"
+                    />
+                  </Field>
+                  <Field id={id('gender')} label={guest ? 'Nem' : 'Nem *'}>
+                    <Select
+                      value={gender}
+                      onValueChange={(value) => {
+                        setGender(value as Gender);
+                        setGenderPicked(true);
+                        setShowGenderError(false);
+                      }}
                     >
-                      <SelectValue placeholder="Válassz" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {GENDER_OPTIONS.map((value) => (
-                        <SelectItem key={value} value={value}>
-                          {GENDER_LABELS[value]}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {showGenderError && !gender ? (
-                    <p
-                      id={id('gender-error')}
-                      role="alert"
-                      className="text-xs text-destructive"
-                    >
-                      Add meg a vendég nemét.
-                    </p>
-                  ) : (
-                    !guest &&
-                    gender &&
-                    !genderPicked && (
-                      <p
-                        id={id('gender-hint')}
-                        className="text-xs text-muted-foreground"
+                      <SelectTrigger
+                        id={id('gender')}
+                        aria-invalid={showGenderError && !gender}
+                        aria-describedby={
+                          showGenderError && !gender
+                            ? id('gender-error')
+                            : !guest && gender && !genderPicked
+                              ? id('gender-hint')
+                              : undefined
+                        }
                       >
-                        A keresztnév alapján előtöltve.
+                        <SelectValue placeholder="Válassz" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {GENDER_OPTIONS.map((value) => (
+                          <SelectItem key={value} value={value}>
+                            {GENDER_LABELS[value]}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {showGenderError && !gender ? (
+                      <p
+                        id={id('gender-error')}
+                        role="alert"
+                        className="text-xs text-destructive"
+                      >
+                        Add meg a vendég nemét.
                       </p>
-                    )
-                  )}
-                </Field>
-                <Field id={id('barcode')} label="Vonalkód / kártyaszám">
-                  <Input
-                    id={id('barcode')}
-                    value={barcode}
-                    onChange={(e) => setBarcode(e.target.value)}
-                    placeholder="Üresen hagyva automatikus"
-                    className="font-mono"
-                  />
-                </Field>
+                    ) : (
+                      !guest &&
+                      gender &&
+                      !genderPicked && (
+                        <p
+                          id={id('gender-hint')}
+                          className="text-xs text-muted-foreground"
+                        >
+                          A keresztnév alapján előtöltve.
+                        </p>
+                      )
+                    )}
+                  </Field>
+                  <Field id={id('birthDate')} label="Születési dátum">
+                    <Input
+                      id={id('birthDate')}
+                      type="date"
+                      value={birthDate}
+                      onChange={(e) => setBirthDate(e.target.value)}
+                    />
+                  </Field>
+                  <Field id={id('nameDay')} label="Névnap (HH-NN, pl. 07-26)">
+                    <Input
+                      id={id('nameDay')}
+                      value={nameDay}
+                      onChange={(e) => setNameDay(e.target.value)}
+                      placeholder="07-26"
+                    />
+                  </Field>
+                </div>
+              </FormSection>
+
+              <div className="grid grid-cols-1 gap-x-4 gap-y-6 lg:grid-cols-3">
+                <FormSection
+                  id={id('contactTitle')}
+                  title="Elérhetőség"
+                  className="lg:col-span-2"
+                >
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <Field id={id('phone')} label="Telefonszám">
+                      <Input
+                        id={id('phone')}
+                        type="tel"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        placeholder="+36 30 555 1234"
+                        autoComplete="tel"
+                      />
+                    </Field>
+                    <Field id={id('email')} label="E-mail-cím">
+                      <Input
+                        id={id('email')}
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="vendeg@email.hu"
+                        autoComplete="email"
+                      />
+                    </Field>
+                  </div>
+                </FormSection>
+                <FormSection id={id('cardTitle')} title="Kártya">
+                  <Field id={id('barcode')} label="Vonalkód / kártyaszám">
+                    <Input
+                      id={id('barcode')}
+                      value={barcode}
+                      onChange={(e) => setBarcode(e.target.value)}
+                      placeholder="Üresen hagyva automatikus"
+                      className="font-mono"
+                    />
+                  </Field>
+                </FormSection>
               </div>
 
-              <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
-                <Field id={id('phone')} label="Telefonszám">
-                  <Input
-                    id={id('phone')}
-                    type="tel"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    placeholder="+36 30 555 1234"
-                    autoComplete="tel"
-                  />
-                </Field>
-                <Field id={id('email')} label="E-mail-cím">
-                  <Input
-                    id={id('email')}
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="vendeg@email.hu"
-                    autoComplete="email"
-                  />
-                </Field>
-                <Field id={id('birthDate')} label="Születési dátum">
-                  <Input
-                    id={id('birthDate')}
-                    type="date"
-                    value={birthDate}
-                    onChange={(e) => setBirthDate(e.target.value)}
-                  />
-                </Field>
-                <Field id={id('nameDay')} label="Névnap (HH-NN, pl. 07-26)">
-                  <Input
-                    id={id('nameDay')}
-                    value={nameDay}
-                    onChange={(e) => setNameDay(e.target.value)}
-                    placeholder="07-26"
-                  />
-                </Field>
-              </div>
-
-              <Field
-                id={id('notes')}
-                label="Gyors összefoglaló / egészségügyi megjegyzés"
-              >
-                <Input
+              <FormSection id={id('summaryTitle')} title="Megjegyzés">
+                <Field
                   id={id('notes')}
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Pl. Hypoxi és köredzés kombinált vendég"
-                />
-              </Field>
+                  label="Gyors összefoglaló / egészségügyi megjegyzés"
+                >
+                  <Input
+                    id={id('notes')}
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    placeholder="Pl. Hypoxi és köredzés kombinált vendég"
+                  />
+                </Field>
+              </FormSection>
 
               <div className="flex justify-end">
                 <Button type="submit" variant="primary">
@@ -941,14 +969,16 @@ export const GuestModal: React.FC<GuestModalProps> = ({
             {guest && (
               <section
                 aria-labelledby={id('notesTitle')}
-                className="space-y-3 border-t border-border pt-5"
+                className="space-y-4 rounded-lg border border-border p-4 md:p-5"
               >
-                <SectionTitle id={id('notesTitle')}>
-                  Belső feljegyzések
-                </SectionTitle>
-                <p className="text-xs text-muted-foreground">
-                  Csak a munkatársak látják.
-                </p>
+                <div className="space-y-1">
+                  <SectionTitle id={id('notesTitle')}>
+                    Belső feljegyzések
+                  </SectionTitle>
+                  <p className="text-xs text-muted-foreground">
+                    Csak a munkatársak látják.
+                  </p>
+                </div>
                 <form
                   onSubmit={handleAddInternalNote}
                   className="flex flex-col gap-2 sm:flex-row"
@@ -992,10 +1022,10 @@ export const GuestModal: React.FC<GuestModalProps> = ({
 
         {/* HAVI TAGSÁGOK ÉS ESEDÉKESSÉGEK */}
         {guest && activeTab === 'memberships' && (
-          <div className="space-y-5">
+          <div className="space-y-6">
             <form
               onSubmit={handleCreateMembership}
-              className="space-y-4 rounded-lg border border-border p-4"
+              className="space-y-4 rounded-lg border border-border p-4 md:p-5"
             >
               <SectionTitle>Új havi tagság</SectionTitle>
               {membershipAccess === 'DENIED' && (
@@ -1014,7 +1044,7 @@ export const GuestModal: React.FC<GuestModalProps> = ({
                   </AlertDescription>
                 </Alert>
               )}
-              <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
                 <Field
                   id={id('membTitle')}
                   label="Megnevezés"
@@ -1066,7 +1096,7 @@ export const GuestModal: React.FC<GuestModalProps> = ({
                 return (
                   <div
                     key={m.id}
-                    className="space-y-3 rounded-lg border border-border p-4"
+                    className="space-y-4 rounded-lg border border-border p-4 md:p-5"
                   >
                     <div className="flex flex-wrap items-start justify-between gap-2">
                       <div className="min-w-0 space-y-1">
@@ -1177,7 +1207,7 @@ export const GuestModal: React.FC<GuestModalProps> = ({
               return (
                 <div
                   key={pass.id}
-                  className="flex flex-wrap items-start justify-between gap-3 rounded-lg border border-border p-4"
+                  className="flex flex-wrap items-start justify-between gap-4 rounded-lg border border-border p-4 md:p-5"
                 >
                   <div className="min-w-0 space-y-1">
                     <div className="flex flex-wrap items-center gap-2">
@@ -1398,13 +1428,13 @@ export const GuestModal: React.FC<GuestModalProps> = ({
 
         {/* MÉRÉSEK (6.1) */}
         {guest && activeTab === 'measurements' && (
-          <div className="space-y-5">
+          <div className="space-y-6">
             <form
               onSubmit={handleAddMeasurement}
-              className="space-y-4 rounded-lg border border-border p-4"
+              className="space-y-4 rounded-lg border border-border p-4 md:p-5"
             >
               <SectionTitle>Új testösszetétel- és körméretmérés</SectionTitle>
-              <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-3 lg:grid-cols-5">
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
                 {measurementFields.map((f) => (
                   <Field key={f.key} id={id(f.key)} label={f.label}>
                     <Input
@@ -1439,8 +1469,8 @@ export const GuestModal: React.FC<GuestModalProps> = ({
 
         {/* FÉNYKÉPEK AUTOMATIKUS TÖMÖRÍTÉSSEL (6.2) */}
         {guest && activeTab === 'photos' && (
-          <div className="space-y-5">
-            <div className="space-y-4 rounded-lg border border-border p-4">
+          <div className="space-y-6">
+            <div className="space-y-4 rounded-lg border border-border p-4 md:p-5">
               <div className="space-y-1">
                 <SectionTitle>Kezelési állapotfotó feltöltése</SectionTitle>
                 <p className="text-xs text-muted-foreground">
@@ -1449,7 +1479,7 @@ export const GuestModal: React.FC<GuestModalProps> = ({
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 items-end gap-3.5 sm:grid-cols-3">
+              <div className="grid grid-cols-1 items-end gap-4 sm:grid-cols-3">
                 <Field id={id('photoService')} label="Kezelés">
                   <Select
                     value={photoServiceId}
@@ -1575,8 +1605,8 @@ export const GuestModal: React.FC<GuestModalProps> = ({
 
         {/* DOKUMENTUMOK, TABLET ALÁÍRÁS ÉS E-MAIL NAPLÓ (6.3, 6.4) */}
         {guest && activeTab === 'documents' && (
-          <div className="space-y-5">
-            <div className="space-y-4 rounded-lg border border-border p-4">
+          <div className="space-y-6">
+            <div className="space-y-4 rounded-lg border border-border p-4 md:p-5">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <SectionTitle>
                   Dokumentum kiküldése tabletre aláírásra
@@ -1588,7 +1618,7 @@ export const GuestModal: React.FC<GuestModalProps> = ({
 
               <form
                 onSubmit={handleCreatePendingDocument}
-                className="grid grid-cols-1 items-end gap-3.5 sm:grid-cols-3"
+                className="grid grid-cols-1 items-end gap-4 sm:grid-cols-3"
               >
                 <Field id={id('docTitle')} label="Dokumentum címe">
                   <Input
@@ -1655,11 +1685,11 @@ export const GuestModal: React.FC<GuestModalProps> = ({
             </div>
 
             {/* E-mail kommunikációs napló */}
-            <div className="space-y-4 rounded-lg border border-border p-4">
+            <div className="space-y-4 rounded-lg border border-border p-4 md:p-5">
               <SectionTitle>Kimenő e-mail-értesítés és napló</SectionTitle>
               <form
                 onSubmit={handleSendEmailLog}
-                className="grid grid-cols-1 items-end gap-3.5 sm:grid-cols-3"
+                className="grid grid-cols-1 items-end gap-4 sm:grid-cols-3"
               >
                 <Field id={id('emailSubject')} label="Tárgy">
                   <Input

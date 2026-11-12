@@ -97,6 +97,22 @@ export const getJiraIssueUrl = (jiraKey: string): string =>
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    id: 'v0.3-clearer-guests',
+    version: '0.3',
+    date: '2026-11-12',
+    kind: 'IMPROVEMENT',
+    title: 'Átláthatóbb vendéglista és adatlap',
+    summary:
+      'A Vendégek listájában minden sor legfeljebb két sor magas: a bérlet neve alatt látszik a havi tagság, a hosszú megjegyzés egy sorra rövidül. A vendég adatlapján az alapadatok szakaszokra bontva, a belső feljegyzések külön blokkban jelennek meg.',
+    details: [
+      'A rövidített szövegek teljes változata a szövegre mutatva látszik.',
+      'Kisebb képernyőn (laptopon ikonsávval, tableten) a Telefon oszlop helyett szélesebb a Bérlet oszlop; a telefonszám és az e-mail-cím az adatlapon látszik, és a kereső is megtalálja.',
+      'A szűrő (Mind, Érvényes, Hamarosan lejár, Lejárt) és a kereső asztali gépen egy sorban, telefonon külön sorban, a kereső teljes szélességben.',
+      'Az adatlap Áttekintés fülén: Személyes adatok, Elérhetőség, Kártya és Megjegyzés; a mentés gomb a szakaszok alján. A fülsor telefonon oldalra görgethető.',
+    ],
+    jiraKey: 'TICKET-47',
+  },
+  {
     id: 'v0.3-airier-layout',
     version: '0.3',
     date: '2026-11-12',
