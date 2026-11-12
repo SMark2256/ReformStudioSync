@@ -112,6 +112,38 @@ export const RELEASE_NOTES: ReleaseNote[] = [
     jiraKey: 'TICKET-48',
   },
   {
+    id: 'v0.3-clearer-guests',
+    version: '0.3',
+    date: '2026-11-12',
+    kind: 'IMPROVEMENT',
+    title: 'Átláthatóbb vendéglista és adatlap',
+    summary:
+      'A Vendégek listájában minden sor legfeljebb két sor magas: a bérlet neve alatt látszik a havi tagság, a hosszú megjegyzés egy sorra rövidül. A vendég adatlapján az alapadatok szakaszokra bontva, a belső feljegyzések külön blokkban jelennek meg.',
+    details: [
+      'A rövidített szövegek teljes változata a szövegre mutatva látszik.',
+      'Kisebb képernyőn (laptopon ikonsávval, tableten) a Telefon oszlop helyett szélesebb a Bérlet oszlop; a telefonszám és az e-mail-cím az adatlapon látszik, és a kereső is megtalálja.',
+      'A szűrő (Mind, Érvényes, Hamarosan lejár, Lejárt) és a kereső asztali gépen egy sorban, telefonon külön sorban, a kereső teljes szélességben.',
+      'Az adatlap Áttekintés fülén: Személyes adatok, Elérhetőség, Kártya és Megjegyzés; a mentés gomb a szakaszok alján. A fülsor telefonon oldalra görgethető.',
+    ],
+    jiraKey: 'TICKET-47',
+  },
+  {
+    id: 'v0.3-calmer-desk',
+    version: '0.3',
+    date: '2026-11-12',
+    kind: 'IMPROVEMENT',
+    title: 'Átláthatóbb recepciós pult',
+    summary:
+      'A recepciós pult rendezettebb lett: felül egy kiemelt Új vendég gomb, a Beléptetés, az Alkalom levonása, az Új bérlet és a Befizetés mellette kisebb gombokként maradt meg, a vendégkereső soraiban pedig csak a Köredzés gomb látszik.',
+    details: [
+      'A Vendégkeresőben a Kezelés -1, az Adatlap és a digitális kártya a sor végi „⋯” gombbal nyíló menüben van; a vendég nevére kattintva továbbra is az adatlap nyílik meg.',
+      'A Vonalkódos beléptetés kártyán egy rövid sor maradt, a részletes magyarázat a kérdőjel gombra kattintva olvasható.',
+      'A gyors tesztkódok csak Demó módban látszanak.',
+      'Felül az összesítő és az ünnepi sáv, alatta bal oldalon a beléptetés, az utoljára azonosított vendég és a kereső, jobb oldalon a mai kassza és a mai érkezések, egyenletes résekkel.',
+    ],
+    jiraKey: 'TICKET-46',
+  },
+  {
     id: 'v0.3-airier-layout',
     version: '0.3',
     date: '2026-11-12',

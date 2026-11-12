@@ -22,7 +22,7 @@ const ArrivalRow: React.FC<{ arrival: GuestArrivalDto; showPass: boolean }> = ({
   const badge = ARRIVAL_STATUS_BADGE[arrival.status];
   const isVoided = arrival.status === CheckInStatus.CANCELLED;
   return (
-    <li className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-3 py-2.5 text-[13px]">
+    <li className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-3 text-[13px]">
       <div className="min-w-0">
         <p className={cn(isVoided && 'text-muted-foreground line-through')}>
           <span className="font-medium">{arrivalTitle(arrival)}</span>
