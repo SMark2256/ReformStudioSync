@@ -27,7 +27,8 @@ interface ScannerChannelState {
 }
 
 export const useScannerChannelStore = create<ScannerChannelState>((set) => ({
-  isListening: true,
+  // A QR csatorna alapból ki van kapcsolva (TICKET-50); a recepciós a fejlécben kapcsolja be.
+  isListening: false,
   isProcessing: false,
   scanCount: 0,
   lastScannedCode: null,

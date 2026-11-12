@@ -97,6 +97,19 @@ export const getJiraIssueUrl = (jiraKey: string): string =>
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    id: 'v0.3-qr-channel-off-by-default',
+    version: '0.3',
+    date: '2026-11-12',
+    kind: 'IMPROVEMENT',
+    title: 'A QR csatorna alapból kikapcsolva',
+    summary:
+      'Megnyitáskor a QR csatorna (a vonalkód- és QR-olvasó figyelése) ki van kapcsolva; a fejlécben a „QR csatorna” gombbal kapcsolható be.',
+    details: [
+      'A kód kézi beírása és a tesztkártyák kikapcsolt csatornával is működnek.',
+    ],
+    jiraKey: 'TICKET-50',
+  },
+  {
     id: 'v0.3-test-cards',
     version: '0.3',
     date: '2026-11-12',
