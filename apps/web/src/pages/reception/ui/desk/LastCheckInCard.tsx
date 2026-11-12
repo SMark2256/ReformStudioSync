@@ -6,6 +6,7 @@ import {
 } from '@reform/shared';
 import { AlertTriangle, RotateCcw, Ticket, Users } from 'lucide-react';
 import React from 'react';
+import { isTestEnvironment } from '@/shared/api';
 import {
   Alert,
   AlertDescription,
@@ -77,7 +78,9 @@ export const LastCheckInCard: React.FC<LastCheckInCardProps> = ({
           <div className="py-4 text-center text-[13px] text-muted-foreground">
             <p>Még nem történt vendégazonosítás ebben a munkamenetben.</p>
             <p className="mt-1 text-xs">
-              Olvass be egy vonalkódot, vagy válassz a gyors tesztkódok közül.
+              {isTestEnvironment()
+                ? 'Olvass be egy vonalkódot, vagy válassz egy tesztkártyát.'
+                : 'Olvass be egy vonalkódot.'}
             </p>
           </div>
         ) : (
