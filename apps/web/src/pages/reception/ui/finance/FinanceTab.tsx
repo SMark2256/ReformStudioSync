@@ -86,7 +86,7 @@ export const FinanceTab: React.FC<FinanceTabProps> = ({
       cell: (item) => (
         <>
           {item.period}{' '}
-          <span className="text-muted-foreground">
+          <span className="whitespace-nowrap text-muted-foreground">
             (esedékes: {formatShortDate(item.dueDate)})
           </span>
         </>
@@ -106,6 +106,7 @@ export const FinanceTab: React.FC<FinanceTabProps> = ({
       header: 'Előírt / fizetett',
       align: 'right',
       hideOnMobile: true,
+      className: 'whitespace-nowrap',
       cell: (item) =>
         `${formatHuf(item.amountHuf)} / ${formatHuf(item.paidAmountHuf)}`,
     },
@@ -245,7 +246,8 @@ export const FinanceTab: React.FC<FinanceTabProps> = ({
           <CardHeader>
             <CardTitle>Lejárt tagdíjak</CardTitle>
             <CardDescription>késési kategóriák szerint</CardDescription>
-            <CardActions>
+            {/* A késési kategóriák asztalin egy sorban; mobilon tördelődhetnek. */}
+            <CardActions className="md:flex-nowrap">
               {OVERDUE_BUCKETS.map((bucket) => (
                 <Badge key={bucket} variant={bucketVariant(bucket)}>
                   {OVERDUE_BUCKET_LABELS[bucket]}:{' '}

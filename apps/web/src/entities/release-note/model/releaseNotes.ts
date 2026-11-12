@@ -97,6 +97,21 @@ export const getJiraIssueUrl = (jiraKey: string): string =>
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    id: 'v0.3-passes-dialogs',
+    version: '0.3',
+    date: '2026-11-12',
+    kind: 'IMPROVEMENT',
+    title: 'Bérletek és szolgáltatások felvétele külön ablakban',
+    summary:
+      'A Bérletek és termékek oldalon az új bérletsablont és szolgáltatást a kártya fejlécében lévő „Új bérletsablon” és „Új szolgáltatás” gombbal, külön ablakban veheted fel, így a listák átláthatóbbak. A Pénzügy táblázatai is olvashatóbbak lettek.',
+    details: [
+      'Mentés után az ablak bezárul, és az új tétel azonnal megjelenik a listában; ha hiba történik, az ablak nyitva marad, és látszik a hiba oka.',
+      'Az árak, időtartamok és alkalomszámok nem törnek több sorba, a „Csak nőknek” jelölés a szolgáltatás neve mellett látszik.',
+      'A Pénzügy oldalon a késési kategóriák egy sorban látszanak, és az összegek a táblázatokban egy sorban maradnak.',
+    ],
+    jiraKey: 'TICKET-48',
+  },
+  {
     id: 'v0.3-clearer-guests',
     version: '0.3',
     date: '2026-11-12',
