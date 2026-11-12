@@ -56,8 +56,9 @@ interface ReceptionDeskTabProps {
   onOpenFinance: () => void;
 }
 
-// Recepció (UI-specifikáció 6.1): gyorsműveletek, offline várólista, napi összesítő, beolvasás, az utoljára
-// azonosított vendég, vendégkereső, mai kassza és a mai érkezések naplója.
+// Recepció (UI-specifikáció 6.1): egy elsődleges gomb (Új vendég) és a kisebb gyorsműveletek, offline
+// várólista, napi összesítő és ünnepi sáv; alatta bal oszlopban beolvasás, az utoljára azonosított vendég
+// és a vendégkereső, jobb oszlopban a mai kassza és a mai érkezések naplója.
 export const ReceptionDeskTab: React.FC<ReceptionDeskTabProps> = ({
   guests,
   isGuestsLoading,
@@ -85,35 +86,49 @@ export const ReceptionDeskTab: React.FC<ReceptionDeskTabProps> = ({
 
   return (
     <div>
+      {/* Az öt gomb tableten nem fér a cím mellé: ott a cím alá kerülnek, egy sorba. */}
       <PageHeader
+        className="md:flex-col md:items-stretch xl:flex-row xl:items-end"
         title="Recepció"
         description="Beléptetés, bérletek és mai foglalások egy helyen."
         actions={
-          <div className="flex flex-wrap gap-2 max-md:[&>*]:flex-1">
-            <Button
-              title="Köredzés beléptetés (0 levonás) az utoljára azonosított vendégnek"
-              onClick={() => {
-                if (fallbackGuest) onScan(fallbackGuest.barcode);
-              }}
+          <div className="flex w-full flex-col gap-2 md:w-auto md:flex-row md:items-center">
+            {/* A ritkább műveletek látható, kisebb gombsorban; mobilon 2 × 2 rács. */}
+            <div
+              role="group"
+              aria-label="Gyorsműveletek"
+              className="grid grid-cols-2 gap-2 md:flex"
             >
-              <UserCheck aria-hidden strokeWidth={1.75} />
-              Beléptetés
-            </Button>
-            <Button
-              title="Kezelés kiválasztása és 1 alkalom levonása"
-              onClick={() => onOpenDeduct(lastIdentifiedGuest)}
-            >
-              <Ticket aria-hidden strokeWidth={1.75} />
-              Alkalom levonása
-            </Button>
-            <Button onClick={() => onOpenSell(fallbackGuest)}>Új bérlet</Button>
-            <Button
-              title="Tagdíj vagy részbefizetés rögzítése"
-              onClick={() => onOpenPayment(lastIdentifiedGuest)}
-            >
-              <Wallet aria-hidden strokeWidth={1.75} />
-              Befizetés
-            </Button>
+              <Button
+                size="sm"
+                title="Köredzés beléptetés (0 levonás) az utoljára azonosított vendégnek"
+                onClick={() => {
+                  if (fallbackGuest) onScan(fallbackGuest.barcode);
+                }}
+              >
+                <UserCheck aria-hidden strokeWidth={1.75} />
+                Beléptetés
+              </Button>
+              <Button
+                size="sm"
+                title="Kezelés kiválasztása és 1 alkalom levonása"
+                onClick={() => onOpenDeduct(lastIdentifiedGuest)}
+              >
+                <Ticket aria-hidden strokeWidth={1.75} />
+                Alkalom levonása
+              </Button>
+              <Button size="sm" onClick={() => onOpenSell(fallbackGuest)}>
+                Új bérlet
+              </Button>
+              <Button
+                size="sm"
+                title="Tagdíj vagy részbefizetés rögzítése"
+                onClick={() => onOpenPayment(lastIdentifiedGuest)}
+              >
+                <Wallet aria-hidden strokeWidth={1.75} />
+                Befizetés
+              </Button>
+            </div>
             <Button variant="primary" onClick={() => onOpenGuest(null)}>
               <Plus aria-hidden strokeWidth={1.75} />
               Új vendég
@@ -125,7 +140,11 @@ export const ReceptionDeskTab: React.FC<ReceptionDeskTabProps> = ({
       <div className="space-y-4 md:space-y-6">
         {offlineQueueNotice}
 
-        <section aria-labelledby={summaryTitleId} className="space-y-4">
+        {/* Flex rés: a rejtett (`sr-only`, abszolút) cím nem kap rést, a `space-y` adna neki. */}
+        <section
+          aria-labelledby={summaryTitleId}
+          className="flex flex-col gap-4 md:gap-6"
+        >
           <h2 id={summaryTitleId} className="sr-only">
             Napi összesítő
           </h2>
