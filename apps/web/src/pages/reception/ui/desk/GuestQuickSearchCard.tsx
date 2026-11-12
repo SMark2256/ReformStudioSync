@@ -1,5 +1,5 @@
 import { GuestDto, PassStatus, PassType } from '@reform/shared';
-import { QrCode } from 'lucide-react';
+import { MoreHorizontal } from 'lucide-react';
 import React from 'react';
 import {
   Badge,
@@ -9,6 +9,10 @@ import {
   CardContent,
   CardHeader,
   CardTitle,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
   SearchInput,
   Skeleton,
 } from '@/shared/ui';
@@ -36,7 +40,8 @@ const describeActivePass = (guest: GuestDto) => {
   return `${activePass.passTemplateName} (${balance})`;
 };
 
-// Vendég gyorskereső a recepción: soronként köredzés, kezelés levonása, adatlap, digitális kártya.
+// Vendég gyorskereső a recepción: soronként egy látható gomb (Köredzés), a kezelés levonása, az
+// adatlap és a digitális kártya a sor „⋯” menüjében; a név is az adatlapot nyitja.
 export const GuestQuickSearchCard: React.FC<GuestQuickSearchCardProps> = ({
   guests,
   isLoading,
@@ -73,14 +78,17 @@ export const GuestQuickSearchCard: React.FC<GuestQuickSearchCardProps> = ({
             : 'Még nincs vendég. Vegyél fel egyet az Új vendég gombbal.'}
         </p>
       ) : (
-        <div className="max-h-80 overflow-y-auto">
+        <ul
+          aria-label="Vendégkereső találatai"
+          className="max-h-80 overflow-y-auto"
+        >
           {guests.map((g) => {
             const name = `${g.lastName} ${g.firstName}`;
             const isFrozen = (g.passes ?? []).some((p) => p.isFrozen);
             return (
-              <div
+              <li
                 key={g.id}
-                className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-2.5 last:border-b-0"
+                className="flex items-center justify-between gap-3 border-b border-border px-4 py-3 last:border-b-0 md:px-5"
               >
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -97,7 +105,7 @@ export const GuestQuickSearchCard: React.FC<GuestQuickSearchCardProps> = ({
                   </p>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-1.5">
+                <div className="flex shrink-0 items-center gap-2">
                   <Button
                     size="sm"
                     onClick={() => onScan(g.barcode)}
@@ -105,29 +113,33 @@ export const GuestQuickSearchCard: React.FC<GuestQuickSearchCardProps> = ({
                   >
                     Köredzés
                   </Button>
-                  <Button
-                    size="sm"
-                    onClick={() => onOpenDeduct(g)}
-                    title="Kezelés kiválasztása és 1 alkalom levonása"
-                  >
-                    Kezelés -1
-                  </Button>
-                  <Button size="sm" onClick={() => onOpenGuest(g)}>
-                    Adatlap
-                  </Button>
-                  <Button
-                    size="icon"
-                    aria-label={`${name} digitális kártyája`}
-                    title="Digitális Kártya (QR & Vonalkód)"
-                    onClick={() => onOpenDigitalCard(g)}
-                  >
-                    <QrCode aria-hidden strokeWidth={1.75} />
-                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        size="icon"
+                        className="h-8 w-8"
+                        aria-label={`További műveletek: ${name}`}
+                      >
+                        <MoreHorizontal aria-hidden strokeWidth={1.75} />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onSelect={() => onOpenDeduct(g)}>
+                        Kezelés -1
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onSelect={() => onOpenGuest(g)}>
+                        Adatlap
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onSelect={() => onOpenDigitalCard(g)}>
+                        Digitális kártya (QR)
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
-              </div>
+              </li>
             );
           })}
-        </div>
+        </ul>
       )}
     </CardContent>
   </Card>

@@ -5,7 +5,7 @@ import {
   expect,
   expectMonitorIdle,
   loginToReception,
-  quickSearchRow,
+  quickSearchRowAction,
   scanBarcode,
   test,
   toasts,
@@ -85,7 +85,7 @@ test.describe('Regresszió: TICKET-43', () => {
     async ({ page }) => {
       const monitor = await openReceptionWithMonitor(page);
       // Kovács Anna (#100001): 5 alkalmas prémium kozmetikai bérlet (Hialuronos arckezelés).
-      await quickSearchRow(page, '100001').getByRole('button', { name: 'Kezelés -1', exact: true }).click();
+      await quickSearchRowAction(page, '100001', 'Kezelés -1');
       const dialog = page.getByRole('dialog', { name: 'Alkalmas Kezelés Kiválasztása & Bérlet Levonás' });
       await expect(dialog).toBeVisible();
       await dialog.getByRole('button', { name: /^Hialuronos Arckezelés/ }).click();
