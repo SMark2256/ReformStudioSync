@@ -107,11 +107,24 @@ export { buttonVariants };
   <SkipLink />
   <AppSidebar />                         // asztali: fixed, lebegő sötét kártya, peek
   | <MobileSidebar />                    // 768 px alatt: Sheet, ugyanaz a tartalom
-  <AppHeader />                          // <header>: mobilon menü gomb + Breadcrumb + dátum + téma gomb
+  <AppHeader statusRef />                // <header>: mobilon menü gomb + Breadcrumb + állapotjelzők + dátum + téma gomb
   <div className="ml-[var(--sidebar-offset)]">
-    <PageContainer asChild><main id="main" tabIndex={-1}>…</main></PageContainer>
+    <HeaderStatusTargetContext.Provider>  // az állapotjelzők helye a fejlécben
+      <PageContainer asChild><main id="main" tabIndex={-1}>…</main></PageContainer>
+    </HeaderStatusTargetContext.Provider>
   </div>
 </AppShell>
+```
+
+Az oldal a saját állapotjelzőit (`SKILL.md` 4.3) így teszi a fejlécbe, a logika az
+oldalon marad (FSD: a widget nem importál oldalt):
+
+```tsx
+import { AppHeaderStatus } from '@/widgets/app-shell';
+
+<AppHeaderStatus>
+  <ReceptionHeaderStatus connectedDisplays={connectedDisplays} />
+</AppHeaderStatus>
 ```
 
 A `--sidebar-offset` (a kártya szélessége + 2 × `--sidebar-inset`) tolja a
@@ -140,10 +153,12 @@ sidebarState.ts`-ben: `useSidebarState` (elrendezés + peek) és a publikus
 
 **Fejléc (`AppHeader`)**: `h-14 border-b bg-card`, a háttere a kártya alatt teljes
 szélességű, a tartalma `pl-[var(--sidebar-offset)]`-tól, a `max-w-content`
-szélességben. Bal oldalon mobilon a menü gomb (`Menu`, `aria-label="Menü
-megnyitása"`), utána a `Breadcrumb` (ReformStudio Sync / oldal neve). Jobb oldalon
-dátum és idő (mobilon rejtve), téma gomb (`Button variant="secondary"
-size="icon"`, `aria-pressed`, `aria-label="Sötét mód"`, `saveTheme`).
+szélességben, `px-4 md:px-8` (a `PageContainer`-rel egy vonalban). Bal oldalon
+mobilon a menü gomb (`Menu`, `aria-label="Menü megnyitása"`), utána a `Breadcrumb`
+(ReformStudio Sync / oldal neve). Jobb oldalon az oldal állapotjelzői
+(`AppHeaderStatus`, üresen rejtve), dátum és idő (mobilon rejtve), téma gomb
+(`Button variant="secondary" size="icon"`, `aria-pressed`, `aria-label="Sötét
+mód"`, `saveTheme`).
 
 ## Oldal felépítése
 
@@ -157,15 +172,19 @@ size="icon"`, `aria-pressed`, `aria-label="Sötét mód"`, `saveTheme`).
   </>}
 />
 <section aria-labelledby="stats-h"><h2 id="stats-h" className="sr-only">Napi összesítő</h2>…</section>
-<div className="grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">…Card-ok…</div>
+<div className="grid gap-4 md:gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">…Card-ok…</div>
 ```
 
-- `PageHeader`: `h1` 20 px félkövér, alatta `text-sm text-muted-foreground`. A
-  műveletek jobbra, mobilon alá és teljes szélességre.
-- Számkártyák (stat): `Card`, címke `text-xs text-muted-foreground`, érték
-  `text-2xl font-semibold tabular-nums`. Asztalin 4, tableten és mobilon 2 oszlop.
-- `Card`: `rounded-lg border bg-card shadow-sm`. Fejléc `px-4 py-3 border-b`,
-  benne `h2` 14 px félkövér, jobbra a kártya műveletei (`link` gomb vagy szűrő).
+- `PageHeader`: `h1` 20 px félkövér, alatta `text-sm text-muted-foreground`, alatta
+  `mb-8` (mobilon `mb-6`). A műveletek jobbra, mobilon alá és teljes szélességre.
+- Blokkok között `gap-4 md:gap-6` (rács) vagy `space-y-4 md:space-y-6` (egymás alatt).
+- Számkártyák (stat): `StatCard` (`px-5 py-4`, mobilon `px-4 py-3.5`), címke
+  `text-xs text-muted-foreground`, `mt-1.5`-tel alatta az érték `text-2xl
+  font-semibold tabular-nums`. Asztalin 4, tableten és mobilon 2 oszlop, közöttük
+  `gap-3 md:gap-6`.
+- `Card`: `rounded-lg border bg-card shadow-sm`. Fejléc és lábléc `px-5 py-4`
+  (mobilon `px-4`), törzs `p-5` (mobilon `p-4`); a fejlécben `h2` 14 px félkövér,
+  jobbra a kártya műveletei (`link` gomb vagy szűrő).
 
 ## ResponsiveTable
 
@@ -186,14 +205,17 @@ type Column<T> = { key: string; header: string; cell: (row: T) => React.ReactNod
 />
 ```
 
-- `md` felett `Table`: `thead`-ben `th scope="col"`, sorfejlécnél `th scope="row"`.
-  A fejléc `bg-muted text-xs font-semibold text-muted-foreground`.
-- `md` alatt ugyanaz az adat kártyasorként: soronként egy blokk, minden mező
-  `címke: érték` párban (a címke a `header`). A `hideOnMobile` oszlop elmarad.
+- `md` felett `Table` (`text-sm`): `thead`-ben `th scope="col"`, sorfejlécnél
+  `th scope="row"`. A fejléc `bg-muted text-xs font-semibold text-muted-foreground
+  px-4 py-2.5`, a cella `px-4 py-3`.
+- `md` alatt ugyanaz az adat kártyasorként: soronként egy blokk (`px-4 py-3.5`),
+  minden mező `címke: érték` párban (a címke a `header`, az érték `text-sm`). A
+  `hideOnMobile` oszlop elmarad.
 - Kattintható sor: `tabIndex={0}`, `onKeyDown` Enterre és szóközre, látható
   fókuszkeret. Ha a sorban van gomb, az a saját nevét kapja
   (`aria-label="Nagy Eszter kiléptetése"`), és a kattintása ne nyissa meg a sort.
-- Számok jobbra igazítva, `tabular-nums`. Idő és kártyaszám `font-mono text-xs`.
+- Számok jobbra igazítva, `tabular-nums`, `whitespace-nowrap` (`align: 'right'`). Idő
+  és kártyaszám `font-mono text-xs`.
 
 ## Modálok
 
@@ -213,6 +235,8 @@ type Column<T> = { key: string; header: string; cell: (row: T) => React.ReactNod
 
 - Minden mezőnek látható `Label`-je van (`htmlFor` + `id`). A placeholder nem
   felirat.
+- Térköz: címke és mező egy `flex flex-col gap-1.5` csoportban (6 px), a csoportok
+  egymás alatt `space-y-4` (rácsban `gap-4`), 16 px.
 - Kötelező mező: a felirat mellett `*` (`aria-hidden`), a mezőn `required` és
   `aria-required`, az űrlap alján „* kötelező mező”.
 - Hiba: a mező alatt `text-destructive text-xs`, `id`-val, a mezőn

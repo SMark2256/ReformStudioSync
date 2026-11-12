@@ -42,8 +42,8 @@ interface ReceptionDeskTabProps {
   lastCheckIn: CheckInResultPayload | null;
   /** Az utoljára beolvasott vendég a vendéglistából. */
   lastIdentifiedGuest: GuestDto | null;
-  /** A recepciós eszközsor, a `PageHeader` alatt. */
-  toolbar: React.ReactNode;
+  /** A várakozó offline beolvasások sávja, a `PageHeader` alatt. */
+  offlineQueueNotice: React.ReactNode;
   onScan: (barcode: string) => void;
   onForceDuplicate: (barcode: string) => void;
   onRevoke: (checkInId: string) => void;
@@ -56,7 +56,7 @@ interface ReceptionDeskTabProps {
   onOpenFinance: () => void;
 }
 
-// Recepció (UI-specifikáció 6.1): gyorsműveletek, eszközsor, napi összesítő, beolvasás, az utoljára
+// Recepció (UI-specifikáció 6.1): gyorsműveletek, offline várólista, napi összesítő, beolvasás, az utoljára
 // azonosított vendég, vendégkereső, mai kassza és a mai érkezések naplója.
 export const ReceptionDeskTab: React.FC<ReceptionDeskTabProps> = ({
   guests,
@@ -68,7 +68,7 @@ export const ReceptionDeskTab: React.FC<ReceptionDeskTabProps> = ({
   todayCheckIns,
   lastCheckIn,
   lastIdentifiedGuest,
-  toolbar,
+  offlineQueueNotice,
   onScan,
   onForceDuplicate,
   onRevoke,
@@ -122,14 +122,14 @@ export const ReceptionDeskTab: React.FC<ReceptionDeskTabProps> = ({
         }
       />
 
-      <div className="space-y-4">
-        {toolbar}
+      <div className="space-y-4 md:space-y-6">
+        {offlineQueueNotice}
 
         <section aria-labelledby={summaryTitleId} className="space-y-4">
           <h2 id={summaryTitleId} className="sr-only">
             Napi összesítő
           </h2>
-          <div className="grid grid-cols-2 gap-2.5 md:gap-4 xl:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 md:gap-6 xl:grid-cols-4">
             {dashboard ? (
               <>
                 <StatCard
@@ -184,8 +184,8 @@ export const ReceptionDeskTab: React.FC<ReceptionDeskTabProps> = ({
           )}
         </section>
 
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
-          <div className="min-w-0 space-y-4">
+        <div className="grid grid-cols-1 gap-4 md:gap-6 xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
+          <div className="min-w-0 space-y-4 md:space-y-6">
             <BarcodeCheckInCard onScan={onScan} />
 
             <LastCheckInCard
@@ -210,7 +210,7 @@ export const ReceptionDeskTab: React.FC<ReceptionDeskTabProps> = ({
             />
           </div>
 
-          <div className="min-w-0 space-y-4">
+          <div className="min-w-0 space-y-4 md:space-y-6">
             <TodayCashCard finance={finance} onOpenFinance={onOpenFinance} />
 
             <TodayCheckInsCard checkIns={todayCheckIns} onRevoke={onRevoke} />

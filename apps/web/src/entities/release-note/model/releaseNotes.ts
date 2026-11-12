@@ -97,6 +97,21 @@ export const getJiraIssueUrl = (jiraKey: string): string =>
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    id: 'v0.3-airier-layout',
+    version: '0.3',
+    date: '2026-11-12',
+    kind: 'IMPROVEMENT',
+    title: 'Levegősebb felület',
+    summary:
+      'Nagyobb térközök és olvashatóbb táblázatok minden oldalon. A kapcsolatjelzők (QR csatorna, kijelzők, hang, tablet) az oldalak tetejéről a fejlécbe költöztek.',
+    details: [
+      'A kártyák, a táblázatsorok és az űrlapmezők között több a hely, a táblázatok szövege nagyobb lett.',
+      'A fejléc jobb oldalán egy pötty mutatja a QR csatorna és a kapcsolat állapotát; kattintásra ugyanúgy szüneteltethető a csatorna, szimulálható az offline mód, némítható a hang, és innen nyílik a Tablet Aláíró.',
+      'Telefonon és tableten a pöttyökre koppintva egy kis menüben látszanak a feliratok és a kapcsolók.',
+    ],
+    jiraKey: 'TICKET-45',
+  },
+  {
     id: 'v0.3-version-changelog-from-news',
     version: '0.3',
     date: '2026-11-11',

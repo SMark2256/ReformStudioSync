@@ -139,7 +139,7 @@ export const PassesTab: React.FC<PassesTabProps> = ({
       title="Bérletek és termékek"
       description="Bérletsablonok és szolgáltatások beállítása."
     />
-    <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+    <div className="grid grid-cols-1 gap-4 md:gap-6 xl:grid-cols-2">
       <PassTemplatesCard templates={templates} onRefreshAll={onRefreshAll} />
       <ServicesCard services={services} onRefreshAll={onRefreshAll} />
     </div>
@@ -196,7 +196,7 @@ const PassTemplatesCard: React.FC<{
               price,
             });
           }}
-          className="grid grid-cols-1 gap-3.5 sm:grid-cols-2"
+          className="grid grid-cols-1 gap-4 sm:grid-cols-2"
         >
           <h3 className="text-xs font-semibold text-muted-foreground sm:col-span-2">
             Új bérletsablon
@@ -337,7 +337,7 @@ const ServicesCard: React.FC<{
               womenOnly,
             });
           }}
-          className="grid grid-cols-1 gap-3.5 sm:grid-cols-2"
+          className="grid grid-cols-1 gap-4 sm:grid-cols-2"
         >
           <h3 className="text-xs font-semibold text-muted-foreground sm:col-span-2">
             Új szolgáltatás

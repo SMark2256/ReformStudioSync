@@ -19,8 +19,15 @@ A felhasználóval magyarul beszélj. A felületi szöveg magyar, a meglévő ha
 
 ## 1. Az irány egy mondatban
 
-Hagyományos, nyugodt, sűrű admin felület: fehér/szürke felületek, vékony 1 px-es
+Hagyományos, nyugodt, levegős admin felület: fehér/szürke felületek, vékony 1 px-es
 szegélyek, 6 px-es lekerekítés, táblázatok és űrlapmezők, **egy** kiemelő szín.
+
+**Levegős, nem sűrű:** bőkezű térközök (3.6), 14 px-es táblaszöveg (3.7), egyértelmű
+hierarchia. Oldalanként (nézetrészenként) **egy** fő művelet; a ritkábban használt
+műveletek menübe (`DropdownMenu`, a sor „⋯” gombja) vagy modálba kerülnek, nem egy
+hosszú gombsorba. A magyarázó szöveg egy rövid sor, a többi súgóba (`Tooltip`) való.
+Ne sűríts vissza: kisebb rés, kisebb betű vagy több egyszerre látható gomb csak a
+ticket kifejezett kérésére.
 
 **Tilos:** színátmenet, üvegeffekt (`backdrop-blur`), dekoratív kör vagy blob,
 emoji a felületen, pasztell kártyahalmaz, túlméretezett lekerekítés (`rounded-2xl`
@@ -154,14 +161,17 @@ oldalsáv kártya `rounded-[14px]`-e az egyetlen kivétel (1.).
 
 | Hol | Érték |
 | --- | --- |
-| Oldal belső margója | asztali `px-6 py-6` (24 px), mobil `px-3 py-4` (12/16 px) |
-| Blokkok közötti rés (rácsok) | `gap-4` (16 px), mobilon a stat-kártyák között `gap-2.5` (10 px) |
-| Kártya fejléc | `px-4 py-3` |
-| Kártya törzs | `p-4` (mobilon `p-3.5`) |
-| Táblacella | `px-3 py-2.5` (12 × 10 px), fejléccella `px-3 py-2` |
+| Oldal belső margója | asztali `px-8 pt-8` (32 px), mobil `px-4 pt-5` (16/20 px), alul 72 px |
+| Blokkok közötti rés (rácsok, kártyák egymás alatt) | `gap-6` / `space-y-6` (24 px), mobilon `gap-4` (16 px): `gap-4 md:gap-6` |
+| Stat-kártyák között | `gap-6` (24 px), mobilon `gap-3` (12 px) |
+| Kártya fejléc és lábléc | `px-5 py-4` (mobilon `px-4 py-4`) |
+| Kártya törzs | `p-5` (mobilon `p-4`) |
+| Stat-kártya | `px-5 py-4` (mobilon `px-4 py-3.5`), címke és érték között `mt-1.5` |
+| Táblacella | `px-4 py-3` (16 × 12 px), fejléccella `px-4 py-2.5` |
+| Táblázat mobilon (kártyasor) | soronként `px-4 py-3.5`, a párok között `gap-1.5` |
 | Gombok egymás mellett | `gap-2` (8 px) |
-| Űrlapmezők egymás alatt | `mb-3.5` (14 px) mezőnként, címke és mező között `gap-1.5` |
-| PageHeader alatt | `mb-5` (20 px) |
+| Űrlapmezők egymás alatt | `space-y-4` / `gap-4` (16 px), címke és mező között `gap-1.5` (6 px) |
+| PageHeader alatt | `mb-8` (32 px), mobilon `mb-6` (24 px) |
 | Menüpontok között | `space-y-0.5` (2 px), szakaszok között `mt-3` |
 
 ### 3.7 Betűk
@@ -176,13 +186,13 @@ oldalsáv kártya `rounded-[14px]`-e az egyetlen kivétel (1.).
 | --- | --- | --- | --- |
 | Alap szöveg | 14 px / 1.45 (`text-sm`) | 400 | `foreground` |
 | `h1` oldalcím | 20 px (`text-xl`) | 600 | `foreground` |
-| Oldal leírása a `h1` alatt | 13 px | 400 | `muted-foreground` |
+| Oldal leírása a `h1` alatt | 14 px (`text-sm`) | 400 | `muted-foreground` |
 | `h2` kártyacím | 14 px | 600 | `foreground` |
 | `h3` alblokk, beállítássor címe | 13 px | 600 | `foreground` |
 | Kis címke (stat, mező felett, `lbl`) | 12 px (`text-xs`) | 600 | `muted-foreground` |
 | Szakaszcím az oldalsávban | 12 px (`text-xs`) | 500 | `sidebar-muted` |
 | Táblafejléc | 12 px | 600 | `muted-foreground` |
-| Táblacella | 13 px | 400 | `foreground` |
+| Táblacella (asztali és mobil kártyasor) | 14 px (`text-sm`) | 400 | `foreground` |
 | Stat érték | 24 px (mobil 20 px) | 600 | `foreground` |
 | Gombfelirat | 13 px (`sm`: 12 px) | 600 | variáns szerint |
 | Jelvény | 12 px | 500 | állapot szerint |
@@ -248,7 +258,7 @@ Vendégmonitor (`/monitor`) és a bejelentkezés **nem** kapja meg a keretet.
 ```
  8/12 px                     a fejléc háttere a kártya alatt fal a falig fut
 ┌──────────────┐┌───────────────────────────────────────────────────────┐
-│ RS / név  [▯]││ Fejléc (56 px) ☰ ReformStudio Sync / Recepció  dátum ☀│
+│ RS / név  [▯]││ Fejléc (56 px) ☰ RS Sync / Recepció  ● jelzők  dátum ☀│
 ├──────────────┤├───────────────────────────────────────────────────────┤
 │ Napi működés ││   ┌───────────── max. 1400 px, középen ─────────────┐ │
 │  Recepció    ││   │ PageHeader: h1 + leírás           [műveletek]   │ │
@@ -353,18 +363,33 @@ verzió rövid alakja („v0.3”) látszik.
 - Bal oldal: mobilon a menü gomb (`Menu` ikon, `aria-label="Menü megnyitása"`),
   utána `Breadcrumb`: „ReformStudio Sync” / **oldal neve** (13 px; az utolsó elem
   600 `foreground`, `aria-current="page"`). Mobilon csak az oldal neve.
-- Jobb oldal: dátum és idő 12 px `muted-foreground` („november 10., kedd, 22:55”,
-  mobilon rejtve), téma gomb (`Button variant="secondary" size="icon"`, `Moon` /
-  `Sun`, `aria-pressed`).
+- Jobb oldal: az oldal állapotjelzői (lent), dátum és idő 12 px `muted-foreground`
+  („november 10., kedd, 22:55”, mobilon rejtve), téma gomb (`Button
+  variant="secondary" size="icon"`, `Moon` / `Sun`, `aria-pressed`).
+- **Állapotjelzők** (a dátum előtt): az oldal az `AppHeaderStatus`-szal
+  (`@/widgets/app-shell`, portál a fejléc helyére) teszi ide a saját kapcsolatjelzőit;
+  a logika az oldalon marad. A recepció fülein (`ReceptionHeaderStatus`): **QR
+  csatorna** (pötty: `success` aktív / `muted-foreground` szünetel, `aria-pressed`,
+  kattintásra szünetel / indul), **Online (N kijelző)** / **Offline puffer (N)**
+  (pötty `success` / `warning`, kattintásra az offline mód szimulálása), **Hangjelzés**
+  (`Volume2` / `VolumeX`, `aria-pressed`), **Tablet** (`FileSignature`, link a
+  `/tablet`-re, `aria-label="Tablet Aláíró"`). 1280 px-től `secondary` `sm` gombok
+  egy sorban (`gap-2`), pötty (8 px kör) + rövid felirat; alatta egyetlen `secondary`
+  `sm` gomb csak a pöttyökkel és a hang ikonnal (`aria-label` „Kapcsolatok: …” az
+  állapotokkal), amely `DropdownMenu`-t nyit: „Kapcsolatok” címke, a három kapcsoló
+  `DropdownMenuCheckboxItem`-ként, elválasztó, „Tablet Aláíró” link. Az oldalak
+  tetején nincs külön státuszsor; a várakozó offline beolvasások sávja („Szinkronizálás
+  most”) csak akkor jelenik meg a tartalomban, ha van mit szinkronizálni.
 - A fejlécben nincs kereső, nincs értesítési harang, nincs második avatar.
 
 ### 4.4 Oldaltartalom
 
-- `PageContainer`: `mx-auto w-full max-w-[1400px] px-6 py-6` (mobil `px-3 py-4`),
-  alul 72 px hely.
-- `PageHeader`: bal oldalt `h1` és alatta egy mondatos leírás, jobb oldalt a
-  műveletek (`gap-2`), alsó igazítással. Alatta 20 px. Mobilon a műveletek a cím
-  alá kerülnek, teljes szélességben.
+- `PageContainer`: `mx-auto w-full max-w-[1400px] px-8 pt-8` (mobil `px-4 pt-5`),
+  alul 72 px hely. A fejléc belseje ugyanígy `px-4 md:px-8`, egy vonalban a tartalommal.
+- `PageHeader`: bal oldalt `h1` és alatta egy mondatos leírás (14 px), jobb oldalt a
+  műveletek (`gap-2`), alsó igazítással. Alatta 32 px (mobilon 24 px). Mobilon a
+  műveletek a cím alá kerülnek, teljes szélességben.
+- A blokkok (kártyák, rácsok) között 24 px (`gap-4 md:gap-6`, `space-y-4 md:space-y-6`).
 - Oldalanként legfeljebb egy `primary` gomb a `PageHeader`-ben.
 
 ## 5. Komponensek
@@ -410,7 +435,8 @@ létre. Nyers `<button>` csak a `shared/ui`-n belül. A kód:
 - Fókusz: `border-primary` + 3 px `ring-primary/15`, nincs böngésző-outline.
 - Letiltva: 50% átlátszóság, `bg-muted`.
 - Hibás: `border-destructive`, alatta 12 px `text-destructive` üzenet.
-- Címke a mező fölött: 12 px 600 `muted-foreground`, közte 5 px.
+- Címke a mező fölött: 12 px 600 `muted-foreground`, közte 6 px (`gap-1.5`). A mezők
+  egymás alatt 16 px-re (`space-y-4`, rácsban `gap-4`).
 - Kereső: bal oldalt 16 px `Search` ikon 10 px-re a széltől, a szöveg 34 px-ről
   indul, `type="search"`, `sr-only` címke. Szélesség asztalin 320 px, tableten
   240 px, mobilon 100%.
@@ -434,37 +460,40 @@ létre. Nyers `<button>` csak a `shared/ui`-n belül. A kód:
 ### 5.4 Kártya
 
 - `bg-card border border-border rounded-lg shadow-sm`, `min-w-0`.
-- Fejléc: `px-4 py-3 border-b`, benne `h2` 14 px 600, mellette opcionálisan
-  12 px `muted-foreground` alcím, jobbra a kártya műveletei (`link` gomb,
-  szegmens, kereső).
-- Törzs: `p-4`. Ha a kártya csak egy táblázatot tartalmaz, a törzs margó nélküli,
-  és a táblázat ér a kártya széléig.
+- Fejléc: `px-5 py-4 border-b` (mobilon `px-4`), benne `h2` 14 px 600, mellette
+  opcionálisan 12 px `muted-foreground` alcím, jobbra a kártya műveletei (`link`
+  gomb, szegmens, kereső).
+- Törzs: `p-5` (mobilon `p-4`). Ha a kártya csak egy táblázatot tartalmaz, a törzs
+  margó nélküli, és a táblázat ér a kártya széléig.
+- Lábléc: `px-5 py-4 border-t` (mobilon `px-4`).
 - Kártyán belül nincs színes fejléc, nincs színes bal csík, nincs ikon a cím előtt.
 
 ### 5.5 Stat-kártya (összesítő szám)
 
-- `Card` `px-4 py-3.5`: felül címke 12 px `muted-foreground`, alatta érték 24 px
-  600 `tabular-nums`, alatta 12 px `faint` magyarázat („3 napon belül vagy lejárt”).
+- `Card` `px-5 py-4` (mobilon `px-4 py-3.5`): felül címke 12 px `muted-foreground`,
+  6 px-re alatta érték 24 px (mobil 20 px) 600 `tabular-nums`, alatta 12 px `faint`
+  magyarázat („3 napon belül vagy lejárt”).
 - Asztalin 4 egy sorban, tableten és mobilon 2 × 2.
 - A szám nem színes, nincs mellette nyíl vagy trendgrafikon, hacsak a ticket nem kéri.
 - A blokk `section aria-labelledby`, `sr-only` `h2`-vel („Napi összesítő”).
 
 ### 5.6 Táblázat (`ResponsiveTable`)
 
-- Teljes szélesség, `border-collapse`, 13 px.
-- Fejléc: `bg-muted`, 12 px 600 `muted-foreground`, `px-3 py-2`, alsó szegély,
+- Teljes szélesség, `border-collapse`, 14 px.
+- Fejléc: `bg-muted`, 12 px 600 `muted-foreground`, `px-4 py-2.5`, alsó szegély,
   nem nagybetűs. `th scope="col"`.
-- Cella: `px-3 py-2.5`, alsó 1 px `border-border` (az utolsó soron nincs).
-- Számok jobbra, `tabular-nums`. Idő, kártyaszám: monospace 12 px `muted-foreground`.
+- Cella: `px-4 py-3`, alsó 1 px `border-border` (az utolsó soron nincs).
+- Számok jobbra, `tabular-nums`, nem törnek (`whitespace-nowrap`). Idő, kártyaszám:
+  monospace 12 px `muted-foreground`.
 - Név cella: 28 px kör avatar (monogram) + név, 10 px réssel.
 - Kattintható sor: `cursor-pointer`, hover `bg-muted`, kijelölt `bg-primary/10`,
   fókusz 2 px belső gyűrű, `tabIndex={0}`, Enter és szóköz nyitja.
 - Soron belüli művelet: `link` gomb a jobb szélen, egyedi `aria-label`-lel
   („Nagy Eszter kiléptetése”).
-- Üres állapot: egy sor, középre igazított 13 px `muted-foreground` szöveg,
-  28 px függőleges margóval („Még nincs belépés ma.”). Nincs illusztráció.
-- Mobilon kártyasor: soronként egy blokk, `címke: érték` párok, a címke 12 px 600
-  `muted-foreground` balra, az érték jobbra (9. fejezet).
+- Üres állapot: egy sor, középre igazított 14 px `muted-foreground` szöveg,
+  32 px függőleges margóval („Még nincs belépés ma.”). Nincs illusztráció.
+- Mobilon kártyasor: soronként egy blokk (`px-4 py-3.5`), `címke: érték` párok, a
+  címke 12 px 600 `muted-foreground` balra, az érték 14 px jobbra (9. fejezet).
 - Rejtett `caption` minden táblán, a sorfejléc `th scope="row"`.
 
 ### 5.7 Jelvény (`Badge`)
@@ -493,8 +522,8 @@ létre. Nyers `<button>` csak a `shared/ui`-n belül. A kód:
 ### 5.9 Adatlista (vendég adatlap)
 
 - `dl` kétoszlopos rács: 130 px (mobil 110 px) címke + érték.
-- Címke `dt` 13 px `muted-foreground`, érték `dd` 13 px 500, soronként alsó
-  1 px szegély, `py-1.5`.
+- Címke `dt` 14 px `muted-foreground`, érték `dd` 14 px 500, soronként alsó
+  1 px szegély, `py-2`.
 - Kiegészítő info az értéken belül zárójelben, `muted-foreground`
   („nov. 29. (még 19 nap)”).
 
@@ -565,8 +594,8 @@ mindig `minmax(0, …)` oszlopokkal, a gyerekeken `min-w-0`.
 - **Napi összesítő** (4 stat-kártya): Bent tartózkodik · Mai belépések
   („ebből N kártyával”) · Elutasított belépés („lejárt vagy elfogyott bérlet”) ·
   Lejáró bérletek („3 napon belül vagy lejárt”).
-- **Rács:** asztalin `grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] gap-4`, alatta
-  egy oszlop.
+- **Rács:** asztalin `grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] gap-6`, alatta
+  egy oszlop (`gap-4`).
   - Bal oszlop:
     1. „Mai belépések” kártya. Fejlécben kereső („Név, kártyaszám vagy telefon”);
        ha van keresőszöveg, a cím „Keresési találatok”. Oszlopok: Idő (`14:52–15:40`
@@ -771,7 +800,8 @@ A 3 nap az admin beállítása („Lejárat előtti figyelmeztetés”).
 
 - A tartalom és a fejléc belseje: `mx-auto max-w-[1400px]`. Az oldalsáv mindig a
   bal szélen, a fejléc háttere teljes szélességű.
-- Mobilon: a fejlécben csak ☰ + oldalnév + téma gomb; a `PageHeader` gombjai a
+- Mobilon: a fejlécben csak ☰ + oldalnév + az állapotjelzők pöttyei (legördülővel,
+  4.3) + téma gomb; a `PageHeader` gombjai a
   cím alatt, teljes szélességben; a kereső teljes szélességű; a szegmensek
   tördelődnek; a toast alul teljes szélességű; nincs vízszintes görgetés.
 - Mobil menü: Escape, háttérre koppintás vagy menüpont választása zárja; nyitva a

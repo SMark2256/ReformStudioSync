@@ -215,12 +215,12 @@ export const FinanceTab: React.FC<FinanceTabProps> = ({
         }
       />
 
-      <div className="space-y-4">
+      <div className="space-y-4 md:space-y-6">
         <section aria-labelledby="finance-summary-title">
           <h2 id="finance-summary-title" className="sr-only">
             Napi kassza
           </h2>
-          <div className="grid grid-cols-2 gap-2.5 md:gap-4 xl:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 md:gap-6 xl:grid-cols-4">
             <StatCard
               label="Napi összbevétel"
               value={formatHuf(finance?.totalRevenue ?? 0)}

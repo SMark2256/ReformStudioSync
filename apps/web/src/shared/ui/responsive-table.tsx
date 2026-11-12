@@ -19,7 +19,7 @@ export interface ResponsiveTableColumn<T> {
   cell: (row: T) => React.ReactNode;
   /** A fejléc csak képernyőolvasónak (pl. a soron belüli művelet oszlopa). */
   srOnlyHeader?: boolean;
-  /** Számok: jobbra igazítva, `tabular-nums`. */
+  /** Számok: jobbra igazítva, `tabular-nums`, nem törnek. */
   align?: 'left' | 'right';
   hideOnMobile?: boolean;
   /** A sor fejléccellája (`th scope="row"`), jellemzően a név. */
@@ -92,7 +92,7 @@ export function ResponsiveTable<T>({
       return (
         <p
           className={cn(
-            'py-7 text-center text-[13px] text-muted-foreground',
+            'py-8 text-center text-sm text-muted-foreground',
             className,
           )}
         >
@@ -112,7 +112,7 @@ export function ResponsiveTable<T>({
               key={id}
               data-state={id === selectedRowId ? 'selected' : undefined}
               className={cn(
-                'px-3.5 py-3 data-[state=selected]:bg-primary-soft',
+                'px-4 py-3.5 data-[state=selected]:bg-primary-soft',
                 onRowOpen && openableRowClassName,
               )}
               {...rowOpenHandlers(row, onRowOpen)}
@@ -132,7 +132,7 @@ export function ResponsiveTable<T>({
                     )}
                     <dd
                       className={cn(
-                        'min-w-0 text-right text-[13px] text-foreground',
+                        'min-w-0 text-right text-sm text-foreground',
                         column.align === 'right' && 'tabular-nums',
                         column.srOnlyHeader && 'ml-auto',
                       )}
@@ -176,7 +176,7 @@ export function ResponsiveTable<T>({
           <TableRow>
             <TableCell
               colSpan={columns.length}
-              className="py-7 text-center text-muted-foreground"
+              className="py-8 text-center text-muted-foreground"
             >
               {emptyText}
             </TableCell>
@@ -197,7 +197,8 @@ export function ResponsiveTable<T>({
                     <Cell
                       key={column.key}
                       className={cn(
-                        column.align === 'right' && 'text-right tabular-nums',
+                        column.align === 'right' &&
+                          'whitespace-nowrap text-right tabular-nums',
                         column.className,
                       )}
                     >

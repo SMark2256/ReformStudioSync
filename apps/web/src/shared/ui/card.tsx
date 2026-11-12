@@ -19,7 +19,8 @@ const Card = React.forwardRef<
 ));
 Card.displayName = 'Card';
 
-// Fejléc: cím (+ alcím) balra, a kártya műveletei (`CardActions`) jobbra; mobilon tördelődik.
+// Fejléc `px-5 py-4` (mobilon `px-4`, a törzzsel egy vonalban): cím (+ alcím) balra, a kártya
+// műveletei (`CardActions`) jobbra; mobilon tördelődik.
 const CardHeader = React.forwardRef<
   HTMLDivElement,
   React.HTMLAttributes<HTMLDivElement>
@@ -27,7 +28,7 @@ const CardHeader = React.forwardRef<
   <div
     ref={ref}
     className={cn(
-      'flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-border px-4 py-3',
+      'flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-border px-4 py-4 md:px-5',
       className,
     )}
     {...props}
@@ -79,12 +80,12 @@ const CardActions = React.forwardRef<
 ));
 CardActions.displayName = 'CardActions';
 
-// Törzs `p-4` (mobilon `p-3.5`). Ha csak egy táblázat van benne: `className="p-0"`.
+// Törzs `p-5` (mobilon `p-4`). Ha csak egy táblázat van benne: `className="p-0"`.
 const CardContent = React.forwardRef<
   HTMLDivElement,
   React.HTMLAttributes<HTMLDivElement>
 >(({ className, ...props }, ref) => (
-  <div ref={ref} className={cn('p-3.5 md:p-4', className)} {...props} />
+  <div ref={ref} className={cn('p-4 md:p-5', className)} {...props} />
 ));
 CardContent.displayName = 'CardContent';
 
@@ -95,7 +96,7 @@ const CardFooter = React.forwardRef<
   <div
     ref={ref}
     className={cn(
-      'flex flex-wrap items-center gap-2 border-t border-border px-4 py-3',
+      'flex flex-wrap items-center gap-2 border-t border-border px-4 py-4 md:px-5',
       className,
     )}
     {...props}

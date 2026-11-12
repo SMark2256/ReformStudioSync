@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { useIsMobile } from '@/shared/lib/hooks';
 import { useThemeStore } from '@/shared/theme';
 import { PageContainer, SkipLink } from '@/shared/ui';
+import { HeaderStatusTargetContext } from '../model/headerStatusTarget';
 import { getPageTitle } from '../model/navigation';
 import { useSidebarState } from '../model/sidebarState';
 import { AppHeader } from './AppHeader';
@@ -33,6 +34,9 @@ export const AppShell: React.FC<AppShellProps> = ({
   const sidebar = useSidebarState();
   const { togglePinned } = sidebar;
   const [mobileOpen, setMobileOpen] = useState(false);
+  // A fejléc állapotjelző-helye: az oldal `AppHeaderStatus`-szal tölti ki.
+  const [headerStatusTarget, setHeaderStatusTarget] =
+    useState<HTMLDivElement | null>(null);
   const title = getPageTitle(pathname) ?? APP_NAME;
   const mainRef = useRef<HTMLElement>(null);
   const lastPathname = useRef(pathname);
@@ -122,18 +126,21 @@ export const AppShell: React.FC<AppShellProps> = ({
           title={title}
           menuOpen={mobileOpen}
           onOpenMenu={() => setMobileOpen(true)}
+          statusRef={setHeaderStatusTarget}
         />
         <div className="ml-[var(--sidebar-offset)] transition-[margin] duration-200 ease-in-out motion-reduce:transition-none">
-          <PageContainer asChild>
-            <main
-              id="main"
-              ref={mainRef}
-              tabIndex={-1}
-              className="outline-none"
-            >
-              {children}
-            </main>
-          </PageContainer>
+          <HeaderStatusTargetContext.Provider value={headerStatusTarget}>
+            <PageContainer asChild>
+              <main
+                id="main"
+                ref={mainRef}
+                tabIndex={-1}
+                className="outline-none"
+              >
+                {children}
+              </main>
+            </PageContainer>
+          </HeaderStatusTargetContext.Provider>
         </div>
       </div>
     </div>

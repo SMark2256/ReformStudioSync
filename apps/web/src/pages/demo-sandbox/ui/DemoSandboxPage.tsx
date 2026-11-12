@@ -400,7 +400,7 @@ export const DemoSandboxPage: React.FC = () => {
         }
       />
 
-      <div className="space-y-4">
+      <div className="space-y-4 md:space-y-6">
         {guestModalState.isOpen ? (
           <GuestModal
             isOpen={guestModalState.isOpen}
@@ -445,7 +445,7 @@ export const DemoSandboxPage: React.FC = () => {
         ) : (
           <>
             {/* Szimulátor (bal) + beágyazott, adatvédett vendégmonitor (jobb) */}
-            <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 md:gap-6 xl:grid-cols-2">
               <Card className="flex flex-col">
                 <CardHeader>
                   <CardTitle>
@@ -649,7 +649,7 @@ export const DemoSandboxPage: React.FC = () => {
             </div>
 
             {/* Vendégek, digitális kártyák, bérletkezelés (bal) + kassza és napló sztornóval (jobb) */}
-            <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+            <div className="grid grid-cols-1 gap-4 md:gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
               <Card>
                 <CardHeader>
                   <div className="min-w-0">
@@ -763,7 +763,7 @@ export const DemoSandboxPage: React.FC = () => {
                 </ul>
               </Card>
 
-              <div className="min-w-0 space-y-4">
+              <div className="min-w-0 space-y-4 md:space-y-6">
                 <Card>
                   <CardHeader>
                     <CardTitle>4. Napi kassza és fizetés sztornó</CardTitle>

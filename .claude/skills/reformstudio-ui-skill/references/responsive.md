@@ -16,7 +16,7 @@ kinyitja, az ő választása marad érvényben (a shadcn cookie-ban tárolja).
 
 ## A 1400 px-es tartalom
 
-- `PageContainer`: `mx-auto w-full max-w-content px-4 md:px-6`
+- `PageContainer`: `mx-auto w-full max-w-content px-4 pt-5 md:px-8 md:pt-8`
   (`maxWidth.content = 1400px` a Tailwind configban). Így a blokkok legfeljebb
   1400 px szélesek, és széles monitoron középen vannak, két oldalt a háttérrel.
 - A fejléc belseje ugyanebben a `max-w-content mx-auto` szélességben van, hogy a
@@ -30,11 +30,14 @@ kinyitja, az ő választása marad érvényben (a shadcn cookie-ban tárolja).
 ## Mobil szabályok
 
 - **Fejléc:** menü gomb (`SidebarTrigger`, `aria-label="Menü megnyitása"`), az
-  aktuális oldal neve, téma gomb. A dátum és az óra rejtve.
+  aktuális oldal neve, az állapotjelzők pöttyei (egy gomb, a feliratok és a kapcsolók
+  legördülőben; 1280 px alatt mindig így, `SKILL.md` 4.3), téma gomb. A dátum és az
+  óra rejtve.
 - **PageHeader:** a cím alatt a műveletek, teljes szélességben (`flex-col`,
   gombok `flex-1`).
-- **Kártyák:** `p-4` helyett `p-3`/`p-4`, a kártya fejlécében a kereső teljes
-  szélességű új sorba kerül.
+- **Kártyák:** törzs `p-4` (asztalin `p-5`), fejléc `px-4`, a blokkok között
+  `gap-4` (asztalin `gap-6`); a kártya fejlécében a kereső teljes szélességű új sorba
+  kerül.
 - **Táblázatok:** `ResponsiveTable` kártyasor módban, `címke: érték` párokkal. Nem
   vízszintes görgetés.
 - **Modálok:** teljes képernyő, a lábléc gombjai teljes szélességűek, az összeg
