@@ -1,4 +1,5 @@
 import { ArrowRight } from 'lucide-react';
+import { useReducedMotion } from 'motion/react';
 import React, {
   useCallback,
   useEffect,
@@ -7,9 +8,9 @@ import React, {
   useRef,
   useState,
 } from 'react';
+import { useIsMobile } from '@/shared/lib/hooks';
 import { Button } from '@/shared/ui';
 import { findTarget, type TourStep } from '../config/tours';
-import { prefersReducedMotion } from '../lib/environment';
 import './tour-layer.css';
 
 // Az oldalbemutató rétege (a Színlap „színpadi reflektorának” mintájára): a kurzor ívben a
@@ -85,10 +86,9 @@ function spotOf(target: HTMLElement): Box {
  * mellett, alatt vagy fölött, ahol elfér; ha sehol, a célponttal átellenes oldalon rátakar.
  * Célpont nélkül a buborék középen, a kurzor mellette.
  */
-function place(target: HTMLElement | null, bh: number): Layout {
+function place(target: HTMLElement | null, bh: number, wide: boolean): Layout {
   const vw = document.documentElement.clientWidth;
   const vh = window.innerHeight;
-  const wide = vw >= 768;
   const w = Math.min(360, vw - 2 * MARGIN);
 
   if (!target) {
@@ -168,7 +168,8 @@ const TourLayer: React.FC<TourLayerProps> = ({ steps, onClose }) => {
   const primary = useRef<HTMLButtonElement>(null);
   const flown = useRef<(Point & { step: number }) | null>(null);
   const flight = useRef<Animation | null>(null);
-  const [reduce] = useState(prefersReducedMotion);
+  const reduce = useReducedMotion() ?? false;
+  const wide = !useIsMobile();
   const titleId = useId();
   const textId = useId();
   const step = steps[index];
@@ -179,11 +180,11 @@ const TourLayer: React.FC<TourLayerProps> = ({ steps, onClose }) => {
   const measure = useCallback(() => {
     placedHeight.current = bubble.current?.offsetHeight || placedHeight.current;
     setLayout({
-      ...place(findTarget(step.target), placedHeight.current),
+      ...place(findTarget(step.target), placedHeight.current, wide),
       height: placedHeight.current,
       step: index,
     });
-  }, [step.target, index]);
+  }, [step.target, index, wide]);
 
   // Lépésváltáskor a célpont a képernyőre gördül, utána mérünk.
   useLayoutEffect(() => {
@@ -206,13 +207,19 @@ const TourLayer: React.FC<TourLayerProps> = ({ steps, onClose }) => {
     if (height && height !== placedHeight.current) measure();
   });
 
-  // Átméretezéskor és görgetéskor (bármelyik görgethető tárolóban) újramérünk.
+  // Átméretezéskor és görgetéskor (bármelyik görgethető tárolóban) képkockánként egyszer mérünk újra.
   useEffect(() => {
-    window.addEventListener('resize', measure);
-    window.addEventListener('scroll', measure, { passive: true, capture: true });
+    let frame = 0;
+    const update = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(measure);
+    };
+    window.addEventListener('resize', update);
+    window.addEventListener('scroll', update, { passive: true, capture: true });
     return () => {
-      window.removeEventListener('resize', measure);
-      window.removeEventListener('scroll', measure, { capture: true });
+      cancelAnimationFrame(frame);
+      window.removeEventListener('resize', update);
+      window.removeEventListener('scroll', update, { capture: true });
     };
   }, [measure]);
 
@@ -312,16 +319,15 @@ const TourLayer: React.FC<TourLayerProps> = ({ steps, onClose }) => {
     primary.current?.focus({ preventScroll: true });
   }, [index]);
 
-  const close = (all = false, done = false) => {
+  /** `at`: ahol bezárta; a végignézett bemutatónál a lépések száma (így elválik a kihagyástól). */
+  const close = (at = index, all = false) => {
     if (state === 'closing') return;
     setState('closing');
-    // A végignézett bemutató lépésszáma a lépések száma: így elválik a kihagyástól.
-    const at = done ? steps.length : index;
     window.setTimeout(() => onClose(all, at), reduce ? 0 : 280);
   };
   const go = (next: number) => {
     if (next >= steps.length) {
-      close(false, true);
+      close(steps.length);
       return;
     }
     setIndex(Math.max(0, next));
@@ -386,24 +392,15 @@ const TourLayer: React.FC<TourLayerProps> = ({ steps, onClose }) => {
       data-state={state}
       data-moving={far ? '' : undefined}
     >
-      {lit ? (
-        <div
-          className="tour-spot"
-          style={{
-            left: lit.x,
-            top: lit.y,
-            width: lit.w,
-            height: lit.h,
-            borderRadius: lit.r,
-          }}
-        />
-      ) : (
-        <div
-          data-empty
-          className="tour-spot"
-          style={{ left: '50%', top: '50%', width: 0, height: 0 }}
-        />
-      )}
+      <div
+        className="tour-spot"
+        data-empty={lit ? undefined : ''}
+        style={
+          lit
+            ? { left: lit.x, top: lit.y, width: lit.w, height: lit.h, borderRadius: lit.r }
+            : { left: '50%', top: '50%', width: 0, height: 0 }
+        }
+      />
       <div
         aria-hidden
         className="tour-vignette"
@@ -496,7 +493,7 @@ const TourLayer: React.FC<TourLayerProps> = ({ steps, onClose }) => {
             variant="link"
             size="sm"
             className="self-start text-xs font-normal text-muted-foreground"
-            onClick={() => close(true)}
+            onClick={() => close(index, true)}
           >
             Többet ne mutass bemutatót
           </Button>

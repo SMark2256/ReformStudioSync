@@ -21,7 +21,7 @@ interface TourStoreState {
   markSeen: (account: string, tourId: string, step: number) => void;
   /** „Többet ne mutass bemutatót”. */
   markAllSeen: (account: string) => void;
-  /** A bemutató indítása; a most nem látható célpontú lépések kimaradnak. */
+  /** A bemutató indítása (ha nem fut már egy); a most nem látható célpontú lépések kimaradnak. */
   start: (tour: Tour) => void;
   stop: () => void;
 }
@@ -85,12 +85,15 @@ export const useTourStore = create<TourStoreState>()(
           send({ kind: 'all' });
         },
         start: (tour) => {
+          if (get().active) return;
           const steps = tour.steps.filter(
             (step) => !step.target || findTarget(step.target),
           );
           if (steps.length > 0) set({ active: { tourId: tour.id, steps } });
         },
-        stop: () => set({ active: null }),
+        stop: () => {
+          if (get().active) set({ active: null });
+        },
       };
     },
     {

@@ -7,25 +7,24 @@ import { useEffect, useState } from 'react';
 export const isAutomatedBrowser = (): boolean =>
   typeof navigator !== 'undefined' && navigator.webdriver === true;
 
-export const prefersReducedMotion = (): boolean =>
-  window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
 /** A bemutató buborékán kívüli nyitott párbeszédablak (modál, oldalpanel, megerősítés). */
 const OTHER_DIALOG = '[role="dialog"]:not([data-tour-bubble])';
 
 /**
- * Van-e nyitott párbeszédablak az oldalon. A Radix a body-ba portálja az ablakait, ezért elég a
- * body közvetlen gyerekeinek változását figyelni.
+ * Van-e nyitott párbeszédablak az oldalon (csak `enabled` mellett figyel). A Radix a body-ba
+ * portálja az ablakait, ezért elég a body közvetlen gyerekeinek változását figyelni.
  */
-export function useOtherDialogOpen(): boolean {
+export function useOtherDialogOpen(enabled: boolean): boolean {
   const [open, setOpen] = useState(
     () => !!document.querySelector(OTHER_DIALOG),
   );
   useEffect(() => {
+    if (!enabled) return;
     const update = () => setOpen(!!document.querySelector(OTHER_DIALOG));
+    update();
     const observer = new MutationObserver(update);
     observer.observe(document.body, { childList: true });
     return () => observer.disconnect();
-  }, []);
+  }, [enabled]);
   return open;
 }

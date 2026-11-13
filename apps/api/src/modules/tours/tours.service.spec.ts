@@ -1,14 +1,14 @@
+import { applyTourEvent, readTourState } from '@reform/shared';
 import { describe, expect, it, vi } from 'vitest';
-import { applyTourEvent, readTourState, ToursService } from './tours.service';
+import { ToursService } from './tours.service';
 
 const empty = { seen: [], closedAt: {} };
 
 function createService(tourState: unknown) {
   const row = { tourState };
   const tx = {
-    $queryRaw: vi.fn().mockResolvedValue([]),
+    $queryRaw: vi.fn(async () => [{ tour_state: row.tourState }]),
     user: {
-      findUnique: vi.fn(async () => row),
       update: vi.fn(async ({ data }: { data: { tourState: unknown } }) => {
         row.tourState = data.tourState;
         return row;
@@ -40,7 +40,7 @@ describe('ToursService — látott oldalbemutatók (TICKET-53)', () => {
   });
 
   it('a látott bemutató egyszer kerül a listába, a bezárás lépésével', async () => {
-    const { service, tx } = createService({});
+    const { service, tx, row } = createService({});
     await service.recordEvent('u1', { kind: 'seen', id: 'recepcio-pult-v1', step: 2 });
     const result = await service.recordEvent('u1', {
       kind: 'seen',
@@ -48,11 +48,17 @@ describe('ToursService — látott oldalbemutatók (TICKET-53)', () => {
       step: 8,
     });
     expect(result).toEqual({ seen: ['recepcio-pult-v1'] });
-    expect(tx.user.update).toHaveBeenLastCalledWith({
-      where: { id: 'u1' },
-      data: { tourState: { seen: ['recepcio-pult-v1'], closedAt: { 'recepcio-pult-v1': 8 } } },
+    expect(row.tourState).toEqual({
+      seen: ['recepcio-pult-v1'],
+      closedAt: { 'recepcio-pult-v1': 8 },
     });
     expect(tx.$queryRaw).toHaveBeenCalledTimes(2);
+  });
+
+  it('változatlan állapotnál nem ír', async () => {
+    const { service, tx } = createService({ seen: ['*'], closedAt: {} });
+    await expect(service.recordEvent('u1', { kind: 'all' })).resolves.toEqual({ seen: ['*'] });
+    expect(tx.user.update).not.toHaveBeenCalled();
   });
 
   it('„Többet ne mutass”: a `*` kerül a listába, ismétlés nélkül', () => {

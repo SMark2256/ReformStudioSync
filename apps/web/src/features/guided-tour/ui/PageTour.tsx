@@ -26,7 +26,8 @@ export const PageTour: React.FC = () => {
   const seen = useTourStore(
     (state) => !tour || isTourSeen(state.seenByAccount[account], tour.id),
   );
-  const dialogOpen = useOtherDialogOpen();
+  const offerPending = !!tour && !automated && loaded && !seen && !active;
+  const dialogOpen = useOtherDialogOpen(offerPending);
   // Az útvonal, amelyen a felajánlás már kivárt.
   const [settledPath, setSettledPath] = useState<string | null>(null);
 
@@ -47,14 +48,7 @@ export const PageTour: React.FC = () => {
   }, [pathname, stop]);
 
   const offer =
-    !automated &&
-    loaded &&
-    settledPath === pathname &&
-    !seen &&
-    !active &&
-    !dialogOpen
-      ? tour
-      : null;
+    offerPending && settledPath === pathname && !dialogOpen ? tour : null;
 
   return (
     <>
@@ -71,8 +65,9 @@ export const PageTour: React.FC = () => {
               key={active.tourId}
               steps={active.steps}
               onClose={(all, step) => {
+                // „Többet ne mutass”: a `*` ezt a bemutatót is lefedi, egy mentés elég.
                 if (all) markAllSeen(account);
-                markSeen(account, active.tourId, step);
+                else markSeen(account, active.tourId, step);
                 stop();
               }}
             />

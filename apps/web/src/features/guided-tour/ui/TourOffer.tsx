@@ -1,6 +1,11 @@
 import { MousePointerClick, X } from 'lucide-react';
 import React, { useId } from 'react';
-import { Button } from '@/shared/ui';
+import { cn } from '@/shared/lib/utils';
+import {
+  Button,
+  focusRingClassName,
+  modalCloseButtonClassName,
+} from '@/shared/ui';
 
 interface TourOfferProps {
   onStart: () => void;
@@ -39,7 +44,11 @@ export const TourOffer: React.FC<TourOfferProps> = ({ onStart, onDismiss }) => {
           aria-label="Bezárás"
           title="Bezárás"
           onClick={onDismiss}
-          className="-mr-1.5 -mt-1.5 inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background motion-reduce:transition-none coarse:size-11"
+          className={cn(
+            '-mr-1.5 -mt-1.5',
+            modalCloseButtonClassName,
+            focusRingClassName,
+          )}
         >
           <X aria-hidden strokeWidth={1.75} className="size-4" />
         </button>

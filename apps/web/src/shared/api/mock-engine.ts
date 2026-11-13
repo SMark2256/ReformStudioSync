@@ -69,11 +69,14 @@ import {
   resolveArrivalEntitlement,
   Role,
   ServiceCategory,
-  ALL_TOURS,
+  applyTourEvent,
+  readTourState,
   ServiceDto,
+  StoredTourState,
   stopsBilling,
   TodayDashboardDto,
   TOUR_ID_PATTERN,
+  TOUR_STEP_MAX,
   TourEventDto,
   TourStateDto,
   toGuestArrivals,
@@ -3369,31 +3372,31 @@ class MockStudioEngine {
     return this.load().devices.map((d) => normalizeDisplayDevice(d));
   }
 
-  getTourState(): TourStateDto {
-    if (typeof window === 'undefined') return { seen: [] };
+  private loadTourState(): StoredTourState {
+    if (typeof window === 'undefined') return readTourState(null);
     try {
-      const parsed: unknown = JSON.parse(localStorage.getItem(TOURS_KEY) ?? '[]');
-      return {
-        seen: Array.isArray(parsed)
-          ? parsed.filter((id): id is string => typeof id === 'string')
-          : [],
-      };
+      return readTourState(JSON.parse(localStorage.getItem(TOURS_KEY) ?? 'null'));
     } catch {
-      return { seen: [] };
+      return readTourState(null);
     }
   }
 
+  getTourState(): TourStateDto {
+    return { seen: this.loadTourState().seen };
+  }
+
   recordTourEvent(event: TourEventDto): TourStateDto {
-    if (event.kind === 'seen' && !TOUR_ID_PATTERN.test(event.id)) {
+    if (
+      event.kind === 'seen' &&
+      (!TOUR_ID_PATTERN.test(event.id) || event.step < 0 || event.step > TOUR_STEP_MAX)
+    ) {
       throw appError('COMMON.VALIDATION_FAILED');
     }
-    const { seen } = this.getTourState();
-    const id = event.kind === 'all' ? ALL_TOURS : event.kind === 'seen' ? event.id : null;
-    const next = id === null ? [] : seen.includes(id) ? seen : [...seen, id];
+    const next = applyTourEvent(this.loadTourState(), event);
     if (typeof window !== 'undefined') {
       localStorage.setItem(TOURS_KEY, JSON.stringify(next));
     }
-    return { seen: next };
+    return { seen: next.seen };
   }
 }
 

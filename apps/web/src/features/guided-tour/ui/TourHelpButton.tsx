@@ -12,7 +12,6 @@ export const TourHelpButton: React.FC = () => {
   const { pathname } = useLocation();
   const tour = findTour(pathname);
   const start = useTourStore((state) => state.start);
-  const running = useTourStore((state) => state.active !== null);
   if (!tour || isAutomatedBrowser()) return null;
   return (
     <Button
@@ -20,9 +19,7 @@ export const TourHelpButton: React.FC = () => {
       aria-label="Az oldal bemutatója"
       title="Az oldal bemutatója"
       data-tour={HELP_BUTTON_ANCHOR}
-      onClick={() => {
-        if (!running) start(tour);
-      }}
+      onClick={() => start(tour)}
     >
       <CircleHelp aria-hidden strokeWidth={1.75} />
     </Button>
