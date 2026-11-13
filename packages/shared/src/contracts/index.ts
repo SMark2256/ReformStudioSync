@@ -506,7 +506,6 @@ export interface PairDisplayResponseDto {
   device: DisplayDeviceDto;
 }
 
-
 /**
  * Oldalbemutató (TICKET-53): a bemutató azonosítója verzióval (pl. `recepcio-pult-v1`), hogy
  * jelentős oldalváltozásnál újra felajánlható legyen. A `*` („Többet ne mutass bemutatót”) mind.
