@@ -97,6 +97,21 @@ export const getJiraIssueUrl = (jiraKey: string): string =>
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    id: 'v0.3-page-tour',
+    version: '0.3',
+    date: '2026-11-13',
+    kind: 'NEW_FEATURE',
+    title: 'Oldalbemutató',
+    summary:
+      'Új oldalon a sarokban felajánljuk, hogy megmutatjuk, mi hol van. A fejléc „?” gombjával bármikor újranézheted.',
+    details: [
+      'A bemutató csak akkor indul, ha a „Mutasd” gombra kattintasz; a felajánlás bezárva vagy a bemutató végignézése után nem jön vissza, másik gépen sem.',
+      'Lépésenként kiemeljük a pult egy részét: beléptetés, vendégkereső, utolsó belépés, mai belépések, mai kassza és a QR csatorna. A nyilakkal léptethetsz, az Esc kihagyja.',
+    ],
+    jiraKey: 'TICKET-53',
+    link: { type: 'receptionTab', tab: 'desk', label: 'Recepció megnyitása' },
+  },
+  {
     id: 'v0.3-qr-channel-off-by-default',
     version: '0.3',
     date: '2026-11-12',

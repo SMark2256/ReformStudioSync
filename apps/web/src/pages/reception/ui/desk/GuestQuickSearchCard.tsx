@@ -52,7 +52,7 @@ export const GuestQuickSearchCard: React.FC<GuestQuickSearchCardProps> = ({
   onOpenDeduct,
   onOpenDigitalCard,
 }) => (
-  <Card>
+  <Card data-tour="reception.search">
     <CardHeader>
       <CardTitle>Vendégkereső</CardTitle>
       <CardActions>

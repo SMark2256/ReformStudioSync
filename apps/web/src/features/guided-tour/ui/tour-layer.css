@@ -1,0 +1,164 @@
+/*
+ * Oldalbemutató rétege (TourLayer, TICKET-53): a célpont körül reflektor, a többi elsötétül, felülről
+ * fénycsóva, körben vignetta; az animált kurzor a célponthoz siklik, és koppint. A színek a téma
+ * tokenjeiből jönnek: a sötétítés az oldalsáv (mindkét témában sötét) színe, a fény az oldalsáv
+ * szövegszíne, a reflektor kerete a kiemelő szín.
+ */
+@property --tour-cx {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 50vw;
+}
+@property --tour-cy {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 50vh;
+}
+@property --tour-r {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 30vmin;
+}
+
+/* A fény, a buborék és a kurzor ugyanazzal az ütemmel és görbével mozog: együtt érkeznek. */
+.tour-layer {
+  --tour-time: 0.7s;
+  --tour-ease: cubic-bezier(0.33, 0, 0.2, 1);
+  --tour-dim: hsl(var(--sidebar) / 0.6);
+  --tour-shade: hsl(var(--sidebar) / 0.36);
+  --tour-glow: hsl(var(--sidebar-foreground) / 0.32);
+  --tour-light: hsl(var(--sidebar-foreground) / 0.18);
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+}
+/* Sötét témában a sötét oldal mögött erősebb takarás, halványabb fény (különben szürkén világítana). */
+:root[data-theme='dark'] .tour-layer {
+  --tour-dim: hsl(var(--sidebar) / 0.76);
+  --tour-shade: hsl(var(--sidebar) / 0.5);
+  --tour-glow: hsl(var(--sidebar-foreground) / 0.14);
+  --tour-light: hsl(var(--sidebar-foreground) / 0.09);
+}
+
+.tour-spot {
+  position: fixed;
+  border-radius: var(--radius);
+  pointer-events: none;
+  box-shadow:
+    0 0 0 2px hsl(var(--primary)),
+    0 0 36px 14px var(--tour-glow),
+    0 0 0 200vmax var(--tour-dim);
+  transition-property: top, left, width, height, border-radius, opacity;
+  transition-duration: var(--tour-time);
+  transition-timing-function: var(--tour-ease);
+}
+.tour-spot[data-empty] {
+  box-shadow: 0 0 0 200vmax var(--tour-dim);
+}
+
+.tour-vignette {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    circle at var(--tour-cx) var(--tour-cy),
+    transparent 0 var(--tour-r),
+    var(--tour-shade) calc(var(--tour-r) * 2.4)
+  );
+  transition-property: --tour-cx, --tour-cy, --tour-r, opacity;
+  transition-duration: var(--tour-time);
+  transition-timing-function: var(--tour-ease);
+}
+
+.tour-cone {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  filter: blur(16px);
+  transition: opacity 0.4s;
+}
+.tour-cone > div {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, var(--tour-light), transparent);
+  transition: clip-path var(--tour-time) var(--tour-ease);
+}
+.tour-cone[data-off] {
+  opacity: 0;
+}
+
+.tour-cursor {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 72;
+  pointer-events: none;
+  filter: drop-shadow(0 2px 3px hsl(var(--sidebar) / 0.45));
+  transition: opacity 0.3s;
+}
+
+/* A koppintás hulláma a kurzor hegyénél, érkezéskor (kétszer). */
+.tour-tap {
+  position: fixed;
+  z-index: 71;
+  width: 40px;
+  height: 40px;
+  margin: -20px 0 0 -20px;
+  border: 2px solid hsl(var(--primary));
+  border-radius: 9999px;
+  pointer-events: none;
+  opacity: 0;
+  animation: tour-tap 0.7s var(--tour-ease) 2;
+}
+@keyframes tour-tap {
+  from {
+    opacity: 0.9;
+    transform: scale(0.3);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.5);
+  }
+}
+
+/* A buborék a fénnyel együtt költözik; hosszú úton elhalványul, és érkezéskor jelenik meg újra. */
+.tour-bubble {
+  position: fixed;
+  z-index: 72;
+  transition-property: top, left, opacity, translate;
+  transition-duration: var(--tour-time), var(--tour-time), 0.25s, 0.25s;
+  transition-timing-function: var(--tour-ease);
+}
+.tour-layer[data-moving] .tour-bubble {
+  opacity: 0;
+  translate: 0 6px;
+}
+.tour-layer[data-state='opening'] :is(.tour-spot, .tour-vignette, .tour-cone, .tour-bubble),
+.tour-layer[data-state='closing']
+  :is(.tour-spot, .tour-vignette, .tour-cone, .tour-bubble, .tour-cursor) {
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .tour-step-in {
+    animation: tour-step-in 0.35s var(--tour-ease) backwards;
+  }
+}
+@keyframes tour-step-in {
+  from {
+    opacity: 0;
+    translate: 0 4px;
+  }
+}
+
+/* Csökkentett mozgásnál nincs repülés, áttűnés és hullám: minden a helyén jelenik meg. */
+@media (prefers-reduced-motion: reduce) {
+  .tour-layer,
+  .tour-layer * {
+    transition: none !important;
+    animation: none !important;
+  }
+  .tour-tap {
+    display: none;
+  }
+}

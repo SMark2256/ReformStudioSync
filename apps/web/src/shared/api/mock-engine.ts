@@ -69,9 +69,13 @@ import {
   resolveArrivalEntitlement,
   Role,
   ServiceCategory,
+  ALL_TOURS,
   ServiceDto,
   stopsBilling,
   TodayDashboardDto,
+  TOUR_ID_PATTERN,
+  TourEventDto,
+  TourStateDto,
   toGuestArrivals,
   VisitDto,
   VisitType,
@@ -82,6 +86,8 @@ import { broadcastToLocalMonitors } from '@/shared/lib/monitor-channel';
 // v4: havi tagdíj-pótlás (TICKET-13) és naplóból számolt alkalom (TICKET-16); a régi tárolt állapot nem konzisztens vele.
 const STORAGE_KEY = 'reform-studio-mock-sandbox-v4';
 const MONITOR_CONFIG_KEY = 'reform-studio-monitor-greeting-seconds';
+/** A látott oldalbemutatók (`GET/POST /tours` párja); a demó adatbázis visszaállítása nem törli. */
+const TOURS_KEY = 'reform-studio-mock-tours';
 
 export interface MockDatabaseState {
   services: ServiceDto[];
@@ -3361,6 +3367,33 @@ class MockStudioEngine {
 
   getDisplayDevices(): DisplayDeviceDto[] {
     return this.load().devices.map((d) => normalizeDisplayDevice(d));
+  }
+
+  getTourState(): TourStateDto {
+    if (typeof window === 'undefined') return { seen: [] };
+    try {
+      const parsed: unknown = JSON.parse(localStorage.getItem(TOURS_KEY) ?? '[]');
+      return {
+        seen: Array.isArray(parsed)
+          ? parsed.filter((id): id is string => typeof id === 'string')
+          : [],
+      };
+    } catch {
+      return { seen: [] };
+    }
+  }
+
+  recordTourEvent(event: TourEventDto): TourStateDto {
+    if (event.kind === 'seen' && !TOUR_ID_PATTERN.test(event.id)) {
+      throw appError('COMMON.VALIDATION_FAILED');
+    }
+    const { seen } = this.getTourState();
+    const id = event.kind === 'all' ? ALL_TOURS : event.kind === 'seen' ? event.id : null;
+    const next = id === null ? [] : seen.includes(id) ? seen : [...seen, id];
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(TOURS_KEY, JSON.stringify(next));
+    }
+    return { seen: next };
   }
 }
 

@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
+import { PageTour } from '@/features/guided-tour';
 import { useIsMobile } from '@/shared/lib/hooks';
 import { useThemeStore } from '@/shared/theme';
 import { PageContainer, SkipLink } from '@/shared/ui';
@@ -143,6 +144,8 @@ export const AppShell: React.FC<AppShellProps> = ({
           </HeaderStatusTargetContext.Provider>
         </div>
       </div>
+      {/* Oldalbemutató: felajánlás a még nem látott oldalon, és a futó bemutató rétege. */}
+      <PageTour />
     </div>
   );
 };

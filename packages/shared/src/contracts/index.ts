@@ -506,3 +506,26 @@ export interface PairDisplayResponseDto {
   device: DisplayDeviceDto;
 }
 
+
+/**
+ * Oldalbemutató (TICKET-53): a bemutató azonosítója verzióval (pl. `recepcio-pult-v1`), hogy
+ * jelentős oldalváltozásnál újra felajánlható legyen. A `*` („Többet ne mutass bemutatót”) mind.
+ */
+export const TOUR_ID_PATTERN = /^[a-z0-9*][a-z0-9:.-]{0,79}$/;
+export const ALL_TOURS = '*';
+/** A lépés, amelynél a bemutatót bezárták (a végignézettnél a lépések száma). */
+export const TOUR_STEP_MAX = 50;
+
+/** `GET /tours`: a bejelentkezett fiók látott bemutatói. */
+export interface TourStateDto {
+  seen: string[];
+}
+
+/**
+ * `POST /tours`: `seen` = bezárta (végignézte, kihagyta vagy a felajánlást elvetette); `all` =
+ * „Többet ne mutass bemutatót”; `reset` = minden bemutató újra felajánlható.
+ */
+export type TourEventDto =
+  | { kind: 'seen'; id: string; step: number }
+  | { kind: 'all' }
+  | { kind: 'reset' };

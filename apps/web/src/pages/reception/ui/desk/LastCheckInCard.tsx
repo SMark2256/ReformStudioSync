@@ -55,7 +55,7 @@ export const LastCheckInCard: React.FC<LastCheckInCardProps> = ({
   const greeting = lastCheckIn && greetingForCheckIn(lastCheckIn);
 
   return (
-    <Card>
+    <Card data-tour="reception.last-check-in">
       <CardHeader>
         <CardTitle>Utoljára azonosított vendég</CardTitle>
         {lastCheckIn && (
