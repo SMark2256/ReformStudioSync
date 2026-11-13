@@ -1,5 +1,6 @@
 import { Check, Moon, Sun } from 'lucide-react';
 import React from 'react';
+import { TourRestart } from '@/features/guided-tour';
 import {
   SURFACE_COLORS,
   THEME_LABELS,
@@ -156,6 +157,20 @@ export const SettingsPage: React.FC = () => {
                 Link gomb
               </Button>
             </div>
+          </SettingRow>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>Súgó</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <SettingRow
+            id="settings-tours"
+            title="Oldalbemutatók"
+            description="A már látott vagy elvetett bemutatók újra felajánlása"
+          >
+            <TourRestart />
           </SettingRow>
         </CardContent>
       </Card>

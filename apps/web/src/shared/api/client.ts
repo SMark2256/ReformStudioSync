@@ -37,6 +37,8 @@ import {
   ServiceDto,
   TodayDashboardDto,
   toAppError,
+  TourEventDto,
+  TourStateDto,
   VisitType,
 } from '@reform/shared';
 import { broadcastToLocalMonitors } from '@/shared/lib/monitor-channel';
@@ -689,5 +691,17 @@ export const api = {
       return res;
     });
   },
-};
 
+  /** A bejelentkezett fiók látott oldalbemutatói (TICKET-53). */
+  getTourState(): Promise<TourStateDto> {
+    return request('/tours', {}, () => mockStudioEngine.getTourState());
+  },
+
+  recordTourEvent(event: TourEventDto): Promise<TourStateDto> {
+    return request(
+      '/tours',
+      { method: 'POST', body: JSON.stringify(event), keepalive: true },
+      () => mockStudioEngine.recordTourEvent(event),
+    );
+  },
+};

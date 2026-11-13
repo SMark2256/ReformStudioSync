@@ -88,6 +88,7 @@ export const ReceptionHeaderStatus: React.FC<ReceptionHeaderStatusProps> = ({
       <div className="flex items-center gap-2 max-xl:hidden">
         <Button
           size="sm"
+          data-tour="reception.scanner-channel"
           aria-pressed={status.isListening}
           title={status.scannerTitle}
           onClick={status.toggleScanner}
@@ -122,6 +123,7 @@ export const ReceptionHeaderStatus: React.FC<ReceptionHeaderStatusProps> = ({
           <DropdownMenuTrigger asChild>
             <Button
               size="sm"
+              data-tour="reception.scanner-channel"
               className="gap-1.5 px-2.5"
               aria-label={`Kapcsolatok: QR csatorna ${status.isListening ? 'aktív' : 'szünetel'}, ${status.connectionLabel}, hangjelzés ${status.soundEnabled ? 'be' : 'ki'}`}
             >

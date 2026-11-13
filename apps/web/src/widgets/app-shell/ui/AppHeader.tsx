@@ -1,5 +1,6 @@
 import { Menu, Moon, Sun } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
+import { TourHelpButton } from '@/features/guided-tour';
 import { saveTheme, useThemeStore } from '@/shared/theme';
 import {
   Breadcrumb,
@@ -60,7 +61,7 @@ interface AppHeaderProps {
 }
 
 // Fejléc (UI-specifikáció 4.3): mobilon menü gomb, morzsamenü, az oldal állapotjelzői, dátum
-// (mobilon rejtve), téma gomb.
+// (mobilon rejtve), az oldal bemutatója („?”, ahol van), téma gomb.
 // A háttere a lebegő oldalsáv alatt a teljes szélességen fut, a tartalma a kártya mellett indul.
 export const AppHeader: React.FC<AppHeaderProps> = ({
   title,
@@ -72,7 +73,10 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   const now = useCurrentMinute();
 
   return (
-    <header className="sticky top-0 z-10 h-14 shrink-0 border-b border-border bg-card pl-[var(--sidebar-offset)] transition-[padding] duration-200 ease-in-out motion-reduce:transition-none">
+    <header
+      data-tour-bar
+      className="sticky top-0 z-10 h-14 shrink-0 border-b border-border bg-card pl-[var(--sidebar-offset)] transition-[padding] duration-200 ease-in-out motion-reduce:transition-none"
+    >
       <div className="mx-auto flex h-full max-w-content items-center gap-3 px-4 md:px-8">
         <Button
           variant="secondary"
@@ -103,6 +107,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
           >
             {formatHeaderDate(now)}
           </time>
+          <TourHelpButton />
           <Button
             variant="secondary"
             size="icon"

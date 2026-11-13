@@ -8,6 +8,7 @@ import { GuestsModule } from './modules/guests/guests.module';
 import { HealthModule } from './modules/health/health.module';
 import { MonitorModule } from './modules/monitor/monitor.module';
 import { PassesModule } from './modules/passes/passes.module';
+import { ToursModule } from './modules/tours/tours.module';
 import { PrismaModule } from './prisma/prisma.module';
 
 @Module({
@@ -24,6 +25,7 @@ import { PrismaModule } from './prisma/prisma.module';
     FinanceModule,
     MonitorModule,
     CheckInsModule,
+    ToursModule,
   ],
 })
 export class AppModule {}

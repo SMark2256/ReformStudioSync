@@ -76,6 +76,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
     <div
       ref={cardRef}
       id={SIDEBAR_ID}
+      data-tour-bar
       data-state={isVisuallyExpanded ? 'expanded' : 'collapsed'}
       className={cn(
         'fixed bottom-[var(--sidebar-inset)] left-[var(--sidebar-inset)] top-[var(--sidebar-inset)] z-20 overflow-hidden rounded-[14px] bg-sidebar text-sidebar-foreground ring-1 ring-sidebar-border',

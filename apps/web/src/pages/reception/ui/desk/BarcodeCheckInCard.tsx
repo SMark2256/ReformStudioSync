@@ -66,7 +66,7 @@ export const BarcodeCheckInCard: React.FC<BarcodeCheckInCardProps> = ({
   const testCardsTitleId = useId();
 
   return (
-    <Card>
+    <Card data-tour="reception.scan">
       <CardHeader>
         <CardTitle>Vonalkódos beléptetés</CardTitle>
         <CardActions className="justify-end md:w-auto">

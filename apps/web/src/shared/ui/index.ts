@@ -27,6 +27,8 @@ export {
 } from './breadcrumb';
 export { Button } from './button';
 export { buttonVariants } from './button-variants';
+export { focusRingClassName } from './focus-styles';
+export { modalCloseButtonClassName } from './modal-styles';
 export type { ButtonProps } from './button';
 export {
   Card,

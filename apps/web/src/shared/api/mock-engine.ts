@@ -1,5 +1,6 @@
 import {
   appError,
+  applyTourEvent,
   ARRIVAL_DENIED_MESSAGES,
   AuditLogDto,
   computeRemainingPasses,
@@ -66,12 +67,18 @@ import {
   PaymentMethod,
   pickCircuitMembershipService,
   RecordPaymentRequestDto,
+  readTourState,
   resolveArrivalEntitlement,
   Role,
   ServiceCategory,
   ServiceDto,
+  StoredTourState,
   stopsBilling,
   TodayDashboardDto,
+  TOUR_ID_PATTERN,
+  TOUR_STEP_MAX,
+  TourEventDto,
+  TourStateDto,
   toGuestArrivals,
   VisitDto,
   VisitType,
@@ -82,6 +89,8 @@ import { broadcastToLocalMonitors } from '@/shared/lib/monitor-channel';
 // v4: havi tagdíj-pótlás (TICKET-13) és naplóból számolt alkalom (TICKET-16); a régi tárolt állapot nem konzisztens vele.
 const STORAGE_KEY = 'reform-studio-mock-sandbox-v4';
 const MONITOR_CONFIG_KEY = 'reform-studio-monitor-greeting-seconds';
+/** A látott oldalbemutatók (`GET/POST /tours` párja); a demó adatbázis visszaállítása nem törli. */
+const TOURS_KEY = 'reform-studio-mock-tours';
 
 export interface MockDatabaseState {
   services: ServiceDto[];
@@ -3361,6 +3370,33 @@ class MockStudioEngine {
 
   getDisplayDevices(): DisplayDeviceDto[] {
     return this.load().devices.map((d) => normalizeDisplayDevice(d));
+  }
+
+  private loadTourState(): StoredTourState {
+    if (typeof window === 'undefined') return readTourState(null);
+    try {
+      return readTourState(JSON.parse(localStorage.getItem(TOURS_KEY) ?? 'null'));
+    } catch {
+      return readTourState(null);
+    }
+  }
+
+  getTourState(): TourStateDto {
+    return { seen: this.loadTourState().seen };
+  }
+
+  recordTourEvent(event: TourEventDto): TourStateDto {
+    if (
+      event.kind === 'seen' &&
+      (!TOUR_ID_PATTERN.test(event.id) || event.step < 0 || event.step > TOUR_STEP_MAX)
+    ) {
+      throw appError('COMMON.VALIDATION_FAILED');
+    }
+    const next = applyTourEvent(this.loadTourState(), event);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(TOURS_KEY, JSON.stringify(next));
+    }
+    return { seen: next.seen };
   }
 }
 

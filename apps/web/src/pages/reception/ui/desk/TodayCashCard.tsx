@@ -20,7 +20,7 @@ export const TodayCashCard: React.FC<TodayCashCardProps> = ({
   finance,
   onOpenFinance,
 }) => (
-  <Card>
+  <Card data-tour="reception.today-cash">
     <CardHeader>
       <CardTitle>Mai kassza</CardTitle>
       <CardActions className="md:w-auto">

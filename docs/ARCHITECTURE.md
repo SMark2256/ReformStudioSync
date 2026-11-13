@@ -20,7 +20,7 @@ Az `apps/web/src` könyvtár rétegei felülről lefelé. Egy réteg csak az ala
 | `app/` | — | Belépési pont (`index.tsx`), QueryClient + Toaster providerek, router (`App.tsx`), globális stílusok |
 | `pages/` | `login`, `reception`, `monitor`, `monitors`, `settings`, `tablet-document`, `demo-sandbox` | Útvonalanként egy oldal |
 | `widgets/` | `guest-profile`, `version-changelog` | Önálló, összetett UI blokkok |
-| `features/` | `scanner-channel`, `sell-pass`, `deduct-treatment`, `record-payment`, `toggle-theme` | Felhasználói műveletek |
+| `features/` | `scanner-channel`, `sell-pass`, `deduct-treatment`, `record-payment`, `toggle-theme`, `guided-tour` | Felhasználói műveletek (`guided-tour`: oldalbemutató — felajánlás, reflektoros réteg, fejléc „?” gomb; a célpontok `data-tour` horgonyok az oldalakon) |
 | `entities/` | `guest`, `check-in`, `display-device`, `release-note` | Üzleti entitások UI-ja és állapota (offline puffer, szkenner csatorna store, kijelzőlista lekérdezése, Újdonságok adatai) |
 | `shared/` | `api`, `auth`, `config`, `theme`, `lib/*` | REST kliens + mock motor, session store, útvonalak és a futó verzió (`config`), téma store, notify/sound/szkenner/monitor csatorna segédek |
 
@@ -97,3 +97,5 @@ Interaktív Swagger/OpenAPI felület elérhető: `GET /api/docs`
 | **Check-Ins** | `POST /api/check-ins/sync-offline` | Offline puffer idempotens kötegelt szinkronizálása | JWT |
 | **Finance** | `GET /api/finance/daily-summary` | Napi kasszazárás és bevételi bontás fizetési mód szerint | JWT |
 | **Finance** | `POST /api/finance/payments/:id/cancel` | Téves bérleteladás és fizetés sztornózása | JWT |
+| **Tours** | `GET /api/tours` | A fiók látott oldalbemutatói (`users.tour_state`) | JWT |
+| **Tours** | `POST /api/tours` | Bemutató bezárva (`seen`), „Többet ne mutass” (`all`), újraindítás (`reset`) | JWT |

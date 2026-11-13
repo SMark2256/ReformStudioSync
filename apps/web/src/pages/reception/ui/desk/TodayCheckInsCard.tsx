@@ -20,7 +20,7 @@ export const TodayCheckInsCard: React.FC<TodayCheckInsCardProps> = ({
   checkIns,
   onRevoke,
 }) => (
-  <Card>
+  <Card data-tour="reception.today-check-ins">
     <CardHeader>
       <CardTitle>Mai érkezések és kezelések ({checkIns.length})</CardTitle>
     </CardHeader>
