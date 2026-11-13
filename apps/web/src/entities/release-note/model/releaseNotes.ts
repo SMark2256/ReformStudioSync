@@ -107,6 +107,7 @@ export const RELEASE_NOTES: ReleaseNote[] = [
     details: [
       'A bemutató csak akkor indul, ha a „Mutasd” gombra kattintasz; a felajánlás bezárva vagy a bemutató végignézése után nem jön vissza, másik gépen sem.',
       'Lépésenként kiemeljük a pult egy részét: beléptetés, vendégkereső, utolsó belépés, mai belépések, mai kassza és a QR csatorna. A nyilakkal léptethetsz, az Esc kihagyja.',
+      'A Beállítások → Súgó alatt a „Bemutatók újraindítása” gombbal minden bemutatót újra felajánlunk.',
     ],
     jiraKey: 'TICKET-53',
     link: { type: 'receptionTab', tab: 'desk', label: 'Recepció megnyitása' },

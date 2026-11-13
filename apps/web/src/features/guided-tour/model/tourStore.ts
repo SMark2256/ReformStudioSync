@@ -21,6 +21,8 @@ interface TourStoreState {
   markSeen: (account: string, tourId: string, step: number) => void;
   /** „Többet ne mutass bemutatót”. */
   markAllSeen: (account: string) => void;
+  /** Minden bemutató újra felajánlható (Beállítások). */
+  reset: (account: string) => void;
   /** A bemutató indítása (ha nem fut már egy); a most nem látható célpontú lépések kimaradnak. */
   start: (tour: Tour) => void;
   stop: () => void;
@@ -83,6 +85,13 @@ export const useTourStore = create<TourStoreState>()(
         markAllSeen: (account) => {
           add(account, ALL_TOURS);
           send({ kind: 'all' });
+        },
+        reset: (account) => {
+          sessionSeen.delete(account);
+          set((state) => ({
+            seenByAccount: { ...state.seenByAccount, [account]: [] },
+          }));
+          send({ kind: 'reset' });
         },
         start: (tour) => {
           if (get().active) return;
