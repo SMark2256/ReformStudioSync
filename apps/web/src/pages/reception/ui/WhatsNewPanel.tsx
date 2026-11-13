@@ -90,6 +90,7 @@ export const WhatsNewPanel: React.FC<WhatsNewPanelProps> = ({
         <ToggleGroup
           type="single"
           aria-label="Szűrés típus szerint"
+          data-tour="news.filter"
           value={filter}
           // A kijelölt elemre kattintva a csoport kiürülne: az a választás marad.
           onValueChange={(next) => {
@@ -138,14 +139,16 @@ export const WhatsNewPanel: React.FC<WhatsNewPanelProps> = ({
                 const expanded = expandedIds.has(note.id);
                 return (
                   <li key={note.id} className="min-w-0">
-                    <Card className="flex h-full flex-col">
+                    <Card data-tour="news.note" className="flex h-full flex-col">
                       <CardContent className="flex flex-1 flex-col gap-2">
                         <div className="flex flex-wrap items-center gap-2">
                           <Badge variant="secondary" dot={false}>
                             {RELEASE_NOTE_KIND_LABELS[note.kind]}
                           </Badge>
                           {unseenOnOpen.has(note.id) && (
-                            <Badge variant="success">Új</Badge>
+                            <Badge variant="success" data-tour="news.new">
+                              Új
+                            </Badge>
                           )}
                           {note.jiraKey && (
                             <Button
@@ -158,6 +161,7 @@ export const WhatsNewPanel: React.FC<WhatsNewPanelProps> = ({
                                 href={getJiraIssueUrl(note.jiraKey)}
                                 target="_blank"
                                 rel="noreferrer"
+                                data-tour="news.jira"
                                 aria-label={`${note.jiraKey} Jira-jegy megnyitása új lapon`}
                               >
                                 {note.jiraKey}

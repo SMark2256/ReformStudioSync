@@ -209,7 +209,11 @@ export const FinanceTab: React.FC<FinanceTabProps> = ({
         title="Pénzügy"
         description="Napi kassza, befizetések és a lejárt havi tagdíjak késési kategóriák szerint."
         actions={
-          <Button variant="primary" onClick={() => onRecordPayment()}>
+          <Button
+            variant="primary"
+            data-tour="finance.record-payment"
+            onClick={() => onRecordPayment()}
+          >
             <Plus aria-hidden strokeWidth={1.75} />
             Befizetés rögzítése
           </Button>
@@ -217,7 +221,10 @@ export const FinanceTab: React.FC<FinanceTabProps> = ({
       />
 
       <div className="space-y-4 md:space-y-6">
-        <section aria-labelledby="finance-summary-title">
+        <section
+          aria-labelledby="finance-summary-title"
+          data-tour="finance.summary"
+        >
           <h2 id="finance-summary-title" className="sr-only">
             Napi kassza
           </h2>
@@ -242,7 +249,7 @@ export const FinanceTab: React.FC<FinanceTabProps> = ({
           </div>
         </section>
 
-        <Card>
+        <Card data-tour="finance.overdue">
           <CardHeader>
             <CardTitle>Lejárt tagdíjak</CardTitle>
             <CardDescription>késési kategóriák szerint</CardDescription>
@@ -267,7 +274,7 @@ export const FinanceTab: React.FC<FinanceTabProps> = ({
           </CardContent>
         </Card>
 
-        <Card>
+        <Card data-tour="finance.payments">
           <CardHeader>
             <CardTitle>Mai tranzakciók</CardTitle>
           </CardHeader>

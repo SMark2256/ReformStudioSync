@@ -289,7 +289,11 @@ export const GuestsTab: React.FC<GuestsTabProps> = ({
         title="Vendégek"
         description={`${search ? '' : `${guests.length} regisztrált vendég. `}Egy sorra kattintva megnyílik a vendég adatlapja.`}
         actions={
-          <Button variant="primary" onClick={onNewGuest}>
+          <Button
+            variant="primary"
+            data-tour="guests.new"
+            onClick={onNewGuest}
+          >
             <Plus aria-hidden strokeWidth={1.75} />
             Új vendég
           </Button>
@@ -313,6 +317,7 @@ export const GuestsTab: React.FC<GuestsTabProps> = ({
             <ToggleGroup
               type="single"
               aria-label="Szűrés bérletállapot szerint"
+              data-tour="guests.filter"
               value={filter}
               onValueChange={(value) => {
                 if (value) setFilter(value as GuestPassFilter);
@@ -330,13 +335,14 @@ export const GuestsTab: React.FC<GuestsTabProps> = ({
             </Label>
             <SearchInput
               id={SEARCH_ID}
+              data-tour="guests.search"
               value={search}
               onChange={(e) => onSearchChange(e.target.value)}
               placeholder="Név, kártyaszám, telefon vagy e-mail"
             />
           </CardActions>
         </CardHeader>
-        <CardContent className="p-0 md:p-0">
+        <CardContent data-tour="guests.list" className="p-0 md:p-0">
           {isError ? (
             <div className="space-y-3 p-4 md:p-5">
               <Alert variant="destructive">

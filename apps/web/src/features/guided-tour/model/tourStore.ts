@@ -23,7 +23,10 @@ interface TourStoreState {
   markAllSeen: (account: string) => void;
   /** Minden bemutató újra felajánlható (Beállítások). */
   reset: (account: string) => void;
-  /** A bemutató indítása (ha nem fut már egy); a most nem látható célpontú lépések kimaradnak. */
+  /**
+   * A bemutató indítása (ha nem fut már egy); a most nem látható célpontú lépések kimaradnak. Ha
+   * egyik sem látszik (pl. egy lépéses újdonság-reflektor), a lépések középen jelennek meg.
+   */
   start: (tour: Tour) => void;
   stop: () => void;
 }
@@ -95,9 +98,13 @@ export const useTourStore = create<TourStoreState>()(
         },
         start: (tour) => {
           if (get().active) return;
-          const steps = tour.steps.filter(
+          const visible = tour.steps.filter(
             (step) => !step.target || findTarget(step.target),
           );
+          const steps =
+            visible.length > 0
+              ? visible
+              : tour.steps.map((step) => ({ ...step, target: undefined }));
           if (steps.length > 0) set({ active: { tourId: tour.id, steps } });
         },
         stop: () => {

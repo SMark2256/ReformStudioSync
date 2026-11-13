@@ -8,13 +8,21 @@ import {
 } from '@/shared/ui';
 
 interface TourOfferProps {
+  title: string;
+  text: string;
   onStart: () => void;
   onDismiss: () => void;
 }
 
 // A bemutató felajánlása a még nem látott oldalon: kis, nem modális kártya a jobb alsó sarokban
-// (mobilon alul, a fő művelet a lap tetején marad szabadon). Csak rákattintva indul a bemutató.
-export const TourOffer: React.FC<TourOfferProps> = ({ onStart, onDismiss }) => {
+// (mobilon alul, a fő művelet a lap tetején marad szabadon). Csak rákattintva indul a bemutató. Az
+// oldal friss újdonságát (reflektor) ugyanez a kártya ajánlja fel, más címmel.
+export const TourOffer: React.FC<TourOfferProps> = ({
+  title,
+  text,
+  onStart,
+  onDismiss,
+}) => {
   const titleId = useId();
   return (
     <aside
@@ -30,10 +38,10 @@ export const TourOffer: React.FC<TourOfferProps> = ({ onStart, onDismiss }) => {
         </span>
         <div className="min-w-0 flex-1">
           <p id={titleId} className="text-sm font-semibold text-foreground">
-            Új itt?
+            {title}
           </p>
           <p className="mt-0.5 text-[13px] leading-snug text-muted-foreground">
-            Megmutatom, mi hol van ezen az oldalon (1 perc).
+            {text}
           </p>
           <Button variant="primary" size="sm" className="mt-3" onClick={onStart}>
             Mutasd

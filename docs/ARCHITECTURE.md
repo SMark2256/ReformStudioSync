@@ -20,7 +20,7 @@ Az `apps/web/src` könyvtár rétegei felülről lefelé. Egy réteg csak az ala
 | `app/` | — | Belépési pont (`index.tsx`), QueryClient + Toaster providerek, router (`App.tsx`), globális stílusok |
 | `pages/` | `login`, `reception`, `monitor`, `monitors`, `settings`, `tablet-document`, `demo-sandbox` | Útvonalanként egy oldal |
 | `widgets/` | `guest-profile`, `version-changelog` | Önálló, összetett UI blokkok |
-| `features/` | `scanner-channel`, `sell-pass`, `deduct-treatment`, `record-payment`, `toggle-theme`, `guided-tour` | Felhasználói műveletek (`guided-tour`: oldalbemutató — felajánlás, reflektoros réteg, fejléc „?” gomb; a célpontok `data-tour` horgonyok az oldalakon) |
+| `features/` | `scanner-channel`, `sell-pass`, `deduct-treatment`, `record-payment`, `toggle-theme`, `guided-tour` | Felhasználói műveletek (`guided-tour`: oldalbemutató — felajánlás, reflektoros réteg, fejléc „?” gomb; forgatókönyv minden alkalmazásoldalon, kivéve a Demót és a Monitorokat (`config/tours.ts`); a célpontok `data-tour` horgonyok az oldalakon, a kötelezőket az `e2e/tour-targets.spec.ts` ellenőrzi; újdonság-reflektor: a `ReleaseNote.spotlight` 45 napig egy lépéses bemutatóként felajánlva, látott-állapota `spotlight:<bejegyzés id>`) |
 | `entities/` | `guest`, `check-in`, `display-device`, `release-note` | Üzleti entitások UI-ja és állapota (offline puffer, szkenner csatorna store, kijelzőlista lekérdezése, Újdonságok adatai) |
 | `shared/` | `api`, `auth`, `config`, `theme`, `lib/*` | REST kliens + mock motor, session store, útvonalak és a futó verzió (`config`), téma store, notify/sound/szkenner/monitor csatorna segédek |
 

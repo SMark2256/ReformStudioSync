@@ -16,6 +16,17 @@ export type ReleaseNoteLink =
   | { type: 'receptionTab'; tab: ReceptionMainTab; label: string }
   | { type: 'route'; path: string; label: string };
 
+/**
+ * Újdonság-reflektor (TICKET-54): a bejegyzés dátumától 45 napig a `path` oldalon egyszer
+ * felajánljuk, hogy egy lépésben megmutatjuk az újdonságot. `target`: a célelem `data-tour`
+ * horgonya (a `[data-tour]` nélkül), `text`: a buborék szövege.
+ */
+export interface ReleaseNoteSpotlight {
+  path: string;
+  target: string;
+  text: string;
+}
+
 interface ReleaseNoteBase {
   /** Stabil, egyedi azonosító — az olvasottság-jelölés erre épül, utólag ne módosítsd. */
   id: string;
@@ -27,6 +38,7 @@ interface ReleaseNoteBase {
   details?: string[];
   /** Jira jegy kulcs (pl. `KAN-12`). `null` csak a Jira bevezetése előtti tételeknél. */
   jiraKey: string | null;
+  spotlight?: ReleaseNoteSpotlight;
 }
 
 interface LinkableReleaseNote extends ReleaseNoteBase {
@@ -96,6 +108,16 @@ export const getJiraIssueUrl = (jiraKey: string): string =>
   `${JIRA_BASE_URL}/browse/${encodeURIComponent(jiraKey)}`;
 
 export const RELEASE_NOTES: ReleaseNote[] = [
+  {
+    id: 'v0.3-tours-everywhere',
+    version: '0.3',
+    date: '2026-11-13',
+    kind: 'IMPROVEMENT',
+    title: 'Bemutató minden oldalon',
+    summary:
+      'Vendégek, Bérletek, Pénzügy, Újdonságok és Beállítások: itt is megmutatjuk, mi hol van, és az újdonságokat is ott, ahol vannak.',
+    jiraKey: 'TICKET-54',
+  },
   {
     id: 'v0.3-page-tour',
     version: '0.3',
