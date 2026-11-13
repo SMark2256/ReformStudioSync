@@ -13,6 +13,7 @@ export type {
   ReleaseNoteFilter,
   ReleaseNoteKind,
   ReleaseNoteLink,
+  ReleaseNoteSpotlight,
 } from './model/releaseNotes';
 export {
   formatReleaseNoteDate,

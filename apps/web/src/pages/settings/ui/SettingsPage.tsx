@@ -30,6 +30,8 @@ const THEME_OPTIONS: { value: ReceptionTheme; icon: typeof Sun }[] = [
 
 interface SettingRowProps {
   id: string;
+  /** Az oldalbemutató horgonya (`data-tour`). */
+  tour: string;
   title: string;
   description: string;
   children: React.ReactNode;
@@ -38,11 +40,15 @@ interface SettingRowProps {
 // Beállítássor (UI-specifikáció 6.9): 220 px leírás + vezérlő; mobilon egymás alatt.
 const SettingRow: React.FC<SettingRowProps> = ({
   id,
+  tour,
   title,
   description,
   children,
 }) => (
-  <div className="grid gap-x-6 gap-y-2.5 py-4 first:pt-0 last:pb-0 md:grid-cols-[220px_minmax(0,1fr)]">
+  <div
+    data-tour={tour}
+    className="grid gap-x-6 gap-y-2.5 py-4 first:pt-0 last:pb-0 md:grid-cols-[220px_minmax(0,1fr)]"
+  >
     <div>
       <h3 id={id} className="text-[13px] font-semibold text-foreground">
         {title}
@@ -72,6 +78,7 @@ export const SettingsPage: React.FC = () => {
         <CardContent className="divide-y divide-border">
           <SettingRow
             id="settings-theme"
+            tour="settings.theme"
             title="Téma"
             description="Világos vagy sötét felület"
           >
@@ -97,6 +104,7 @@ export const SettingsPage: React.FC = () => {
 
           <SettingRow
             id="settings-surface"
+            tour="settings.surface"
             title="Felületszín"
             description="Elsődleges gombok, aktív menüpont, jelölők"
           >
@@ -138,6 +146,7 @@ export const SettingsPage: React.FC = () => {
 
           <SettingRow
             id="settings-buttons"
+            tour="settings.buttons"
             title="Gombstílusok"
             description="A felület három gombtípusa"
           >
@@ -167,6 +176,7 @@ export const SettingsPage: React.FC = () => {
         <CardContent>
           <SettingRow
             id="settings-tours"
+            tour="settings.tours"
             title="Oldalbemutatók"
             description="A már látott vagy elvetett bemutatók újra felajánlása"
           >

@@ -115,11 +115,15 @@ const PassTemplatesCard: React.FC<{
   const [dialogOpen, setDialogOpen] = useState(false);
 
   return (
-    <Card>
+    <Card data-tour="passes.templates">
       <CardHeader>
         <CardTitle>Bérletsablonok</CardTitle>
         <CardActions>
-          <Button variant="secondary" onClick={() => setDialogOpen(true)}>
+          <Button
+            variant="secondary"
+            data-tour="passes.new-template"
+            onClick={() => setDialogOpen(true)}
+          >
             <Plus aria-hidden strokeWidth={1.75} />
             Új bérletsablon
           </Button>
@@ -150,7 +154,7 @@ const ServicesCard: React.FC<{
   const [dialogOpen, setDialogOpen] = useState(false);
 
   return (
-    <Card>
+    <Card data-tour="passes.services">
       <CardHeader>
         <CardTitle>Szolgáltatások és kezelések</CardTitle>
         <CardDescription>törzsadatok</CardDescription>
