@@ -2,6 +2,7 @@ import {
   CheckInStatus,
   GUEST_ARRIVALS_LIMIT,
   MEMBERSHIP_ARRIVAL_PASS_NAME,
+  Role,
   VisitType,
 } from '@reform/shared';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -216,5 +217,92 @@ describe('GuestsService — belépések a vendégadatlapon (TICKET-40)', () => {
 
     expect(guest.arrivals?.map((a) => a.id)).toEqual(['chk-ok']);
     expect(guest.arrivals?.[0].staffName).toBe('Recepciós Munkatárs');
+  });
+});
+
+describe('GuestsService — mérés törlése (TICKET-8)', () => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let prismaMock: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let txMock: any;
+  let service: GuestsService;
+
+  const admin = { id: 'admin-1', studioId: STUDIO, email: 'admin@x.hu', name: 'Admin', role: Role.ADMIN };
+  const recorder = { id: staff.id, studioId: STUDIO, email: 'reka@x.hu', name: staff.name, role: Role.RECEPTIONIST };
+  const otherStaff = { id: 'staff-2', studioId: STUDIO, email: 'anna@x.hu', name: 'Nagy Anna', role: Role.RECEPTIONIST };
+  const measurement = {
+    id: 'ms-1',
+    guestId: 'guest-1',
+    recordedById: staff.id,
+    measuredAt: new Date('2026-11-10T09:00:00.000Z'),
+  };
+
+  beforeEach(() => {
+    txMock = {
+      measurement: { delete: vi.fn().mockResolvedValue(measurement) },
+      auditLog: { create: vi.fn().mockResolvedValue({}) },
+    };
+    prismaMock = {
+      measurement: { findFirst: vi.fn().mockResolvedValue(measurement) },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      $transaction: vi.fn((cb: (tx: any) => unknown) => cb(txMock)),
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    service = new GuestsService(prismaMock as any, {} as any);
+  });
+
+  it('a rögzítő munkatárs törölheti, a törlés naplózódik', async () => {
+    const res = await service.deleteMeasurement('guest-1', 'ms-1', recorder);
+
+    expect(res).toEqual({ deletedId: 'ms-1' });
+    expect(prismaMock.measurement.findFirst).toHaveBeenCalledWith({
+      where: { id: 'ms-1', guestId: 'guest-1', guest: { studioId: STUDIO } },
+    });
+    expect(txMock.measurement.delete).toHaveBeenCalledWith({ where: { id: 'ms-1' } });
+    expect(txMock.auditLog.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        studioId: STUDIO,
+        userId: recorder.id,
+        action: 'MEASUREMENT_DELETED',
+        entityType: 'Measurement',
+        entityId: 'ms-1',
+      }),
+    });
+  });
+
+  it('adminisztrátor más által rögzített mérést is törölhet', async () => {
+    await expect(service.deleteMeasurement('guest-1', 'ms-1', admin)).resolves.toEqual({
+      deletedId: 'ms-1',
+    });
+    expect(txMock.measurement.delete).toHaveBeenCalledTimes(1);
+  });
+
+  it('más munkatárs nem törölheti: 403, és semmi nem törlődik', async () => {
+    await expect(service.deleteMeasurement('guest-1', 'ms-1', otherStaff)).rejects.toMatchObject({
+      code: 'GUEST.MEASUREMENT_DELETE_FORBIDDEN',
+      status: 403,
+    });
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('ismeretlen rögzítőjű mérést csak adminisztrátor törölhet', async () => {
+    prismaMock.measurement.findFirst.mockResolvedValue({ ...measurement, recordedById: null });
+
+    await expect(service.deleteMeasurement('guest-1', 'ms-1', recorder)).rejects.toMatchObject({
+      code: 'GUEST.MEASUREMENT_DELETE_FORBIDDEN',
+    });
+    await expect(service.deleteMeasurement('guest-1', 'ms-1', admin)).resolves.toEqual({
+      deletedId: 'ms-1',
+    });
+  });
+
+  it('nem létező vagy más vendéghez tartozó mérés: 404', async () => {
+    prismaMock.measurement.findFirst.mockResolvedValue(null);
+
+    await expect(service.deleteMeasurement('guest-2', 'ms-1', admin)).rejects.toMatchObject({
+      code: 'GUEST.MEASUREMENT_NOT_FOUND',
+      status: 404,
+    });
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
   });
 });

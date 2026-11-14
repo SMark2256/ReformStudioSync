@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import {
   appError,
+  AuthUserDto,
+  canDeleteMeasurement,
   computeRemainingPasses,
   countActiveDeductions,
   DEFAULT_STUDIO_ID,
@@ -309,8 +311,40 @@ export class GuestsService {
       armCm: created.armCm,
       chestCm: created.chestCm,
       note: created.note,
+      recordedById: created.recordedById,
       recordedByName: created.recordedBy?.name ?? 'Recepció',
     };
+  }
+
+  /** Hibásan rögzített mérés törlése (TICKET-8): admin vagy a rögzítő munkatárs, naplózva. */
+  async deleteMeasurement(
+    guestId: string,
+    measurementId: string,
+    user: AuthUserDto,
+  ): Promise<{ deletedId: string }> {
+    const measurement = await this.prisma.measurement.findFirst({
+      where: { id: measurementId, guestId, guest: { studioId: user.studioId } },
+    });
+    if (!measurement) throw appError('GUEST.MEASUREMENT_NOT_FOUND');
+    if (!canDeleteMeasurement(user, measurement)) {
+      throw appError('GUEST.MEASUREMENT_DELETE_FORBIDDEN');
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.measurement.delete({ where: { id: measurement.id } });
+      await tx.auditLog.create({
+        data: {
+          studioId: user.studioId,
+          userId: user.id,
+          action: 'MEASUREMENT_DELETED',
+          entityType: 'Measurement',
+          entityId: measurement.id,
+          details: `Mérés törölve (${measurement.measuredAt.toISOString().slice(0, 10)}, vendég: ${guestId})`,
+        },
+      });
+    });
+
+    return { deletedId: measurement.id };
   }
 
   async addPhoto(
@@ -706,6 +740,7 @@ export class GuestsService {
           armCm: ms.armCm,
           chestCm: ms.chestCm,
           note: ms.note,
+          recordedById: ms.recordedById ?? null,
           recordedByName: ms.recordedBy?.name ?? 'Recepciós Munkatárs',
         }),
       ),

@@ -3,6 +3,8 @@ import {
   applyTourEvent,
   ARRIVAL_DENIED_MESSAGES,
   AuditLogDto,
+  AuthUserDto,
+  canDeleteMeasurement,
   computeRemainingPasses,
   countActiveDeductions,
   getPassStatus,
@@ -544,6 +546,7 @@ export function createInitialMockDatabase(): MockDatabaseState {
           armCm: 27,
           chestCm: 89,
           note: '3. Hypoxi kezelés utáni kontroll (-2.1 kg, -3 cm derék)',
+          recordedById: null,
           recordedByName: 'Recepciós Munkatárs',
         },
         {
@@ -560,6 +563,7 @@ export function createInitialMockDatabase(): MockDatabaseState {
           armCm: 28,
           chestCm: 90,
           note: 'Kezdő állapotfelmérés a kúra indulásakor',
+          recordedById: null,
           recordedByName: 'Recepciós Munkatárs',
         },
       ],
@@ -2938,6 +2942,7 @@ class MockStudioEngine {
   addMeasurement(
     guestId: string,
     input: Partial<MeasurementDto>,
+    recordedBy?: Pick<AuthUserDto, 'id' | 'name'> | null,
   ): MeasurementDto {
     const state = this.load();
     const guest = state.guests.find((g) => g.id === guestId);
@@ -2957,12 +2962,34 @@ class MockStudioEngine {
       armCm: input.armCm ?? null,
       chestCm: input.chestCm ?? null,
       note: input.note?.trim() || null,
-      recordedByName: 'Recepciós Munkatárs',
+      recordedById: recordedBy?.id ?? null,
+      recordedByName: recordedBy?.name ?? 'Recepciós Munkatárs',
     };
 
     guest.measurements = [created, ...(guest.measurements ?? [])];
     this.save(state);
     return created;
+  }
+
+  // Ugyanaz a szabály, mint az API-ban: admin vagy a rögzítő munkatárs (TICKET-8).
+  deleteMeasurement(
+    guestId: string,
+    measurementId: string,
+    user: Pick<AuthUserDto, 'id' | 'role'> | null,
+  ): { deletedId: string } {
+    const state = this.load();
+    const guest = state.guests.find((g) => g.id === guestId);
+    const measurement = guest?.measurements?.find((m) => m.id === measurementId);
+    if (!guest || !measurement) throw appError('GUEST.MEASUREMENT_NOT_FOUND');
+    if (!canDeleteMeasurement(user, measurement)) {
+      throw appError('GUEST.MEASUREMENT_DELETE_FORBIDDEN');
+    }
+
+    guest.measurements = (guest.measurements ?? []).filter(
+      (m) => m.id !== measurementId,
+    );
+    this.save(state);
+    return { deletedId: measurementId };
   }
 
   addPhoto(

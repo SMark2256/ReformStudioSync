@@ -1,4 +1,5 @@
 import {
+  canDeleteMeasurement,
   DocumentStatus,
   DocumentType,
   Gender,
@@ -22,6 +23,7 @@ import {
   RotateCcw,
   Snowflake,
   Sun,
+  Trash2,
   Upload,
 } from 'lucide-react';
 import React, { useEffect, useId, useRef, useState } from 'react';
@@ -32,6 +34,7 @@ import {
   PASS_STATUS_BADGE,
 } from '@/entities/guest';
 import { api } from '@/shared/api';
+import { useAuthStore } from '@/shared/auth';
 import { formatBytes, optimizeImageFile } from '@/shared/lib/image';
 import { handleAppError } from '@/shared/lib/errors';
 import { notify } from '@/shared/lib/notify';
@@ -56,6 +59,7 @@ import {
   CardActions,
   CardHeader,
   CardTitle,
+  ConfirmActionButton,
   Input,
   Label,
   ResponsiveTable,
@@ -298,6 +302,7 @@ export const GuestModal: React.FC<GuestModalProps> = ({
   const location = useLocation();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<GuestSheetTab>('overview');
+  const currentUser = useAuthStore((s) => s.user);
 
   // Basic Info State
   const [lastName, setLastName] = useState('');
@@ -515,6 +520,42 @@ export const GuestModal: React.FC<GuestModalProps> = ({
     notify.success('Mérési eredmények rögzítve.');
     onRefreshAll?.();
   };
+
+  const handleDeleteMeasurement = async (measurementId: string) => {
+    if (!guest) return;
+    try {
+      await api.deleteMeasurement(guest.id, measurementId);
+    } catch (err) {
+      handleAppError(err, { title: 'A mérés nem törlődött' });
+      return;
+    }
+    notify.success('Mérés törölve.');
+    onRefreshAll?.();
+  };
+
+  // A törlés gomb csak annál látszik, aki törölheti: admin vagy a rögzítő (TICKET-8).
+  const measurementColumns: ResponsiveTableColumn<GuestMeasurement>[] = [
+    ...MEASUREMENT_COLUMNS,
+    {
+      key: 'action',
+      header: 'Művelet',
+      srOnlyHeader: true,
+      align: 'right',
+      cell: (m) =>
+        canDeleteMeasurement(currentUser, m) ? (
+          <ConfirmActionButton
+            size="sm"
+            aria-label={`${formatDate(m.measuredAt)} mérés törlése`}
+            confirmLabel="Mérés törlése"
+            description={`A(z) ${formatDate(m.measuredAt)} napon rögzített mérés véglegesen törlődik a vendég adatlapjáról.`}
+            onConfirm={() => handleDeleteMeasurement(m.id)}
+          >
+            <Trash2 aria-hidden strokeWidth={1.75} />
+            Törlés
+          </ConfirmActionButton>
+        ) : null,
+    },
+  ];
 
   const handlePhotoFileChange = async (
     e: React.ChangeEvent<HTMLInputElement>,
@@ -1467,7 +1508,7 @@ export const GuestModal: React.FC<GuestModalProps> = ({
             <div className="overflow-hidden rounded-md border border-border">
               <ResponsiveTable
                 caption="Mérési eredmények"
-                columns={MEASUREMENT_COLUMNS}
+                columns={measurementColumns}
                 rows={guest.measurements ?? []}
                 getRowId={(m) => m.id}
                 emptyText="Még nincs rögzített mérés."
