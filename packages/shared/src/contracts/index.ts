@@ -220,6 +220,8 @@ export interface MeasurementDto {
   armCm: number | null;
   chestCm: number | null;
   note: string | null;
+  /** A rögzítő munkatárs; `null`, ha ismeretlen vagy a fiókja már nem létezik. */
+  recordedById: string | null;
   recordedByName: string;
 }
 

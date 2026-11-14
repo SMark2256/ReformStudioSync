@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -88,6 +89,19 @@ export class GuestsController {
     @CurrentUser() user: AuthUserDto,
   ) {
     return this.guestsService.addMeasurement(id, dto, user.id);
+  }
+
+  @Delete('guests/:id/measurements/:measurementId')
+  @ApiOperation({
+    summary:
+      'Hibásan rögzített mérés törlése; adminisztrátor vagy a rögzítő munkatárs (TICKET-8)',
+  })
+  deleteMeasurement(
+    @Param('id') id: string,
+    @Param('measurementId') measurementId: string,
+    @CurrentUser() user: AuthUserDto,
+  ) {
+    return this.guestsService.deleteMeasurement(id, measurementId, user);
   }
 
   @Post('guests/:id/photos')

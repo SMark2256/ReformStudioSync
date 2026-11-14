@@ -48,6 +48,8 @@ export const APP_ERROR_CATALOG = {
   'GUEST.BARCODE_TAKEN': { status: 409, message: 'A megadott vonalkód már egy másik vendéghez tartozik.', action: 'notify' },
   'GUEST.PHOTO_TOO_LARGE': { status: 400, message: 'A feltöltött kép mérete meghaladja a megengedett optimalizált határt (750 KB). Kérjük, használd az automatikus WebP tömörítést!', action: 'notify' },
   'GUEST.DOCUMENT_NOT_FOUND': { status: 404, message: 'A dokumentum nem található.', action: 'notify' },
+  'GUEST.MEASUREMENT_NOT_FOUND': { status: 404, message: 'A mérés nem található.', action: 'notify' },
+  'GUEST.MEASUREMENT_DELETE_FORBIDDEN': { status: 403, message: 'A mérést csak adminisztrátor vagy a rögzítő munkatárs törölheti.', action: 'notify' },
 
   // Bérletek
   'PASS.TEMPLATE_NOT_FOUND': { status: 404, message: 'A bérletsablon nem található.', action: 'notify' },

@@ -487,7 +487,28 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(data),
       },
-      () => mockStudioEngine.addMeasurement(guestId, data),
+      () =>
+        mockStudioEngine.addMeasurement(
+          guestId,
+          data,
+          useAuthStore.getState().user,
+        ),
+    );
+  },
+
+  deleteMeasurement(
+    guestId: string,
+    measurementId: string,
+  ): Promise<{ deletedId: string }> {
+    return request(
+      `/guests/${guestId}/measurements/${measurementId}`,
+      { method: 'DELETE' },
+      () =>
+        mockStudioEngine.deleteMeasurement(
+          guestId,
+          measurementId,
+          useAuthStore.getState().user,
+        ),
     );
   },
 

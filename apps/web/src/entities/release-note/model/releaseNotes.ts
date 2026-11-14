@@ -109,6 +109,16 @@ export const getJiraIssueUrl = (jiraKey: string): string =>
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    id: 'v0.3-measurement-delete',
+    version: '0.3',
+    date: '2026-11-14',
+    kind: 'IMPROVEMENT',
+    title: 'Hibás mérés törlése',
+    summary:
+      'A vendégadatlap Mérések fülén a hibásan rögzített mérés megerősítés után törölhető. Adminisztrátor bármelyiket, munkatárs a saját maga által rögzítettet törölheti.',
+    jiraKey: 'TICKET-8',
+  },
+  {
     id: 'v0.3-guest-photo-lightbox',
     version: '0.3',
     date: '2026-11-14',
