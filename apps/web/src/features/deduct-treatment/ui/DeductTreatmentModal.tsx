@@ -394,6 +394,7 @@ export const DeductTreatmentModal: React.FC<DeductTreatmentModalProps> = ({
               </Label>
               <Input
                 id={`${fieldId}-note`}
+                data-barcode-ignore
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
                 placeholder="Pl. Hypoxi L250 gép, 30 perc"

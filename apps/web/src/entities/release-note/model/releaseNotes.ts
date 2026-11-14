@@ -109,6 +109,19 @@ export const getJiraIssueUrl = (jiraKey: string): string =>
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    id: 'v0.3-scanner-typing-fix',
+    version: '0.3',
+    date: '2026-11-14',
+    kind: 'FIX',
+    title: 'Gyors gépelés a QR-olvasó mellett',
+    summary:
+      'Szövegmezőben a gyors gépelés már nem akad be, és nem indít téves beolvasást. A QR-kódot fókuszált mezőből is beolvassuk, a kód nem marad a mezőben.',
+    details: [
+      'A név, e-mail és megjegyzés mezőkben a QR-olvasó nem avatkozik be, ide bármi beírható.',
+    ],
+    jiraKey: 'TICKET-5',
+  },
+  {
     id: 'v0.3-tours-everywhere',
     version: '0.3',
     date: '2026-11-13',

@@ -1,4 +1,13 @@
 import { useEffect, useRef } from 'react';
+import {
+  type FieldSnapshot,
+  isBarcodeIgnored,
+  isEditableElement,
+  isMachineKeySequence,
+  MACHINE_SEQUENCE_DEFAULTS,
+  restoreFieldSnapshot,
+  takeFieldSnapshot,
+} from './scanSequence';
 
 export interface UseBarcodeScannerOptions {
   onScan: (barcode: string, rawInput?: string) => void;
@@ -13,6 +22,11 @@ export interface UseBarcodeScannerOptions {
    * Automatikus burst-lezárási idő (ms), ha a 2D QR-olvasó nem küld Enter/Tab karaktert a végén.
    */
   autoCommitTimeoutMs?: number;
+  /**
+   * Szövegmezőben a gépi sorozat leütései közötti átlagos idő felső határa (ms).
+   * Ennél lassabb bevitel kézi gépelésnek számít, és érintetlenül a mezőben marad.
+   */
+  editableMaxAvgIntervalMs?: number;
 }
 
 /**
@@ -140,9 +154,13 @@ export function normalizeScannedCode(raw: string): string {
  * Globális fizikai 2D QR-kód és vonalkódolvasó (USB/Bluetooth HID) hook.
  * - Folyamatosan figyel minden oldalon (Capture fázisban).
  * - Támogatja a rövid és a nagyon hosszú, összetett számsorokat is.
- * - Input Stealth Guard: ha a kurzor egy keresőmezőben vagy űrlapban áll (kivéve a dedikált
- *   `data-barcode-input="true"` mezőt), megakadályozza, hogy a gépi QR-beolvasás beleíródjon
- *   a szövegmezőbe vagy véletlenül elküldje az űrlapot.
+ * - Fókusz nélkül (nem szerkeszthető elemen) a gyors sorozat 2. karakterétől elnyeli a leütéseket.
+ * - Szövegmezőben (input, textarea, contenteditable) menet közben semmit nem nyel el, így a
+ *   gyors kézi gépelés hibátlan marad (TICKET-5). Csak az egyértelműen gépi sorozatot
+ *   (≥ 6 karakter, átlag < `editableMaxAvgIntervalMs`) kezeli utólag beolvasásként, és
+ *   visszaállítja a mező beolvasás előtti értékét.
+ * - Kivétel: a dedikált `data-barcode-input="true"` mező (saját űrlapküldés), valamint a
+ *   `data-barcode-ignore` attribútumú mezők, ahol a figyelő semmit nem csinál.
  */
 export function useBarcodeScanner({
   onScan,
@@ -150,22 +168,28 @@ export function useBarcodeScanner({
   maxIntervalMs = 80,
   minLength = 4,
   autoCommitTimeoutMs = 110,
+  editableMaxAvgIntervalMs = MACHINE_SEQUENCE_DEFAULTS.maxAvgIntervalMs,
 }: UseBarcodeScannerOptions) {
   const bufferRef = useRef<string>('');
   const rawBufferRef = useRef<string>('');
+  const keyTimesRef = useRef<number[]>([]);
   const lastKeyTimeRef = useRef<number>(0);
   const firstKeyTimeRef = useRef<number>(0);
   const autoCommitTimerRef = useRef<number | null>(null);
-  const inputSnapshotRef = useRef<{
-    element: HTMLInputElement | HTMLTextAreaElement | null;
-    valueBeforeBurst: string;
-  }>({ element: null, valueBeforeBurst: '' });
+  /** A sorozatot indító szerkeszthető mező állapota; `null`, ha a sorozat fókusz nélkül indult. */
+  const fieldSnapshotRef = useRef<FieldSnapshot | null>(null);
 
   const onScanRef = useRef(onScan);
   onScanRef.current = onScan;
 
   useEffect(() => {
     if (!enabled) return;
+
+    const editableSequenceOptions = {
+      minLength: Math.max(minLength, MACHINE_SEQUENCE_DEFAULTS.minLength),
+      maxAvgIntervalMs: editableMaxAvgIntervalMs,
+      maxGapMs: maxIntervalMs,
+    };
 
     const clearAutoCommit = () => {
       if (autoCommitTimerRef.current !== null) {
@@ -174,84 +198,83 @@ export function useBarcodeScanner({
       }
     };
 
-    const restoreFocusedInputIfPolluted = () => {
-      const snap = inputSnapshotRef.current;
-      if (!snap.element) return;
-      const el = snap.element;
-      if (el.getAttribute('data-barcode-input') === 'true') return;
-
-      // Visszaállítjuk az input mező eredeti értékét, ha a szkenner első 1-2 karaktere belecsúszott
-      if (el.value !== snap.valueBeforeBurst) {
-        const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
-          window.HTMLInputElement.prototype,
-          'value',
-        )?.set;
-        if (nativeInputValueSetter && el instanceof HTMLInputElement) {
-          nativeInputValueSetter.call(el, snap.valueBeforeBurst);
-          el.dispatchEvent(new Event('input', { bubbles: true }));
-        } else {
-          el.value = snap.valueBeforeBurst;
-        }
-      }
-      inputSnapshotRef.current = { element: null, valueBeforeBurst: '' };
+    const resetBurst = () => {
+      clearAutoCommit();
+      bufferRef.current = '';
+      rawBufferRef.current = '';
+      keyTimesRef.current = [];
+      fieldSnapshotRef.current = null;
     };
 
     const commitScan = () => {
-      clearAutoCommit();
       const raw = rawBufferRef.current;
       const candidate = bufferRef.current;
-      bufferRef.current = '';
-      rawBufferRef.current = '';
+      const snapshot = fieldSnapshotRef.current;
+      resetBurst();
+
+      // Gépi sorozat volt: a mezőbe került karaktereket akkor is kivesszük, ha a kód érvénytelen.
+      if (snapshot) restoreFieldSnapshot(snapshot);
 
       const normalized = normalizeScannedCode(candidate);
       if (normalized.length >= minLength) {
-        restoreFocusedInputIfPolluted();
         onScanRef.current(normalized, raw);
       }
     };
 
+    const isMachineBurst = () =>
+      fieldSnapshotRef.current
+        ? isMachineKeySequence(keyTimesRef.current, editableSequenceOptions)
+        : bufferRef.current.length > 1 &&
+          (lastKeyTimeRef.current - firstKeyTimeRef.current) /
+            (bufferRef.current.length - 1) <=
+            maxIntervalMs * 0.85;
+
     const handleKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
-      const isDedicatedBarcodeInput =
-        target?.getAttribute?.('data-barcode-input') === 'true';
 
-      // Ha a dedikált manuális vonalkód inputban gépel/szkennel, hagyjuk a saját form submitját működni,
-      // kivéve ha nem fókuszált, vagy ha globálisan kezeljük
-      if (isDedicatedBarcodeInput) {
+      // A dedikált manuális vonalkód inputban a saját form submit működik.
+      if (target?.getAttribute?.('data-barcode-input') === 'true') {
         return;
       }
 
-      const isTextInput =
-        target instanceof HTMLInputElement ||
-        target instanceof HTMLTextAreaElement ||
-        Boolean(target?.isContentEditable);
+      // Mezőszintű kikapcsolás (név, e-mail, megjegyzés): a figyelő semmit nem csinál.
+      if (isBarcodeIgnored(target)) {
+        resetBurst();
+        return;
+      }
 
+      const editableTarget = isEditableElement(target) ? target : null;
       const now = performance.now();
       const elapsed = now - lastKeyTimeRef.current;
 
       // Lezáró karakterek: Enter vagy Tab (2D QR olvasóknál gyakori a Tab vagy CR/LF)
       if (e.key === 'Enter' || e.key === 'Tab') {
-        const totalDuration = now - firstKeyTimeRef.current;
-        const avgInterval =
-          bufferRef.current.length > 1
-            ? totalDuration / (bufferRef.current.length - 1)
-            : elapsed;
+        let isScan: boolean;
+        if (fieldSnapshotRef.current) {
+          isScan =
+            fieldSnapshotRef.current.element === editableTarget &&
+            elapsed <= maxIntervalMs &&
+            isMachineKeySequence(keyTimesRef.current, editableSequenceOptions);
+        } else {
+          const totalDuration = now - firstKeyTimeRef.current;
+          const avgInterval =
+            bufferRef.current.length > 1
+              ? totalDuration / (bufferRef.current.length - 1)
+              : elapsed;
+          isScan =
+            bufferRef.current.length >= minLength &&
+            elapsed <= maxIntervalMs * 3.5 &&
+            avgInterval <= maxIntervalMs;
+        }
 
-        if (
-          bufferRef.current.length >= minLength &&
-          elapsed <= maxIntervalMs * 3.5 &&
-          avgInterval <= maxIntervalMs
-        ) {
+        if (isScan) {
           e.preventDefault();
           e.stopPropagation();
           commitScan();
           return;
         }
 
-        clearAutoCommit();
-        bufferRef.current = '';
-        rawBufferRef.current = '';
-        inputSnapshotRef.current = { element: null, valueBeforeBurst: '' };
+        resetBurst();
         return;
       }
 
@@ -267,64 +290,64 @@ export function useBarcodeScanner({
       }
 
       const resolvedChar = resolveScannerChar(e);
-      if (resolvedChar !== null) {
-        if (elapsed > maxIntervalMs || bufferRef.current.length === 0) {
-          bufferRef.current = resolvedChar;
-          rawBufferRef.current = e.key;
-          firstKeyTimeRef.current = now;
+      if (resolvedChar === null) {
+        // Szövegmezőben a Backspace, a nyilak stb. a mezőt módosítják: a pillanatkép érvénytelen.
+        if (editableTarget) resetBurst();
+        return;
+      }
 
-          if (
-            target instanceof HTMLInputElement ||
-            target instanceof HTMLTextAreaElement
-          ) {
-            inputSnapshotRef.current = {
-              element: target,
-              valueBeforeBurst: target.value,
-            };
+      const startsNewBurst =
+        elapsed > maxIntervalMs ||
+        bufferRef.current.length === 0 ||
+        (fieldSnapshotRef.current?.element ?? null) !== editableTarget;
+
+      if (startsNewBurst) {
+        bufferRef.current = resolvedChar;
+        rawBufferRef.current = e.key;
+        keyTimesRef.current = [now];
+        firstKeyTimeRef.current = now;
+        fieldSnapshotRef.current = editableTarget
+          ? takeFieldSnapshot(editableTarget)
+          : null;
+      } else {
+        bufferRef.current += resolvedChar;
+        rawBufferRef.current += e.key;
+        keyTimesRef.current.push(now);
+
+        // Fókusz nélkül a 2. gyors karaktertől elnyeljük a leütést. Szövegmezőben nem: ott csak
+        // utólag, egyértelműen gépi sorozatnál avatkozunk be (a kézi gépelés védelme).
+        if (!editableTarget && bufferRef.current.length >= 2) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+      }
+
+      lastKeyTimeRef.current = now;
+
+      // Ha a 2D QR-olvasó nem küld Enter-t a végén, de egy gyors gépi sorozat (legalább 6 karakter) befejeződött:
+      clearAutoCommit();
+      if (bufferRef.current.length >= Math.max(minLength, 6)) {
+        autoCommitTimerRef.current = window.setTimeout(() => {
+          autoCommitTimerRef.current = null;
+          if (isMachineBurst()) {
+            commitScan();
           } else {
-            inputSnapshotRef.current = { element: null, valueBeforeBurst: '' };
+            resetBurst();
           }
-        } else {
-          bufferRef.current += resolvedChar;
-          rawBufferRef.current += e.key;
-
-          // Ha már legalább 2 gyors gépi karakter érkezett, blokkoljuk a beírást bármilyen fókuszált mezőbe is!
-          if (bufferRef.current.length >= 2) {
-            e.preventDefault();
-            e.stopPropagation();
-            if (isTextInput) {
-              restoreFocusedInputIfPolluted();
-            }
-          }
-        }
-
-        lastKeyTimeRef.current = now;
-
-        // Ha a 2D QR-olvasó nem küld Enter-t a végén, de egy gyors gépi sorozat (legalább 6 karakter) befejeződött:
-        clearAutoCommit();
-        if (bufferRef.current.length >= Math.max(minLength, 6)) {
-          autoCommitTimerRef.current = window.setTimeout(() => {
-            const burstDuration =
-              lastKeyTimeRef.current - firstKeyTimeRef.current;
-            const avg =
-              bufferRef.current.length > 1
-                ? burstDuration / (bufferRef.current.length - 1)
-                : 999;
-            if (avg <= maxIntervalMs * 0.85) {
-              commitScan();
-            } else {
-              bufferRef.current = '';
-              rawBufferRef.current = '';
-            }
-          }, autoCommitTimeoutMs);
-        }
+        }, autoCommitTimeoutMs);
       }
     };
 
     window.addEventListener('keydown', handleKeyDown, { capture: true });
     return () => {
-      clearAutoCommit();
+      resetBurst();
       window.removeEventListener('keydown', handleKeyDown, { capture: true });
     };
-  }, [enabled, maxIntervalMs, minLength, autoCommitTimeoutMs]);
+  }, [
+    enabled,
+    maxIntervalMs,
+    minLength,
+    autoCommitTimeoutMs,
+    editableMaxAvgIntervalMs,
+  ]);
 }
