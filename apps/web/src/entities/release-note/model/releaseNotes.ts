@@ -109,6 +109,20 @@ export const getJiraIssueUrl = (jiraKey: string): string =>
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    id: 'v0.3-guest-photo-lightbox',
+    version: '0.3',
+    date: '2026-11-14',
+    kind: 'IMPROVEMENT',
+    title: 'Vendégfotók nagyban',
+    summary:
+      'A vendég adatlapján a Fényképek fülön a képre kattintva a teljes fotó nagyban, levágás nélkül nyílik meg, a kezelés nevével, a megjegyzéssel, a dátummal és a mérettel.',
+    details: [
+      'Több fotó között az „Előző” és „Következő” gombbal vagy a bal és jobb nyíllal lehet lapozni.',
+      'Bezárás: X gomb, Esc vagy kattintás a kép mellé.',
+    ],
+    jiraKey: 'TICKET-52',
+  },
+  {
     id: 'v0.3-sell-pass-guest-picker',
     version: '0.3',
     date: '2026-11-14',
