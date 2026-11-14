@@ -109,6 +109,20 @@ export const getJiraIssueUrl = (jiraKey: string): string =>
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    id: 'v0.3-fix-demo-sandbox-new-guests',
+    version: '0.3',
+    date: '2026-11-14',
+    kind: 'FIX',
+    title: 'Új vendég a demó szimulátorban',
+    summary:
+      'A demó beléptető szimulátora és a Tesztvendégek lista újratöltés nélkül mutatja az újonnan felvett vendégeket.',
+    details: [
+      'A szimulátorban vendégválasztóval bármely vendég beolvasható, az imént felvett is.',
+      'A recepción vagy más böngészőfülön felvett vendég is azonnal megjelenik.',
+    ],
+    jiraKey: 'TICKET-3',
+  },
+  {
     id: 'v0.3-measurement-delete',
     version: '0.3',
     date: '2026-11-14',

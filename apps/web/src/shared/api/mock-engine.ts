@@ -1251,6 +1251,47 @@ function normalizeDisplayDevice(d: Partial<DisplayDeviceDto> & { id: string; nam
 }
 
 class MockStudioEngine {
+  /** Változás-értesítés (TICKET-3): a feliratkozók és a változásszámláló (`useSyncExternalStore` pillanatképe). */
+  private listeners = new Set<() => void>();
+  private version = 0;
+  private notifyScheduled = false;
+
+  private readonly handleStorage = (event: StorageEvent) => {
+    // Más böngészőfül írta át a demó adatbázist (vagy törölte a teljes localStorage-et).
+    if (event.key === STORAGE_KEY || event.key === null) this.emitChange();
+  };
+
+  /** Feliratkozás a demó adatbázis változására (ez a fül és a többi fül); a visszatérési érték leiratkozik. */
+  subscribe(listener: () => void): () => void {
+    this.listeners.add(listener);
+    if (this.listeners.size === 1 && typeof window !== 'undefined') {
+      window.addEventListener('storage', this.handleStorage);
+    }
+    return () => {
+      this.listeners.delete(listener);
+      if (this.listeners.size === 0 && typeof window !== 'undefined') {
+        window.removeEventListener('storage', this.handleStorage);
+      }
+    };
+  }
+
+  /** Minden változáskor nő; `useSyncExternalStore` pillanatképnek. */
+  getVersion(): number {
+    return this.version;
+  }
+
+  // Mikrotaszkban értesít: render közbeni olvasás (pl. tagdíj-pótlás mentése) ne frissítsen renderelés közben,
+  // és az egy művelet alatti több mentés egy értesítés legyen.
+  private emitChange() {
+    if (this.notifyScheduled) return;
+    this.notifyScheduled = true;
+    queueMicrotask(() => {
+      this.notifyScheduled = false;
+      this.version += 1;
+      for (const listener of [...this.listeners]) listener();
+    });
+  }
+
   private load(): MockDatabaseState {
     if (typeof window === 'undefined') return createInitialMockDatabase();
     try {
@@ -1321,7 +1362,11 @@ class MockStudioEngine {
       g.payments = state.payments.filter((p) => p.guestId === g.id);
       syncGuestArrivals(state, g);
     }
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    const raw = JSON.stringify(state);
+    // Csak tényleges változásnál értesít, így a render közbeni olvasás nem okoz végtelen frissítést.
+    if (localStorage.getItem(STORAGE_KEY) === raw) return;
+    localStorage.setItem(STORAGE_KEY, raw);
+    this.emitChange();
   }
 
   getMonitorGreetingSeconds(): number {
