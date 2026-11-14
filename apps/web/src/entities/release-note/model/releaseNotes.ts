@@ -109,6 +109,20 @@ export const getJiraIssueUrl = (jiraKey: string): string =>
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    id: 'v0.3-sell-pass-guest-picker',
+    version: '0.3',
+    date: '2026-11-14',
+    kind: 'FIX',
+    title: 'Vendégválasztó a bérleteladásban',
+    summary:
+      'Az „Új bérlet” ablakban név, vonalkód vagy telefonszám alapján kiválaszthatod a vendéget; a gyorsgomb már nem választ helyetted, eladni csak kiválasztott vendégnek lehet.',
+    details: [
+      'Vendégprofilból, a vendéglistából vagy a beléptetés után nyitva a vendég előre ki van választva, de módosítható.',
+      'Ugyanez a kereshető választó van az alkalomlevonás és a befizetés ablakában is.',
+    ],
+    jiraKey: 'TICKET-4',
+  },
+  {
     id: 'v0.3-scanner-typing-fix',
     version: '0.3',
     date: '2026-11-14',

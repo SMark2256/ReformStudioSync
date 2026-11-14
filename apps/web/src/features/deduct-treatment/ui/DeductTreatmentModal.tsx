@@ -8,6 +8,7 @@ import {
   womenOnlyAccess,
 } from '@reform/shared';
 import React, { useEffect, useId, useState } from 'react';
+import { GuestPicker } from '@/entities/guest';
 import {
   Alert,
   AlertDescription,
@@ -23,12 +24,6 @@ import {
   DialogTitle,
   Input,
   Label,
-  SearchInput,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
 } from '@/shared/ui';
 
 // Választható elem (kezelés, bérlet): `secondary` gomb, a kijelölt `aria-pressed`, halvány
@@ -75,7 +70,6 @@ export const DeductTreatmentModal: React.FC<DeductTreatmentModalProps> = ({
   onOpenSellPass,
 }) => {
   const fieldId = useId();
-  const [guestSearch, setGuestSearch] = useState('');
   const [selectedGuestId, setSelectedGuestId] = useState<string>('');
   const [selectedServiceId, setSelectedServiceId] = useState<string>('');
   const [selectedPassId, setSelectedPassId] = useState<string>('');
@@ -88,7 +82,6 @@ export const DeductTreatmentModal: React.FC<DeductTreatmentModalProps> = ({
     if (!isOpen) return;
     const g = initialGuest ?? guests[0] ?? null;
     setSelectedGuestId(g?.id ?? '');
-    setGuestSearch('');
     setNote('');
     setShowErrors(false);
 
@@ -143,15 +136,6 @@ export const DeductTreatmentModal: React.FC<DeductTreatmentModalProps> = ({
       isWomenOnly(selectedService?.id) || isWomenOnly(selectedPass?.serviceId),
     ) === 'GENDER_MISSING';
 
-  const filteredGuests = guests.filter((g) => {
-    const q = guestSearch.trim().toLowerCase();
-    if (!q) return true;
-    return (
-      `${g.lastName} ${g.firstName}`.toLowerCase().includes(q) ||
-      g.barcode.toLowerCase().includes(q)
-    );
-  });
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     // A gomb nem tiltott: hiányzó adatnál a mezők alatt jelenik meg, mi hiányzik.
@@ -198,48 +182,20 @@ export const DeductTreatmentModal: React.FC<DeductTreatmentModalProps> = ({
             )}
 
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor={`${fieldId}-guest`}>Vendég</Label>
-              {!initialGuest && (
-                <>
-                  <Label htmlFor={`${fieldId}-search`} className="sr-only">
-                    Vendég keresése
-                  </Label>
-                  <SearchInput
-                    id={`${fieldId}-search`}
-                    value={guestSearch}
-                    onChange={(e) => setGuestSearch(e.target.value)}
-                    placeholder="Név vagy vonalkód"
-                    className="md:w-full xl:w-full"
-                  />
-                </>
-              )}
-              <Select
+              <GuestPicker
+                guests={guests}
                 value={selectedGuestId}
-                onValueChange={setSelectedGuestId}
-              >
-                <SelectTrigger
-                  id={`${fieldId}-guest`}
-                  aria-invalid={guestError}
-                  aria-describedby={
-                    guestError ? `${fieldId}-guest-error` : undefined
-                  }
-                >
-                  <SelectValue placeholder="Válassz vendéget" />
-                </SelectTrigger>
-                <SelectContent>
-                  {filteredGuests.map((g) => (
-                    <SelectItem key={g.id} value={g.id}>
-                      {g.lastName} {g.firstName} (#{g.barcode}),{' '}
-                      {
-                        (g.passes ?? []).filter(
-                          (p) => p.status === PassStatus.ACTIVE,
-                        ).length
-                      }{' '}
-                      aktív bérlet
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                onChange={setSelectedGuestId}
+                describeGuest={(g) =>
+                  `${
+                    (g.passes ?? []).filter(
+                      (p) => p.status === PassStatus.ACTIVE,
+                    ).length
+                  } aktív bérlet`
+                }
+                invalid={guestError}
+                describedBy={guestError ? `${fieldId}-guest-error` : undefined}
+              />
               {guestError && (
                 <p
                   id={`${fieldId}-guest-error`}

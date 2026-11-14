@@ -49,7 +49,8 @@ interface ReceptionDeskTabProps {
   onRevoke: (checkInId: string) => void;
   onOpenGuest: (guest: GuestDto | null) => void;
   onOpenDeduct: (guest: GuestDto | null) => void;
-  onOpenSell: (guest: GuestDto | null) => void;
+  /** Az „Új bérlet” gyorsgomb: vendég nélkül nyit, a vendéget a modálban kell kiválasztani. */
+  onOpenSell: () => void;
   onOpenSellForGuestId: (guestId: string, templateId?: string | null) => void;
   onOpenPayment: (guest: GuestDto | null) => void;
   onOpenDigitalCard: (guest: GuestDto) => void;
@@ -117,7 +118,7 @@ export const ReceptionDeskTab: React.FC<ReceptionDeskTabProps> = ({
                 <Ticket aria-hidden strokeWidth={1.75} />
                 Alkalom levonása
               </Button>
-              <Button size="sm" onClick={() => onOpenSell(fallbackGuest)}>
+              <Button size="sm" onClick={onOpenSell}>
                 Új bérlet
               </Button>
               <Button

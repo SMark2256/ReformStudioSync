@@ -119,6 +119,12 @@ export const ReceptionPage: React.FC = () => {
     queryFn: () => api.getGuests(guestSearch),
   });
 
+  // A modálok vendégválasztója a teljes vendéglistából keres, nem a gyorskereső találataiból.
+  const pickerGuestsQuery = useQuery({
+    queryKey: ['guests', ''],
+    queryFn: () => api.getGuests(''),
+  });
+
   const servicesQuery = useQuery({
     queryKey: ['services'],
     queryFn: () => api.getServices(true),
@@ -169,7 +175,9 @@ export const ReceptionPage: React.FC = () => {
   // Helper to open Sell Pass Modal by guestId
   const openSellModalByGuestId = useCallback(
     (guestId: string, suggestedTemplateId?: string | null) => {
-      const found = (guestsQuery.data ?? []).find((g) => g.id === guestId);
+      const found = (pickerGuestsQuery.data ?? []).find(
+        (g) => g.id === guestId,
+      );
       if (found) {
         setSellModalState({
           isOpen: true,
@@ -178,7 +186,7 @@ export const ReceptionPage: React.FC = () => {
         });
       }
     },
-    [guestsQuery.data],
+    [pickerGuestsQuery.data],
   );
 
   // Mutations
@@ -338,10 +346,16 @@ export const ReceptionPage: React.FC = () => {
 
   const sellPassMutation = useMutation({
     mutationFn: api.sellPass,
-    onSuccess: (res) => {
+    onSuccess: (res, variables) => {
+      const soldTo = (pickerGuestsQuery.data ?? []).find(
+        (g) => g.id === variables.guestId,
+      );
+      const paid = `${res.amount.toLocaleString('hu-HU')} Ft`;
       notify.success(
         `Bérlet sikeresen rögzítve: ${res.pass.passTemplateName ?? 'Bérlet'}`,
-        `Fizetve: ${res.amount.toLocaleString('hu-HU')} Ft`,
+        soldTo
+          ? `${soldTo.lastName} ${soldTo.firstName}, fizetve: ${paid}`
+          : `Fizetve: ${paid}`,
       );
       setSellModalState({ isOpen: false, guest: null });
       refreshAll();
@@ -426,7 +440,7 @@ export const ReceptionPage: React.FC = () => {
   const dashboard = todayDashboardQuery.data;
 
   // Beolvasás után a vendég frissen betöltött adataival (a keresés miatt a listából hiányozhat is).
-  const guestList = guestsQuery.data ?? [];
+  const guestList = pickerGuestsQuery.data ?? [];
   const scannedGuest = deductModalState.treatmentOptions
     ? deductModalState.guest
     : null;
@@ -556,7 +570,7 @@ export const ReceptionPage: React.FC = () => {
             onRevoke={(checkInId) => revokeMutation.mutate(checkInId)}
             onOpenGuest={openGuestSheet}
             onOpenDeduct={(guest) => setDeductModalState({ isOpen: true, guest })}
-            onOpenSell={(guest) => setSellModalState({ isOpen: true, guest })}
+            onOpenSell={() => setSellModalState({ isOpen: true, guest: null })}
             onOpenSellForGuestId={openSellModalByGuestId}
             onOpenPayment={(guest) =>
               setPaymentModalState({ isOpen: true, guest })
@@ -648,7 +662,7 @@ export const ReceptionPage: React.FC = () => {
       <RecordPaymentModal
         isOpen={paymentModalState.isOpen}
         initialGuest={paymentModalState.guest}
-        guests={guestsQuery.data ?? []}
+        guests={guestList}
         preselectedDueId={paymentModalState.preselectedDueId}
         isSubmitting={recordPaymentMutation.isPending}
         onClose={() => setPaymentModalState({ isOpen: false, guest: null })}
@@ -657,7 +671,8 @@ export const ReceptionPage: React.FC = () => {
 
       <SellPassModal
         isOpen={sellModalState.isOpen}
-        guest={sellModalState.guest}
+        initialGuest={sellModalState.guest}
+        guests={guestList}
         templates={templatesQuery.data ?? []}
         preselectedTemplateId={sellModalState.preselectedTemplateId}
         isSubmitting={sellPassMutation.isPending}

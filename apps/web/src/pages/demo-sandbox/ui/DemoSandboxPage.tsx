@@ -962,14 +962,16 @@ export const DemoSandboxPage: React.FC = () => {
 
       <SellPassModal
         isOpen={sellModalState.isOpen}
-        guest={sellModalState.guest}
+        initialGuest={sellModalState.guest}
+        guests={guests}
         templates={templates}
         preselectedTemplateId={sellModalState.preselectedTemplateId}
         onClose={() => setSellModalState({ isOpen: false, guest: null })}
         onConfirmSell={(data) => {
           const sold = mockStudioEngine.sellPass(data);
+          const soldTo = guests.find((g) => g.id === data.guestId);
           notify.success(
-            `Bérlet eladva: ${sold.pass.passTemplateName}`,
+            `Bérlet eladva: ${sold.pass.passTemplateName}${soldTo ? `, ${soldTo.lastName} ${soldTo.firstName}` : ''}`,
             `Összeg: ${sold.amount.toLocaleString('hu-HU')} Ft rögzítve a kasszába.`,
           );
           setSellModalState({ isOpen: false, guest: null });

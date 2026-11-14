@@ -1,5 +1,6 @@
 import { GuestDto, MembershipDueStatus, PaymentMethod } from '@reform/shared';
 import React, { useEffect, useId, useRef, useState } from 'react';
+import { GuestPicker } from '@/entities/guest';
 import {
   Button,
   Dialog,
@@ -157,24 +158,11 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
           noValidate
           className="flex min-h-0 flex-1 flex-col">
           <DialogBody className="space-y-4">
-            <div className={fieldGroupClassName}>
-              <Label htmlFor={`${fieldId}-guest`}>Vendég</Label>
-              <Select
-                value={selectedGuestId}
-                onValueChange={setSelectedGuestId}
-              >
-                <SelectTrigger id={`${fieldId}-guest`}>
-                  <SelectValue placeholder="Válassz vendéget" />
-                </SelectTrigger>
-                <SelectContent>
-                  {guests.map((g) => (
-                    <SelectItem key={g.id} value={g.id}>
-                      {g.lastName} {g.firstName} (#{g.barcode})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <GuestPicker
+              guests={guests}
+              value={selectedGuestId}
+              onChange={setSelectedGuestId}
+            />
 
             <div className={fieldGroupClassName}>
               <span
