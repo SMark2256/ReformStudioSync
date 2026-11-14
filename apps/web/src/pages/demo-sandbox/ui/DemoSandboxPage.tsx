@@ -26,7 +26,14 @@ import {
   Wallet,
   XCircle,
 } from 'lucide-react';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { normalizeScannedCode } from '@/shared/lib/barcode-scanner';
 import { broadcastToScannerChannel } from '@/shared/lib/monitor-channel';
@@ -45,7 +52,13 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
+  Label,
   PageHeader,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from '@/shared/ui';
 import { DigitalPassCardModal } from '@/entities/guest';
 import { GuestModal } from '@/widgets/guest-profile';
@@ -90,11 +103,19 @@ const ScenarioButton: React.FC<ScenarioButtonProps> = ({
   </Button>
 );
 
+// A demó adatbázis változására (ez a fül, recepció, más böngészőfül) újrarenderelünk (TICKET-3).
+const subscribeToMockEngine = (onChange: () => void) =>
+  mockStudioEngine.subscribe(onChange);
+const getMockEngineVersion = () => mockStudioEngine.getVersion();
+
 export const DemoSandboxPage: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [, setTick] = useState(0);
   const forceRender = useCallback(() => setTick((t) => t + 1), []);
+  useSyncExternalStore(subscribeToMockEngine, getMockEngineVersion);
+  const simulatorGuestFieldId = useId();
+  const [simulatorGuestId, setSimulatorGuestId] = useState('');
 
   const [monitorResult, setMonitorResult] =
     useState<MonitorCheckInPayload | null>(null);
@@ -150,6 +171,8 @@ export const DemoSandboxPage: React.FC = () => {
   const templates = mockStudioEngine.getTemplates(true);
   const todayCheckIns = mockStudioEngine.getTodayCheckIns();
   const financeSummary = mockStudioEngine.getDailyFinanceSummary();
+  // Ha a kiválasztott vendég eltűnt (pl. Reset), a választó üresre áll.
+  const simulatorGuest = guests.find((g) => g.id === simulatorGuestId) ?? null;
 
   const deductPreselection = getTreatmentPreselection(
     deductModalState.treatmentOptions ?? [],
@@ -418,6 +441,8 @@ export const DemoSandboxPage: React.FC = () => {
                   `${saved.lastName} ${saved.firstName} (#${saved.barcode})`,
                 );
                 if (!data.id) {
+                  // Az új vendég rögtön beolvasható a szimulátorban.
+                  setSimulatorGuestId(saved.id);
                   closeGuestSheet();
                 }
                 forceRender();
@@ -579,6 +604,52 @@ export const DemoSandboxPage: React.FC = () => {
                       hint="Teszteli: szüneteltetés ellenőrzés"
                       onClick={() => handleSimulatedScan('100006')}
                     />
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor={simulatorGuestFieldId}>
+                      Bármely vendég beolvasása (köredzés)
+                    </Label>
+                    <div className="flex flex-col gap-2 sm:flex-row">
+                      <Select
+                        value={simulatorGuest?.id ?? ''}
+                        onValueChange={setSimulatorGuestId}
+                      >
+                        <SelectTrigger
+                          id={simulatorGuestFieldId}
+                          className="sm:flex-1"
+                        >
+                          <SelectValue placeholder="Válassz vendéget" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {guests.map((g) => (
+                            <SelectItem key={g.id} value={g.id}>
+                              {g.lastName} {g.firstName} (#{g.barcode})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        variant="secondary"
+                        disabled={!simulatorGuest}
+                        onClick={() => {
+                          if (simulatorGuest) {
+                            handleSimulatedScan(
+                              simulatorGuest.barcode,
+                              false,
+                              VisitType.CIRCUIT_TRAINING,
+                            );
+                          }
+                        }}
+                      >
+                        <QrCode aria-hidden strokeWidth={1.75} />
+                        Beolvasás
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      A lista a mindenkori vendégeket mutatja, a recepción vagy
+                      más fülön felvetteket is.
+                    </p>
                   </div>
                 </CardContent>
 
