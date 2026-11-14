@@ -289,6 +289,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
                 <Label htmlFor={`${fieldId}-note`}>Megjegyzés</Label>
                 <Input
                   id={`${fieldId}-note`}
+                  data-barcode-ignore
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
                   placeholder="Pl. havi tagdíj, részbefizetés"

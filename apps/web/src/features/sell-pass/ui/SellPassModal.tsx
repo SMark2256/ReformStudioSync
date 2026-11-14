@@ -197,6 +197,7 @@ export const SellPassModal: React.FC<SellPassModalProps> = ({
               <Label htmlFor={noteId}>Megjegyzés (nem kötelező)</Label>
               <Input
                 id={noteId}
+                data-barcode-ignore
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
                 placeholder="Pl. bérletmegújítás, ajándékutalvány"

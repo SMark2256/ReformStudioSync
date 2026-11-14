@@ -288,6 +288,7 @@ export const TabletDocumentPage: React.FC = () => {
               </label>
               <input
                 type="text"
+                data-barcode-ignore
                 required
                 value={signerName}
                 onChange={(e) => setSignerName(e.target.value)}

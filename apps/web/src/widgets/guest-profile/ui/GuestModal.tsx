@@ -815,6 +815,7 @@ export const GuestModal: React.FC<GuestModalProps> = ({
                   <Field id={id('lastName')} label="Vezetéknév *">
                     <Input
                       id={id('lastName')}
+                      data-barcode-ignore
                       required
                       value={lastName}
                       onChange={(e) => setLastName(e.target.value)}
@@ -825,6 +826,7 @@ export const GuestModal: React.FC<GuestModalProps> = ({
                   <Field id={id('firstName')} label="Keresztnév *">
                     <Input
                       id={id('firstName')}
+                      data-barcode-ignore
                       required
                       value={firstName}
                       onChange={(e) => handleFirstNameChange(e.target.value)}
@@ -922,6 +924,7 @@ export const GuestModal: React.FC<GuestModalProps> = ({
                     <Field id={id('email')} label="E-mail-cím">
                       <Input
                         id={id('email')}
+                        data-barcode-ignore
                         type="email"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
@@ -951,6 +954,7 @@ export const GuestModal: React.FC<GuestModalProps> = ({
                 >
                   <Input
                     id={id('notes')}
+                    data-barcode-ignore
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
                     placeholder="Pl. Hypoxi és köredzés kombinált vendég"
@@ -988,6 +992,7 @@ export const GuestModal: React.FC<GuestModalProps> = ({
                   </Label>
                   <Input
                     id={id('newNote')}
+                    data-barcode-ignore
                     value={newInternalNote}
                     onChange={(e) => setNewInternalNote(e.target.value)}
                     placeholder="Új belső feljegyzés a vendéghez"
@@ -1052,6 +1057,7 @@ export const GuestModal: React.FC<GuestModalProps> = ({
                 >
                   <Input
                     id={id('membTitle')}
+                    data-barcode-ignore
                     value={newMembTitle}
                     onChange={(e) => setNewMembTitle(e.target.value)}
                   />
@@ -1191,6 +1197,7 @@ export const GuestModal: React.FC<GuestModalProps> = ({
               >
                 <Input
                   id={id('extendReason')}
+                  data-barcode-ignore
                   value={extendReason}
                   onChange={(e) => setExtendReason(e.target.value)}
                   placeholder="Pl. igazolt hiányzás"
@@ -1331,6 +1338,7 @@ export const GuestModal: React.FC<GuestModalProps> = ({
               >
                 <Input
                   id={id('reversalReason')}
+                  data-barcode-ignore
                   value={reversalReason}
                   onChange={(e) => setReversalReason(e.target.value)}
                   placeholder="Pl. téves rögzítés"
@@ -1500,6 +1508,7 @@ export const GuestModal: React.FC<GuestModalProps> = ({
                 <Field id={id('photoNote')} label="Megjegyzés">
                   <Input
                     id={id('photoNote')}
+                    data-barcode-ignore
                     value={photoNotes}
                     onChange={(e) => setPhotoNotes(e.target.value)}
                     placeholder="Pl. 1. alkalom előtt, szemből"
@@ -1623,6 +1632,7 @@ export const GuestModal: React.FC<GuestModalProps> = ({
                 <Field id={id('docTitle')} label="Dokumentum címe">
                   <Input
                     id={id('docTitle')}
+                    data-barcode-ignore
                     value={docTitle}
                     onChange={(e) => setDocTitle(e.target.value)}
                   />
@@ -1694,6 +1704,7 @@ export const GuestModal: React.FC<GuestModalProps> = ({
                 <Field id={id('emailSubject')} label="Tárgy">
                   <Input
                     id={id('emailSubject')}
+                    data-barcode-ignore
                     value={emailSubject}
                     onChange={(e) => setEmailSubject(e.target.value)}
                   />
@@ -1701,6 +1712,7 @@ export const GuestModal: React.FC<GuestModalProps> = ({
                 <Field id={id('emailBody')} label="Üzenet">
                   <Input
                     id={id('emailBody')}
+                    data-barcode-ignore
                     value={emailBody}
                     onChange={(e) => setEmailBody(e.target.value)}
                   />
