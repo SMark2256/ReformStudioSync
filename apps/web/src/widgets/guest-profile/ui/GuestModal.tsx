@@ -70,6 +70,7 @@ import {
 } from '@/shared/ui';
 import { arrivalsForPass } from '../model/arrivals';
 import { GuestArrivalsSection, PassArrivals } from './GuestArrivals';
+import { GuestPhotoGrid } from './GuestPhotos';
 
 const DUE_STATUS_LABEL: Record<MembershipDueStatus, string> = {
   [MembershipDueStatus.PENDING]: 'függőben',
@@ -1566,48 +1567,7 @@ export const GuestModal: React.FC<GuestModalProps> = ({
             {(guest.photos ?? []).length === 0 ? (
               <EmptyText>Még nincs feltöltött fénykép.</EmptyText>
             ) : (
-              <ul
-                aria-label="Fényképek"
-                className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"
-              >
-                {(guest.photos ?? []).map((ph) => {
-                  const savedPct =
-                    ph.originalSizeBytes > 0
-                      ? Math.round(
-                          (1 - ph.compressedSizeBytes / ph.originalSizeBytes) *
-                            100,
-                        )
-                      : 0;
-                  return (
-                    <li
-                      key={ph.id}
-                      className="min-w-0 overflow-hidden rounded-lg border border-border bg-card shadow-sm"
-                    >
-                      <img
-                        src={ph.fileUrl}
-                        alt={ph.note ?? 'Kezelési fotó'}
-                        className="h-44 w-full bg-muted object-cover"
-                      />
-                      <div className="space-y-1 p-3 text-xs">
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-[13px] font-semibold text-foreground">
-                            {ph.serviceName ?? 'Állapotfotó'}
-                          </span>
-                          <span className="font-mono text-muted-foreground">
-                            −{savedPct}% ({formatBytes(ph.compressedSizeBytes)})
-                          </span>
-                        </div>
-                        {ph.note && (
-                          <p className="text-muted-foreground">{ph.note}</p>
-                        )}
-                        <p className="font-mono text-muted-foreground">
-                          {formatDateTime(ph.takenAt)} · {ph.width}×{ph.height}
-                        </p>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
+              <GuestPhotoGrid photos={guest.photos ?? []} />
             )}
           </div>
         )}
