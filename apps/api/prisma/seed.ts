@@ -21,6 +21,8 @@ import {
   getStudioDate,
   MembershipStatus as SharedMembershipStatus,
 } from '@reform/shared';
+import { IntakeDefinitionsService } from '../src/modules/intake/intake-definitions.service';
+import type { PrismaService } from '../src/prisma/prisma.service';
 
 /**
  * Alap- és demóadatok (TICKET-27): munkatársak (TICKET-35: jelszó nélkül, kóddal lépnek be), szolgáltatások, bérletsablonok és a
@@ -840,6 +842,10 @@ async function main() {
     templates.set(tpl.name, created);
     createdTemplates++;
   }
+
+  // Vendégfelvétel (TICKET-56): a beépített csomagok és verziózott kérdőívek. Ugyanaz, amit az
+  // API induláskor futtat; meglévő (kulcs, verzió) párt nem ír felül.
+  await new IntakeDefinitionsService(prisma as unknown as PrismaService).ensureBuiltIns(studioId);
 
   // Tesztvendégek: vonalkód szerint; meglévőt csak SEED_DEMO_RESET=1 esetén építünk újra.
   const guestResults: string[] = [];

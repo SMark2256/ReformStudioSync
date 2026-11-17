@@ -268,14 +268,20 @@ export function requiredIntakeForms(
 
 /**
  * Több szolgáltatásnál egy profil marad: a vendégtől csak azok az űrlapok kellenek, amelyeket
- * még nem írt alá (bármelyik verzióját). Új vendégnél minden szükséges űrlap kell.
+ * még nem írt alá (bármelyik verzióját). Aki már aláírt felvételi dokumentumot, annak a
+ * törzsadatait (`PROFILE`) sem kérjük újra. Új vendégnél minden szükséges űrlap kell.
  */
 export function missingIntakeForms(
   required: IntakeFormDefinitionDto[],
   signedFormKeys: Iterable<string>,
 ): IntakeFormDefinitionDto[] {
   const signed = new Set(signedFormKeys);
-  return required.filter((f) => !signed.has(f.key));
+  return required.filter((f) => (f.kind === 'PROFILE' ? signed.size === 0 : !signed.has(f.key)));
+}
+
+/** Van-e még aláírandó dokumentum (a profil önmagában nem az). */
+export function hasSignableIntakeForms(forms: IntakeFormDefinitionDto[]): boolean {
+  return forms.some((f) => f.requiresSignature);
 }
 
 // ---------------------------------------------------------------------------------------------

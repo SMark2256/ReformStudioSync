@@ -102,12 +102,11 @@ export const APP_ERROR_CATALOG = {
   'INTAKE.PROFILE_INCOMPLETE': { status: 400, message: 'A jóváhagyáshoz a vendég vezeték- és keresztneve szükséges.', action: 'notify' },
   'INTAKE.DOCUMENT_NOT_FOUND': { status: 404, message: 'Az aláírt dokumentum nem található.', action: 'notify' },
   'INTAKE.PDF_NOT_READY': { status: 409, message: 'A dokumentum PDF-je még nem készült el. Próbáld újra a lezárást.', action: 'notify' },
-  'INTAKE.PDF_FAILED': { status: 500, message: 'A PDF elkészítése nem sikerült. Próbáld újra.', action: 'retry' },
   'INTAKE.EMAIL_MISSING': { status: 400, message: 'A vendégnek nincs e-mail címe, a dokumentum nem küldhető el.', action: 'notify' },
   'INTAKE.MAIL_FAILED': { status: 502, message: 'A dokumentumot nem sikerült elküldeni. Próbáld újra később.', action: 'retry' },
 
   // Fájltárolás (TICKET-56)
-  'STORAGE.NOT_CONFIGURED': { status: 503, message: 'A dokumentumtárolás nincs beállítva (Supabase Storage). Szólj a rendszergazdának.', action: 'notify' },
+  'STORAGE.NOT_CONFIGURED': { status: 424, message: 'A dokumentumtárolás nincs beállítva (Supabase Storage). Szólj a rendszergazdának.', action: 'notify' },
   'STORAGE.UNAVAILABLE': { status: 502, message: 'A dokumentumtároló nem érhető el. Próbáld újra később.', action: 'retry' },
   'STORAGE.LINK_INVALID': { status: 403, message: 'A letöltési link lejárt vagy érvénytelen.', action: 'notify' },
 } as const satisfies Record<string, AppErrorDefinition>;

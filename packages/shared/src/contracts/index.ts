@@ -247,6 +247,8 @@ export interface GuestPhotoDto {
   width: number;
   height: number;
   visibilityRole: Role;
+  /** `PROFILE`: belső azonosító profilkép a vendégfelvételből (TICKET-56), nem marketingcélú. */
+  purpose?: 'PROGRESS' | 'PROFILE';
   note: string | null;
 }
 

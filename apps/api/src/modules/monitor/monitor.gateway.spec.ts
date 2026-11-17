@@ -185,8 +185,9 @@ describe('MonitorGateway — Vendégmonitor adatszűrés (TICKET-17)', () => {
   });
 
   it.each([
-    ['DEVICE', false, [MONITOR_ROOM]],
-    ['DEVICE', true, [MONITOR_ROOM]],
+    // Az eszköz a saját szobájába is bekerül (TICKET-56: tabletre küldött vendégfelvétel).
+    ['DEVICE', false, [MONITOR_ROOM, 'device:device-1']],
+    ['DEVICE', true, [MONITOR_ROOM, 'device:device-1']],
     ['STAFF', false, [MONITOR_ROOM, STAFF_ROOM]],
     // Munkatársi tokennel megnyitott Vendégmonitor: nem kap teljes eredményt.
     ['STAFF', true, [MONITOR_ROOM]],

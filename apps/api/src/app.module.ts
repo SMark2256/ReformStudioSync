@@ -6,6 +6,7 @@ import { CheckInsModule } from './modules/check-ins/check-ins.module';
 import { FinanceModule } from './modules/finance/finance.module';
 import { GuestsModule } from './modules/guests/guests.module';
 import { HealthModule } from './modules/health/health.module';
+import { IntakeModule } from './modules/intake/intake.module';
 import { MonitorModule } from './modules/monitor/monitor.module';
 import { PassesModule } from './modules/passes/passes.module';
 import { ToursModule } from './modules/tours/tours.module';
@@ -26,6 +27,7 @@ import { PrismaModule } from './prisma/prisma.module';
     MonitorModule,
     CheckInsModule,
     ToursModule,
+    IntakeModule,
   ],
 })
 export class AppModule {}

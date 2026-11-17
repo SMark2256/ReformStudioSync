@@ -163,6 +163,31 @@ export class CreateMeasurementDto {
   @IsNumber()
   chestCm?: number | null;
 
+  // TICKET-56: Omron mérő és a felvételi körfogatok.
+  @IsOptional()
+  @IsNumber()
+  bmi?: number | null;
+
+  @IsOptional()
+  @IsNumber()
+  skeletalMusclePct?: number | null;
+
+  @IsOptional()
+  @IsNumber()
+  restingMetabolismKcal?: number | null;
+
+  @IsOptional()
+  @IsNumber()
+  abdomenCm?: number | null;
+
+  @IsOptional()
+  @IsNumber()
+  aboveKneeCm?: number | null;
+
+  @IsOptional()
+  @IsNumber()
+  calfCm?: number | null;
+
   @IsOptional()
   @IsString()
   note?: string | null;
