@@ -784,6 +784,12 @@ describe('nyilvános foglaló', () => {
 // ---------------------------------------------------------------------------
 
 describe('Google Naptár outbox', () => {
+  // Az újbóli sorba állítás a rendszeridőt használja: a tesztben ez a rögzített NOW.
+  beforeEach(() => {
+    vi.useFakeTimers({ now: NOW, toFake: ['Date'] });
+    return () => vi.useRealTimers();
+  });
+
   const bookingRow = (db: Row) => {
     db.booking.rows.push({
       id: 'b-sync',
