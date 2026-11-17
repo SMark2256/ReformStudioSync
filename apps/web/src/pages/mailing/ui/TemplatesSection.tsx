@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { EMAIL_TEMPLATE_NAME_MAX_LENGTH, EmailTemplateDto } from '@reform/shared';
 import { Plus } from 'lucide-react';
 import React, { useState } from 'react';
-import { AUTOMATION_LABEL } from '@/entities/email';
+import { AUTOMATION_LABEL, formatMailDateTime, MAIL_QUERY_KEYS } from '@/entities/email';
 import { draftHasContent, EmailComposer, EmailDraft } from '@/features/compose-email';
 import { api } from '@/shared/api';
 import { notify } from '@/shared/lib/notify';
@@ -22,7 +22,6 @@ import {
   type ResponsiveTableColumn,
   Skeleton,
 } from '@/shared/ui';
-import { formatMailDateTime, MAIL_QUERY_KEYS } from '../model/queries';
 
 interface TemplateForm extends EmailDraft {
   id: string | null;

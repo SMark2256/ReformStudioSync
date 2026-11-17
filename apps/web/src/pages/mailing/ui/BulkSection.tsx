@@ -3,9 +3,17 @@ import {
   AudiencePassState,
   EmailAudienceFilterDto,
   EmailAudienceRecipientDto,
+  EmailTemplateDto,
 } from '@reform/shared';
 import React, { useMemo, useState } from 'react';
-import { draftHasContent, EmailComposer, EmailDraft, EMPTY_DRAFT } from '@/features/compose-email';
+import { MAIL_QUERY_KEYS } from '@/entities/email';
+import {
+  draftHasContent,
+  EmailComposer,
+  EmailDraft,
+  EmailTemplateSelect,
+  EMPTY_DRAFT,
+} from '@/features/compose-email';
 import { api } from '@/shared/api';
 import { notify } from '@/shared/lib/notify';
 import {
@@ -30,7 +38,6 @@ import {
   ToggleGroup,
   ToggleGroupItem,
 } from '@/shared/ui';
-import { MAIL_QUERY_KEYS } from '../model/queries';
 
 const PASS_STATE_OPTIONS: { value: AudiencePassState; label: string }[] = [
   { value: 'ANY', label: 'Mindegy' },
@@ -46,8 +53,6 @@ const RECIPIENT_COLUMNS: ResponsiveTableColumn<EmailAudienceRecipientDto>[] = [
   { key: 'email', header: 'E-mail', cell: (r) => r.email },
 ];
 
-const NO_TEMPLATE = '__none__';
-
 // Csoportos küldés (TICKET-55, csak admin): szűrő → címzettlista → levél → megerősítés. Marketing
 // levél: csak a hozzájáruló, e-mail címmel rendelkező vendégek kapják, leiratkozó linkkel.
 export const BulkSection: React.FC = () => {
@@ -56,7 +61,7 @@ export const BulkSection: React.FC = () => {
   const [passState, setPassState] = useState<AudiencePassState>('ANY');
   const [visitMode, setVisitMode] = useState<VisitMode>('ANY');
   const [visitDays, setVisitDays] = useState(30);
-  const [templateId, setTemplateId] = useState<string>(NO_TEMPLATE);
+  const [templateId, setTemplateId] = useState<string | null>(null);
   const [draft, setDraft] = useState<EmailDraft>(EMPTY_DRAFT);
 
   const filter = useMemo<EmailAudienceFilterDto>(
@@ -70,10 +75,6 @@ export const BulkSection: React.FC = () => {
   );
 
   const servicesQuery = useQuery({ queryKey: ['services'], queryFn: () => api.getServices() });
-  const templatesQuery = useQuery({
-    queryKey: MAIL_QUERY_KEYS.templates,
-    queryFn: () => api.getEmailTemplates(),
-  });
   const audienceQuery = useQuery({
     queryKey: [...MAIL_QUERY_KEYS.audience, filter],
     queryFn: () => api.previewEmailAudience(filter),
@@ -86,7 +87,7 @@ export const BulkSection: React.FC = () => {
         guestIds: (audienceQuery.data?.recipients ?? []).map((r) => r.guestId),
         subject: draft.subject,
         bodyHtml: draft.bodyHtml,
-        templateId: templateId === NO_TEMPLATE ? null : templateId,
+        templateId,
       }),
     onSuccess: (res) => {
       notify.success(
@@ -98,9 +99,8 @@ export const BulkSection: React.FC = () => {
     },
   });
 
-  const loadTemplate = (id: string) => {
-    setTemplateId(id);
-    const template = templatesQuery.data?.find((t) => t.id === id);
+  const loadTemplate = (template: EmailTemplateDto | null) => {
+    setTemplateId(template?.id ?? null);
     if (template) setDraft({ subject: template.subject, bodyHtml: template.bodyHtml });
   };
 
@@ -218,22 +218,12 @@ export const BulkSection: React.FC = () => {
           <CardTitle>Levél</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex max-w-md flex-col gap-1.5">
-            <Label htmlFor="bulk-template">Sablon betöltése</Label>
-            <Select value={templateId} onValueChange={loadTemplate}>
-              <SelectTrigger id="bulk-template">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={NO_TEMPLATE}>Egyedi levél</SelectItem>
-                {(templatesQuery.data ?? []).map((t) => (
-                  <SelectItem key={t.id} value={t.id}>
-                    {t.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          <EmailTemplateSelect
+            id="bulk-template"
+            label="Sablon betöltése"
+            value={templateId}
+            onSelect={loadTemplate}
+          />
           <EmailComposer idPrefix="bulk" value={draft} onChange={setDraft} marketing />
           <Alert>
             <AlertDescription>

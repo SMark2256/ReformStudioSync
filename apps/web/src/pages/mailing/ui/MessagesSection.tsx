@@ -3,6 +3,8 @@ import { EmailMessageListQueryDto, MessageLogDto, MessageStatus } from '@reform/
 import React, { useDeferredValue, useState } from 'react';
 import {
   EmailStatusBadge,
+  formatMailDateTime,
+  MAIL_QUERY_KEYS,
   MESSAGE_STATUS_LABEL,
   MESSAGE_TYPE_OPTIONS,
   messageTypeLabel,
@@ -27,7 +29,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/shared/ui';
-import { formatMailDateTime, MAIL_QUERY_KEYS } from '../model/queries';
 
 const PAGE_SIZE = 50;
 /** Az API egy lekérésben legfeljebb ennyit ad; a régebbiekhez szűkíteni kell. */

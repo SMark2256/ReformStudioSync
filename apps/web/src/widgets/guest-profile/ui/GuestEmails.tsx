@@ -1,45 +1,34 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { GuestDto, placeholderValuesFor } from '@reform/shared';
+import { EmailTemplateDto, GuestDto, placeholderValuesFor } from '@reform/shared';
 import React, { useState } from 'react';
-import { EmailStatusBadge, messageTypeLabel } from '@/entities/email';
-import { draftHasContent, EmailComposer, EmailDraft, EMPTY_DRAFT } from '@/features/compose-email';
+import {
+  EmailStatusBadge,
+  formatMailDateTime,
+  MAIL_QUERY_KEYS,
+  messageTypeLabel,
+} from '@/entities/email';
+import {
+  draftHasContent,
+  EmailComposer,
+  EmailDraft,
+  EmailTemplateSelect,
+  EMPTY_DRAFT,
+} from '@/features/compose-email';
 import { api } from '@/shared/api';
 import { notify } from '@/shared/lib/notify';
-import {
-  Alert,
-  AlertDescription,
-  Button,
-  Label,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/shared/ui';
-
-const NO_TEMPLATE = '__none__';
-
-const formatDateTime = (iso: string | null | undefined) =>
-  iso ? new Date(iso).toLocaleString('hu-HU') : '–';
-
-/** A vendég leveleinek lekérdezési kulcsa (a Levelezés oldal naplója külön kulcson). */
-const guestEmailsKey = (guestId: string) => ['mail', 'guest', guestId] as const;
+import { Alert, AlertDescription, Button } from '@/shared/ui';
 
 // Levelek fül (TICKET-55): egyéni levél a vendégnek (egyedi szöveggel vagy sablonból) és a
 // vendég levelezési előzményei. A recepció is küldhet; ez szolgáltatási levél, hozzájárulás
 // nélkül is kimegy.
 export const GuestEmails: React.FC<{ guest: GuestDto }> = ({ guest }) => {
   const queryClient = useQueryClient();
-  const [templateId, setTemplateId] = useState(NO_TEMPLATE);
+  const [templateId, setTemplateId] = useState<string | null>(null);
   const [draft, setDraft] = useState<EmailDraft>(EMPTY_DRAFT);
 
   const messagesQuery = useQuery({
-    queryKey: guestEmailsKey(guest.id),
+    queryKey: MAIL_QUERY_KEYS.guest(guest.id),
     queryFn: () => api.getGuestEmailMessages(guest.id),
-  });
-  const templatesQuery = useQuery({
-    queryKey: ['mail', 'templates'],
-    queryFn: () => api.getEmailTemplates(),
   });
 
   const sendMutation = useMutation({
@@ -47,20 +36,19 @@ export const GuestEmails: React.FC<{ guest: GuestDto }> = ({ guest }) => {
       api.sendGuestEmail(guest.id, {
         subject: draft.subject,
         bodyHtml: draft.bodyHtml,
-        templateId: templateId === NO_TEMPLATE ? null : templateId,
+        templateId,
       }),
     onSuccess: (msg) => {
       notify.success('A levél a kimenő sorban.', `Címzett: ${msg.recipientEmail}`);
       setDraft(EMPTY_DRAFT);
-      setTemplateId(NO_TEMPLATE);
-      void queryClient.invalidateQueries({ queryKey: guestEmailsKey(guest.id) });
-      void queryClient.invalidateQueries({ queryKey: ['mail', 'messages'] });
+      setTemplateId(null);
+      void queryClient.invalidateQueries({ queryKey: MAIL_QUERY_KEYS.guest(guest.id) });
+      void queryClient.invalidateQueries({ queryKey: MAIL_QUERY_KEYS.messages });
     },
   });
 
-  const loadTemplate = (id: string) => {
-    setTemplateId(id);
-    const template = templatesQuery.data?.find((t) => t.id === id);
+  const loadTemplate = (template: EmailTemplateDto | null) => {
+    setTemplateId(template?.id ?? null);
     if (template) setDraft({ subject: template.subject, bodyHtml: template.bodyHtml });
   };
 
@@ -81,22 +69,12 @@ export const GuestEmails: React.FC<{ guest: GuestDto }> = ({ guest }) => {
           </Alert>
         ) : (
           <>
-            <div className="flex max-w-md flex-col gap-1.5">
-              <Label htmlFor="guest-email-template">Sablon</Label>
-              <Select value={templateId} onValueChange={loadTemplate}>
-                <SelectTrigger id="guest-email-template">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={NO_TEMPLATE}>Egyedi levél</SelectItem>
-                  {(templatesQuery.data ?? []).map((t) => (
-                    <SelectItem key={t.id} value={t.id}>
-                      {t.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <EmailTemplateSelect
+              id="guest-email-template"
+              label="Sablon"
+              value={templateId}
+              onSelect={loadTemplate}
+            />
             <EmailComposer
               idPrefix="guest-email"
               value={draft}
@@ -146,7 +124,7 @@ export const GuestEmails: React.FC<{ guest: GuestDto }> = ({ guest }) => {
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="font-mono text-xs text-muted-foreground">
-                    {formatDateTime(m.sentAt ?? m.createdAt)}
+                    {formatMailDateTime(m.sentAt ?? m.createdAt)}
                   </span>
                   <EmailStatusBadge status={m.status} />
                 </div>

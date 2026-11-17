@@ -306,11 +306,10 @@ export function studioDayRange(from?: string, to?: string): { gte?: Date; lt?: D
   const range: { gte?: Date; lt?: Date } = {};
   const start = from ? studioDayStart(from) : null;
   if (start) range.gte = start;
-  const end = to ? studioDayStart(to) : null;
+  const end = to ? DAY_PATTERN.exec(to) : null;
   if (end) {
-    const next = addCalendarDays(getStudioDate(new Date(end.getTime() + 12 * 60 * 60 * 1000)), 1);
-    const pad = (n: number) => String(n).padStart(2, '0');
-    range.lt = studioDayStart(`${next.year}-${pad(next.month)}-${pad(next.day)}`)!;
+    const nextDay = new Date(Date.UTC(Number(end[1]), Number(end[2]) - 1, Number(end[3]) + 1));
+    range.lt = studioDayStart(nextDay.toISOString().slice(0, 10))!;
   }
   return range;
 }

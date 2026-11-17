@@ -6,7 +6,7 @@ import {
   UpdateEmailAutomationDto,
 } from '@reform/shared';
 import React from 'react';
-import { AUTOMATION_LABEL, EMAIL_CATEGORY_LABEL } from '@/entities/email';
+import { AUTOMATION_LABEL, EMAIL_CATEGORY_LABEL, MAIL_QUERY_KEYS } from '@/entities/email';
 import { api } from '@/shared/api';
 import { notify } from '@/shared/lib/notify';
 import {
@@ -23,7 +23,6 @@ import {
   Skeleton,
   Switch,
 } from '@/shared/ui';
-import { MAIL_QUERY_KEYS } from '../model/queries';
 
 const DESCRIPTION: Record<EmailAutomationKind, string> = {
   [EmailAutomationKind.WELCOME]:
