@@ -8,6 +8,7 @@ import {
 } from 'react-router-dom';
 import { GlobalScannerChannel } from '@/features/scanner-channel';
 import { LoginPage } from '@/pages/login';
+import { MailingPage } from '@/pages/mailing';
 import { DemoSandboxPage } from '@/pages/demo-sandbox';
 import { MonitorPage } from '@/pages/monitor';
 import { MonitorsPage } from '@/pages/monitors';
@@ -18,6 +19,7 @@ import {
 } from '@/pages/reception';
 import { SettingsPage } from '@/pages/settings';
 import { TabletDocumentPage } from '@/pages/tablet-document';
+import { UnsubscribePage } from '@/pages/unsubscribe';
 import { AppShell } from '@/widgets/app-shell';
 import { APP_RELEASE_VERSION, APP_ROUTES } from '@/shared/config';
 
@@ -55,6 +57,7 @@ export const App: React.FC = () => {
           ))}
           <Route path={APP_ROUTES.demo.path} element={<DemoSandboxPage />} />
           <Route path={APP_ROUTES.monitors.path} element={<MonitorsPage />} />
+          <Route path={APP_ROUTES.mailing.path} element={<MailingPage />} />
           <Route
             path={APP_ROUTES.settings.path}
             element={<SettingsPage />}
@@ -72,6 +75,8 @@ export const App: React.FC = () => {
         </Route>
         <Route path={APP_ROUTES.monitor.path} element={<MonitorPage />} />
         <Route path="/tablet" element={<TabletDocumentPage />} />
+        {/* Nyilvános leiratkozó oldal (TICKET-55): belépés nélkül, a levélben kapott tokennel. */}
+        <Route path="/leiratkozas/:token" element={<UnsubscribePage />} />
         <Route path="*" element={<Navigate to="/reception" replace />} />
       </Routes>
     </BrowserRouter>

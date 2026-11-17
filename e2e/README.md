@@ -85,3 +85,4 @@ kerülnek be, a nevük ugyanígy a ticketszámmal kezdődik.
 | TICKET-25 | `record-payment.spec.ts` |
 | TICKET-29 | `monitor.spec.ts` (socket.io stub) |
 | TICKET-32 | `monitor.spec.ts` (socket.io stub, párosított kijelző) |
+| TICKET-55 | `mailing.spec.ts` (sablon és előnézet, csoportos küldés, leiratkozó oldal) |

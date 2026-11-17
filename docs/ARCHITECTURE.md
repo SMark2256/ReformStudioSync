@@ -71,6 +71,15 @@ A szabályokat a [Steiger](https://github.com/feature-sliced/steiger) linter ell
 - **Ütemezés:** a folyó hónapig minden hónapnak van esedékessége (hónap elejétől befizethető). Ha a kezdés (vagy az utolsó újraaktiválás, `memberships.resumed_at`) napja későbbi a `dueDay`-nél, az első esedékesség a következő hónapé. Szünet / megszűnés alatt nincs új esedékesség; a leállás napja után esedékes, érintetlen díj törlődik.
 - **Pótlás:** `FinanceService.ensureDuesUpTo(now)` (stúdiószinten) és `ensureDuesForGuest(guestId, now?, tx?)` (vendégszinten, hívó tranzakciójában is). Futás: `MembershipDuesScheduler` indításkor és óránként, az elmaradás-lekérdezéskor, a vendég adatlapján és státuszváltás előtt. Csak a legutóbbi meglévő időszak utáni hónapok jönnek létre, a `@@unique([membershipId, period])` + `skipDuplicates` miatt ismételt futás sem duplikál.
 
+### ADR-08: Vendégkommunikáció: kimenő sor, idempotens automatikus levelek, hozzájárulás (TICKET-55)
+- **Modul:** `apps/api/src/modules/mailing` (`MailOutboxService`, `EmailTemplatesService`, `EmailAutomationsService`, `EmailCampaignsService`, `EmailConsentService`, `MailingScheduler`). A tiszta szabályok (mezők kitöltése, levélkeret, születés- és névnap, szűrő, hozzájárulás, visszalépés) a `packages/shared/src/email.ts`-ben; az API, a kliensoldali mock (`shared/api/mock-mail.ts`) és az élő előnézet ugyanezt használja.
+- **Táblák:** `email_templates` (szanitizált HTML törzs), `email_automations` (üdvözlő / születésnapi / névnapi: be- és kikapcsolás, sablon, `enabled_at`), a `message_logs` kimenő sorrá bővült (`PENDING` / `SENT` / `FAILED`, próbálkozások, következő próba, hibaüzenet, sablon, kategória; a régi sorok megmaradtak, a `DELIVERED` `SENT` lett). Vendég: `marketing_consent`, `marketing_consent_at`, `unsubscribed_at`, `unsubscribe_token` (egyedi).
+- **Kimenő sor:** minden levél előbb a sorba kerül; a `MailingScheduler` percenként küld, legfeljebb `MAIL_HOURLY_LIMIT` levelet óránként (alap: 10, SendPulse teszt csomag). Hibánál visszalépő újrapróbálás (5, 10, 20, 40 perc …), 5 próba után végleg hibás; kézzel újraküldhető. SendPulse kulcs nélkül a levelek várakoznak.
+- **Dupla küldés kizárása:** az automatikus levél `message_logs.dedupe_key` egyedi kulcsot kap (vendég + automatizmus + év); az ütemező óránként fut a stúdió naptára (`Europe/Budapest`) szerint, 8 órától, és legfeljebb 2 napot pótol, de a bekapcsolás napjánál korábbit nem. Ismételt futás vagy újraindítás után sem megy ki kétszer.
+- **Kategória:** az üdvözlő, az egyéni és a tesztlevél tranzakciós; a születés- és névnapi, valamint a csoportos levél marketing: csak hozzájárulással és leiratkozó linkkel (`PUBLIC_WEB_URL/leiratkozas/:token`). A leiratkozás visszavonja a hozzájárulást.
+- **Jogosultság:** sablonkezelés, automatikus levelek, csoportos küldés: ADMIN; egyéni levél, napló, újraküldés: minden munkatárs.
+- **Env:** `MAIL_HOURLY_LIMIT`, `PUBLIC_WEB_URL` (alapból a `CORS_ORIGIN` első címe).
+
 ---
 
 ## 3. REST API Végpontok Összefoglalója
@@ -98,5 +107,13 @@ Interaktív Swagger/OpenAPI felület elérhető: `GET /api/docs`
 | **Check-Ins** | `POST /api/check-ins/sync-offline` | Offline puffer idempotens kötegelt szinkronizálása | JWT |
 | **Finance** | `GET /api/finance/daily-summary` | Napi kasszazárás és bevételi bontás fizetési mód szerint | JWT |
 | **Finance** | `POST /api/finance/payments/:id/cancel` | Téves bérleteladás és fizetés sztornózása | JWT |
+| **Mail** | `GET /api/mail/status` | Levélküldés állapota: beállítva-e, óránkénti korlát, várakozó és hibás levelek | JWT |
+| **Mail** | `GET/POST /api/mail/templates`, `PATCH/DELETE /api/mail/templates/:id` | E-mail-sablonok (a lista mindenkié, a módosítás adminé) | JWT / ADMIN |
+| **Mail** | `POST /api/mail/test` | Tesztlevél a bejelentkezett munkatárs címére | ADMIN |
+| **Mail** | `GET /api/mail/automations`, `PATCH /api/mail/automations/:kind` | Automatikus levelek be- és kikapcsolása, sablon | ADMIN |
+| **Mail** | `POST /api/mail/audience/preview`, `POST /api/mail/bulk` | Csoportos küldés: címzettek a szűrő szerint, küldés hozzájárulással | ADMIN |
+| **Mail** | `GET /api/mail/messages`, `POST /api/mail/messages/:id/retry` | Elküldött e-mailek (szűrés: címzett, tárgy, típus, sablon, állapot, dátum), újraküldés | JWT |
+| **Mail** | `GET/POST /api/mail/guests/:guestId/messages` | A vendég levelei, egyéni levél a vendégnek | JWT |
+| **Mail** | `GET/POST /api/public/unsubscribe/:token` | Leiratkozó oldal adatai, leiratkozás (idempotens) | Publikus |
 | **Tours** | `GET /api/tours` | A fiók látott oldalbemutatói (`users.tour_state`) | JWT |
 | **Tours** | `POST /api/tours` | Bemutató bezárva (`seen`), „Többet ne mutass” (`all`), újraindítás (`reset`) | JWT |

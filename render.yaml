@@ -32,3 +32,9 @@ services:
         sync: false
       - key: MAIL_FROM_NAME
         sync: false
+      # Kimenő levélsor (TICKET-55): óránkénti korlát (alapból 10, a SendPulse teszt csomaghoz) és
+      # a webapp nyilvános címe a leiratkozó linkhez (alapból a CORS_ORIGIN első címe).
+      - key: MAIL_HOURLY_LIMIT
+        sync: false
+      - key: PUBLIC_WEB_URL
+        sync: false

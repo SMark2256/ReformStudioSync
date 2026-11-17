@@ -1,3 +1,5 @@
+import { DEFAULT_MAIL_HOURLY_LIMIT } from '@reform/shared';
+
 export interface EnvConfig {
   NODE_ENV: string;
   PORT: number;
@@ -11,6 +13,10 @@ export interface EnvConfig {
   MAIL_FROM_NAME: string;
   /** Rögzített belépőkód teszteknek (E2E, CI); productionben nem engedélyezett. */
   AUTH_FIXED_LOGIN_CODE?: string;
+  /** A kimenő sor óránkénti korlátja (TICKET-55); a SendPulse teszt csomaghoz 10. */
+  MAIL_HOURLY_LIMIT: number;
+  /** A webapp címe a levelekben (leiratkozó link); alapból a `CORS_ORIGIN` első címe. */
+  PUBLIC_WEB_URL: string;
 }
 
 const optional = (value: unknown): string | undefined => {
@@ -47,6 +53,17 @@ export function validateEnv(config: Record<string, unknown>): EnvConfig {
     throw new Error('AUTH_FIXED_LOGIN_CODE 6 számjegy legyen.');
   }
 
+  const hourlyLimitRaw = optional(config.MAIL_HOURLY_LIMIT);
+  const hourlyLimit = hourlyLimitRaw === undefined ? DEFAULT_MAIL_HOURLY_LIMIT : Number(hourlyLimitRaw);
+  if (!Number.isInteger(hourlyLimit) || hourlyLimit < 1 || hourlyLimit > 10_000) {
+    throw new Error('MAIL_HOURLY_LIMIT 1 és 10000 közötti egész szám legyen.');
+  }
+
+  const publicWebUrl =
+    optional(config.PUBLIC_WEB_URL) ??
+    corsOrigin.split(',').map((o) => o.trim()).find((o) => /^https?:\/\//.test(o)) ??
+    'http://localhost:5173';
+
   return {
     NODE_ENV: nodeEnv,
     PORT: Number.isNaN(port) ? 3001 : port,
@@ -58,5 +75,7 @@ export function validateEnv(config: Record<string, unknown>): EnvConfig {
     MAIL_FROM_EMAIL: optional(config.MAIL_FROM_EMAIL) ?? 'devtest@sendpulseemail.com',
     MAIL_FROM_NAME: optional(config.MAIL_FROM_NAME) ?? 'ReformStudio Sync',
     AUTH_FIXED_LOGIN_CODE: fixedLoginCode,
+    MAIL_HOURLY_LIMIT: hourlyLimit,
+    PUBLIC_WEB_URL: publicWebUrl.replace(/\/+$/, ''),
   };
 }

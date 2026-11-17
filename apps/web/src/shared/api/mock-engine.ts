@@ -51,7 +51,6 @@ import {
   MembershipDueDto,
   MembershipDueStatus,
   MembershipStatus,
-  MessageLogDto,
   MessageStatus,
   MonitorDeviceRevokedPayload,
   MonitorTestPingPayload,
@@ -653,11 +652,13 @@ export function createInitialMockDatabase(): MockDatabaseState {
           recipientEmail: 'anna.kovacs@reform.hu',
           subject: 'RE-FORM Stúdió — Bérletvásárlás visszaigazolás',
           messageType: 'PASS_PURCHASE_CONFIRMATION',
-          status: MessageStatus.DELIVERED,
+          status: MessageStatus.SENT,
           sentAt: addDays(now, -20),
           errorDetails: null,
         },
       ],
+      marketingConsent: true,
+      marketingConsentAt: addDays(now, -60),
     },
     {
       id: 'guest-2',
@@ -756,6 +757,8 @@ export function createInitialMockDatabase(): MockDatabaseState {
       documents: [],
       internalNotes: [],
       messageLogs: [],
+      marketingConsent: true,
+      marketingConsentAt: addDays(now, -30),
     },
     {
       id: 'guest-3',
@@ -836,6 +839,8 @@ export function createInitialMockDatabase(): MockDatabaseState {
       documents: [],
       internalNotes: [],
       messageLogs: [],
+      marketingConsent: true,
+      marketingConsentAt: addDays(now, -30),
     },
     {
       id: 'guest-4',
@@ -1461,6 +1466,7 @@ class MockStudioEngine {
     gender: Gender;
     status?: GuestStatus;
     notes?: string;
+    marketingConsent?: boolean;
   }): GuestDto {
     const state = this.load();
     const barcode =
@@ -1501,6 +1507,9 @@ class MockStudioEngine {
       documents: [],
       internalNotes: [],
       messageLogs: [],
+      marketingConsent: Boolean(input.marketingConsent),
+      marketingConsentAt: input.marketingConsent ? now : null,
+      unsubscribedAt: null,
     };
 
     state.guests.unshift(newGuest);
@@ -1521,6 +1530,7 @@ class MockStudioEngine {
       gender: Gender;
       status: GuestStatus;
       notes: string;
+      marketingConsent: boolean;
     }>,
   ): GuestDto {
     const state = this.load();
@@ -1560,6 +1570,13 @@ class MockStudioEngine {
         input.notes !== undefined ? input.notes.trim() || null : current.notes,
       updatedAt: new Date().toISOString(),
     };
+    // Hozzájárulás (TICKET-55): változáskor új időpont; az újbóli megadás a leiratkozást is törli.
+    const consent = input.marketingConsent;
+    if (consent !== undefined && consent !== Boolean(current.marketingConsent)) {
+      updated.marketingConsent = consent;
+      updated.marketingConsentAt = updated.updatedAt;
+      if (consent) updated.unsubscribedAt = null;
+    }
 
     state.guests[idx] = updated;
     this.save(state);
@@ -3166,31 +3183,19 @@ class MockStudioEngine {
     return created;
   }
 
-  sendGuestEmailLog(
-    guestId: string,
-    input: { subject: string; messageType: string },
-  ): MessageLogDto {
+  /** Leiratkozás a marketing levelekről (TICKET-55, a `mock-mail` nyilvános oldalához). */
+  markGuestUnsubscribed(guestId: string): GuestDto {
     const state = this.load();
     const guest = state.guests.find((g) => g.id === guestId);
     if (!guest) throw appError('GUEST.NOT_FOUND');
-
-    const created: MessageLogDto = {
-      id: `msg-${Date.now()}`,
-      guestId,
-      guestName: `${guest.lastName} ${guest.firstName}`,
-      recipientEmail: guest.email || 'nincs-email@reform.hu',
-      subject: input.subject.trim(),
-      messageType: input.messageType,
-      status: guest.email ? MessageStatus.DELIVERED : MessageStatus.FAILED,
-      sentAt: new Date().toISOString(),
-      errorDetails: guest.email
-        ? null
-        : 'A vendégnek nincs rögzített e-mail címe.',
-    };
-
-    guest.messageLogs = [created, ...(guest.messageLogs ?? [])];
-    this.save(state);
-    return created;
+    if (!guest.unsubscribedAt || guest.marketingConsent) {
+      const now = new Date().toISOString();
+      guest.unsubscribedAt ??= now;
+      guest.marketingConsent = false;
+      guest.marketingConsentAt = now;
+      this.save(state);
+    }
+    return guest;
   }
 
   getAuditLogs(): AuditLogDto[] {

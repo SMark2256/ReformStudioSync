@@ -15,6 +15,7 @@ import {
   ServiceCategory,
   VisitType,
 } from '../enums';
+import { EmailCategory } from '../email';
 import { CheckInResultPayload } from '../socket-events';
 
 export interface AuthUserDto {
@@ -264,16 +265,33 @@ export interface GuestNoteDto {
   createdAt: string;
 }
 
+/**
+ * Egy kimenő levél a sorban / naplóban (`message_logs`, TICKET-55). A TICKET-55 előtti sorok
+ * kevesebb adatot hordoznak (nincs sablon, próbálkozás, kategória).
+ */
 export interface MessageLogDto {
   id: string;
-  guestId: string;
+  /** Tesztlevélnél (munkatársnak) nincs vendég. */
+  guestId: string | null;
   guestName?: string;
   recipientEmail: string;
+  recipientName?: string | null;
   subject: string;
+  /** `EmailMessageType` (WELCOME, BIRTHDAY, …); a régi sorokban szabad szöveg. */
   messageType: string;
+  category?: EmailCategory;
   status: MessageStatus;
-  sentAt: string;
+  templateId?: string | null;
+  templateName?: string | null;
+  attempts?: number;
+  /** A sorba kerülés ideje. */
+  createdAt?: string;
+  /** A tényleges kiküldés ideje; várakozó vagy hibás levélnél `null`. */
+  sentAt: string | null;
+  /** Várakozó levélnél a következő próbálkozás ideje. */
+  nextAttemptAt?: string | null;
   errorDetails?: string | null;
+  createdByName?: string | null;
 }
 
 export interface AuditLogDto {
@@ -342,6 +360,15 @@ export interface GuestDto {
   documents?: GuestDocumentDto[];
   internalNotes?: GuestNoteDto[];
   messageLogs?: MessageLogDto[];
+  /**
+   * Marketingcélú levelek hozzájárulása (TICKET-55). A születés- és névnapi, valamint a csoportos
+   * levél csak ezzel megy ki. A régi mock-állapotban hiányozhat (= nincs hozzájárulás).
+   */
+  marketingConsent?: boolean;
+  /** A hozzájárulás utolsó változásának ideje (megadás vagy visszavonás). */
+  marketingConsentAt?: string | null;
+  /** A vendég a levélben kapott linkkel iratkozott le. */
+  unsubscribedAt?: string | null;
 }
 
 export interface LoggedCheckInDto {
@@ -530,3 +557,5 @@ export type TourEventDto =
   | { kind: 'seen'; id: string; step: number }
   | { kind: 'all' }
   | { kind: 'reset' };
+
+export * from './email';
