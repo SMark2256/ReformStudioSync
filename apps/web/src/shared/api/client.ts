@@ -55,11 +55,32 @@ import {
   UnsubscribeInfoDto,
   UpdateEmailAutomationDto,
   VisitType,
+  CreateIntakeSessionRequestDto,
+  DEVICE_TOKEN_HEADER,
+  DisplayDeviceKind,
+  INTAKE_TOKEN_HEADER,
+  IntakeAnswers,
+  IntakeDeviceAssignmentDto,
+  IntakeDocumentLinkDto,
+  IntakeDocumentSnapshotDto,
+  IntakeDuplicateCandidateDto,
+  IntakeGuestExitResponseDto,
+  IntakeGuestTokenDto,
+  IntakeGuestViewDto,
+  IntakeHealthDto,
+  IntakePackageDto,
+  IntakeProfileDraft,
+  IntakeSendToDeviceResponseDto,
+  IntakeSessionDetailDto,
+  IntakeSessionSummaryDto,
+  IntakeWarning,
+  UpdateIntakeSessionRequestDto,
 } from '@reform/shared';
 import { broadcastToLocalMonitors } from '@/shared/lib/monitor-channel';
 import { useAuthStore } from '@/shared/auth';
 import { isDemoMode } from './demo-mode';
 import { mockStudioEngine } from './mock-engine';
+import { mockIntakeEngine } from './mock-intake';
 import { mockMailEngine } from './mock-mail';
 
 const API_BASE_URL =
@@ -68,6 +89,27 @@ const API_BASE_URL =
 /** Demó módban, API nélkül ezzel a kóddal lehet belépni (a mock nem küld levelet). */
 const DEMO_LOGIN_CODE = '123456';
 
+/** Vendégfelvétel recepciós műveletei (`POST /intake/sessions/:id/<művelet>`). */
+export type IntakeSessionAction = 'release' | 'return' | 'approve' | 'retry' | 'cancel';
+
+type RequestOptions = RequestInit & {
+  /** Munkatársi token nélkül (a tablet vendégmódja és az eszköztokenes hívások). */
+  anonymous?: boolean;
+};
+
+/** A vendégmód kérése: csak a kitöltéshez kötött token. */
+function intakeGuestInit(
+  guestToken: string,
+  method: 'GET' | 'PUT' | 'POST' = 'GET',
+  body?: unknown,
+): RequestOptions {
+  return {
+    method,
+    headers: { [INTAKE_TOKEN_HEADER]: guestToken },
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    anonymous: true,
+  };
+}
 /** A mock jogosultság-ellenőrzéséhez: a bejelentkezett munkatárs. */
 const currentUser = () => useAuthStore.getState().user;
 
@@ -77,10 +119,10 @@ function isNetworkError(err: unknown): err is TypeError {
 
 async function request<T>(
   path: string,
-  options: RequestInit = {},
+  { anonymous, ...options }: RequestOptions = {},
   fallbackFn?: () => T | Promise<T>,
 ): Promise<T> {
-  const token = useAuthStore.getState().accessToken;
+  const token = anonymous ? null : useAuthStore.getState().accessToken;
 
   try {
     const response = await fetch(`${API_BASE_URL}${path}`, {
@@ -601,6 +643,201 @@ export const api = {
     );
   },
 
+  // Vendégfelvétel (TICKET-56): recepció, párosított tablet és a tablet vendégmódja.
+  getIntakePackages(): Promise<IntakePackageDto[]> {
+    return request('/intake/packages', {}, () => mockIntakeEngine.listPackages());
+  },
+
+  checkIntakeDuplicates(
+    profile: IntakeProfileDraft,
+  ): Promise<IntakeDuplicateCandidateDto[]> {
+    return request(
+      '/intake/duplicates',
+      { method: 'POST', body: JSON.stringify(profile) },
+      () => mockIntakeEngine.findDuplicates(profile),
+    );
+  },
+
+  getIntakeSessions(): Promise<IntakeSessionSummaryDto[]> {
+    return request('/intake/sessions', {}, () => mockIntakeEngine.listSessions());
+  },
+
+  createIntakeSession(
+    data: CreateIntakeSessionRequestDto,
+  ): Promise<IntakeSessionDetailDto> {
+    return request(
+      '/intake/sessions',
+      { method: 'POST', body: JSON.stringify(data) },
+      () => mockIntakeEngine.createSession(data, useAuthStore.getState().user),
+    );
+  },
+
+  getIntakeSession(id: string): Promise<IntakeSessionDetailDto> {
+    return request(`/intake/sessions/${id}`, {}, () =>
+      mockIntakeEngine.getDetail(id),
+    );
+  },
+
+  /** Egészségügyi válaszok: minden olvasás auditnaplóba kerül. */
+  getIntakeHealth(id: string): Promise<IntakeHealthDto> {
+    return request(`/intake/sessions/${id}/health`, {}, () =>
+      mockIntakeEngine.getHealth(id, useAuthStore.getState().user),
+    );
+  },
+
+  updateIntakeSession(
+    id: string,
+    data: UpdateIntakeSessionRequestDto,
+  ): Promise<IntakeSessionDetailDto> {
+    return request(
+      `/intake/sessions/${id}`,
+      { method: 'PATCH', body: JSON.stringify(data) },
+      () =>
+        mockIntakeEngine.updateSession(id, data, useAuthStore.getState().user),
+    );
+  },
+
+  startIntakeGuestMode(id: string): Promise<IntakeGuestTokenDto> {
+    return request(`/intake/sessions/${id}/guest-mode`, { method: 'POST' }, () =>
+      mockIntakeEngine.startGuestMode(id, useAuthStore.getState().user),
+    );
+  },
+
+  sendIntakeToDevice(
+    id: string,
+    deviceId: string,
+  ): Promise<IntakeSendToDeviceResponseDto> {
+    return request(
+      `/intake/sessions/${id}/send-to-device`,
+      { method: 'POST', body: JSON.stringify({ deviceId }) },
+      () =>
+        mockIntakeEngine.sendToDevice(
+          id,
+          deviceId,
+          useAuthStore.getState().user,
+        ),
+    );
+  },
+
+  intakeSessionAction(
+    id: string,
+    action: IntakeSessionAction,
+  ): Promise<IntakeSessionDetailDto> {
+    return request(`/intake/sessions/${id}/${action}`, { method: 'POST' }, () => {
+      const user = useAuthStore.getState().user;
+      switch (action) {
+        case 'release':
+          return mockIntakeEngine.releaseGuestMode(id, user);
+        case 'return':
+          return mockIntakeEngine.returnToGuest(id, user);
+        case 'approve':
+          return mockIntakeEngine.approve(id, user);
+        case 'retry':
+          return mockIntakeEngine.retry(id, user);
+        case 'cancel':
+          return mockIntakeEngine.cancel(id, user);
+      }
+    });
+  },
+
+  getGuestIntakeDocuments(guestId: string): Promise<IntakeDocumentSnapshotDto[]> {
+    return request(`/guests/${guestId}/intake-documents`, {}, () =>
+      mockIntakeEngine.listGuestDocuments(guestId),
+    );
+  },
+
+  async getIntakeDocumentLink(documentId: string): Promise<IntakeDocumentLinkDto> {
+    const link = await request<IntakeDocumentLinkDto>(
+      `/intake/documents/${documentId}/link`,
+      { method: 'POST' },
+      () =>
+        mockIntakeEngine.documentLink(documentId, useAuthStore.getState().user),
+    );
+    // A helyi tároló linkje az API relatív útvonala.
+    return link.url.startsWith('/')
+      ? { ...link, url: `${API_BASE_URL}${link.url}` }
+      : link;
+  },
+
+  emailIntakeDocument(documentId: string): Promise<{ sent: true }> {
+    return request(
+      `/intake/documents/${documentId}/email`,
+      { method: 'POST' },
+      () =>
+        mockIntakeEngine.sendDocumentEmail(
+          documentId,
+          useAuthStore.getState().user,
+        ),
+    );
+  },
+
+  /** Párosított tablet: a neki küldött kitöltés átvétele (`null`, ha nincs). */
+  claimIntakeForDevice(
+    deviceToken: string,
+  ): Promise<{ assignment: IntakeDeviceAssignmentDto | null }> {
+    return request(
+      '/intake/device/claim',
+      {
+        method: 'POST',
+        headers: { [DEVICE_TOKEN_HEADER]: deviceToken },
+        anonymous: true,
+      },
+      () => ({ assignment: mockIntakeEngine.claimForDevice(deviceToken) }),
+    );
+  },
+
+  // A vendégmód hívásai csak a kitöltéshez kötött tokent viszik (munkatársi token nincs).
+  getIntakeGuestView(guestToken: string): Promise<IntakeGuestViewDto> {
+    return request('/intake/guest/session', intakeGuestInit(guestToken), () =>
+      mockIntakeEngine.getGuestView(guestToken),
+    );
+  },
+
+  saveIntakeGuestAnswers(
+    guestToken: string,
+    formKey: string,
+    answers: IntakeAnswers,
+  ): Promise<{ warnings: IntakeWarning[] }> {
+    return request(
+      '/intake/guest/answers',
+      intakeGuestInit(guestToken, 'PUT', { formKey, answers }),
+      () => mockIntakeEngine.saveGuestAnswers(guestToken, formKey, answers),
+    );
+  },
+
+  saveIntakeGuestPhoto(
+    guestToken: string,
+    dataUrl: string,
+  ): Promise<{ saved: true }> {
+    return request(
+      '/intake/guest/photo',
+      intakeGuestInit(guestToken, 'PUT', { dataUrl }),
+      () => mockIntakeEngine.saveGuestPhoto(guestToken, dataUrl),
+    );
+  },
+
+  submitIntakeGuest(
+    guestToken: string,
+    signatureDataUrl: string,
+  ): Promise<IntakeGuestViewDto> {
+    return request(
+      '/intake/guest/submit',
+      intakeGuestInit(guestToken, 'POST', { signatureDataUrl }),
+      () => mockIntakeEngine.submitGuest(guestToken, signatureDataUrl),
+    );
+  },
+
+  exitIntakeGuestMode(
+    guestToken: string,
+    exitCode: string,
+  ): Promise<IntakeGuestExitResponseDto> {
+    return request(
+      '/intake/guest/exit',
+      intakeGuestInit(guestToken, 'POST', { exitCode }),
+      () => mockIntakeEngine.exitGuestMode(guestToken, exitCode),
+    );
+  },
+
   addInternalNote(guestId: string, content: string): Promise<GuestNoteDto> {
     return request(
       `/guests/${guestId}/notes`,
@@ -743,14 +980,17 @@ export const api = {
     );
   },
 
-  initDisplayPairing(name: string): Promise<DisplayDeviceDto> {
+  initDisplayPairing(
+    name: string,
+    kind: DisplayDeviceKind = 'MONITOR',
+  ): Promise<DisplayDeviceDto> {
     return request(
       '/auth/monitor/pair-init',
       {
         method: 'POST',
-        body: JSON.stringify({ name }),
+        body: JSON.stringify({ name, kind }),
       },
-      () => mockStudioEngine.initDisplayPairing(name),
+      () => mockStudioEngine.initDisplayPairing(name, kind),
     );
   },
 

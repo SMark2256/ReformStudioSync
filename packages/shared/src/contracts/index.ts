@@ -220,6 +220,15 @@ export interface MeasurementDto {
   thighCm: number | null;
   armCm: number | null;
   chestCm: number | null;
+  /** Az Omron mérő és a felvételi körfogatok (TICKET-56); régi méréseknél hiányozhatnak. */
+  bmi?: number | null;
+  skeletalMusclePct?: number | null;
+  restingMetabolismKcal?: number | null;
+  abdomenCm?: number | null;
+  aboveKneeCm?: number | null;
+  calfCm?: number | null;
+  /** A mérés vendégfelvételből jött (TICKET-56). */
+  intakeSessionId?: string | null;
   note: string | null;
   /** A rögzítő munkatárs; `null`, ha ismeretlen vagy a fiókja már nem létezik. */
   recordedById: string | null;
@@ -239,6 +248,8 @@ export interface GuestPhotoDto {
   width: number;
   height: number;
   visibilityRole: Role;
+  /** `PROFILE`: belső azonosító profilkép a vendégfelvételből (TICKET-56), nem marketingcélú. */
+  purpose?: 'PROGRESS' | 'PROFILE';
   note: string | null;
 }
 
@@ -516,9 +527,14 @@ export interface OfflineSyncResponseDto {
 
 export type DisplayDeviceStatus = 'PENDING_PAIRING' | 'PAIRED' | 'EXPIRED';
 
+/** A párosított eszköz szerepe (TICKET-56): Vendégmonitor vagy vendégfelvételi tablet. */
+export type DisplayDeviceKind = 'MONITOR' | 'TABLET';
+
 export interface DisplayDeviceDto {
   id: string;
   name: string;
+  /** Régi (TICKET-56 előtti) adatnál hiányozhat: ilyenkor Vendégmonitor. */
+  kind?: DisplayDeviceKind;
   status: DisplayDeviceStatus;
   pairingCode: string | null;
   pairingExpiresAt: string | null;

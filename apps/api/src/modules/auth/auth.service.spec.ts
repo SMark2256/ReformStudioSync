@@ -146,6 +146,7 @@ describe('AuthService.validateSocketToken — közben törölt kijelző (TICKET-
       type: 'DEVICE',
       name: 'Bejárati kijelző',
       deviceId: 'device-1',
+      deviceKind: 'MONITOR',
     });
     expect(prismaMock.displayDevice.updateMany).toHaveBeenCalledWith({
       where: { id: 'device-1', deviceToken: 'old-token' },

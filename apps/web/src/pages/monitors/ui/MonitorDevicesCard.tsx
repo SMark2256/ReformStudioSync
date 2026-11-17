@@ -1,4 +1,4 @@
-import { DisplayDeviceDto } from '@reform/shared';
+import { DisplayDeviceDto, DisplayDeviceKind } from '@reform/shared';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Edit3,
@@ -28,6 +28,8 @@ import {
   ConfirmActionButton,
   Input,
   Label,
+  ToggleGroup,
+  ToggleGroupItem,
 } from '@/shared/ui';
 
 const sectionTitleClassName = 'text-[13px] font-semibold text-foreground';
@@ -53,6 +55,8 @@ export const MonitorDevicesCard: React.FC = () => {
     mockStudioEngine.getMonitorGreetingSeconds(),
   );
   const [newDeviceName, setNewDeviceName] = useState('Recepciós Tablet #1');
+  // TICKET-56: a párosított eszköz Vendégmonitor vagy vendégfelvételi tablet.
+  const [newDeviceKind, setNewDeviceKind] = useState<DisplayDeviceKind>('MONITOR');
 
   const devicesQuery = useDisplayDevices();
   const devices = devicesQuery.data ?? [];
@@ -63,11 +67,13 @@ export const MonitorDevicesCard: React.FC = () => {
     queryClient.invalidateQueries({ queryKey: DISPLAY_DEVICES_QUERY_KEY });
 
   const initPairingMutation = useMutation({
-    mutationFn: (name: string) => api.initDisplayPairing(name),
+    mutationFn: (name: string) => api.initDisplayPairing(name, newDeviceKind),
     onSuccess: (device) => {
       notify.success(
         `6 jegyű párosító kód generálva: ${device.pairingCode}`,
-        `Írd be ezt a kódot (10 percig érvényes) a(z) "${device.name}" eszköz /monitor oldalán.`,
+        `Írd be ezt a kódot (10 percig érvényes) a(z) "${device.name}" eszköz ${
+          device.kind === 'TABLET' ? '/tablet/intake' : '/monitor'
+        } oldalán.`,
       );
       setNewDeviceName('');
       void refreshDevices();
@@ -188,6 +194,16 @@ export const MonitorDevicesCard: React.FC = () => {
             }}
             className="mt-3 flex flex-col gap-1.5"
           >
+            <ToggleGroup
+              type="single"
+              value={newDeviceKind}
+              onValueChange={(value) => value && setNewDeviceKind(value as DisplayDeviceKind)}
+              aria-label="Eszköz szerepe"
+              className="mb-2 self-start"
+            >
+              <ToggleGroupItem value="MONITOR">Vendégmonitor</ToggleGroupItem>
+              <ToggleGroupItem value="TABLET">Vendégfelvételi tablet</ToggleGroupItem>
+            </ToggleGroup>
             <Label htmlFor={deviceNameInputId}>Eszköz neve</Label>
             <div className="flex flex-col gap-2 sm:flex-row">
               <Input

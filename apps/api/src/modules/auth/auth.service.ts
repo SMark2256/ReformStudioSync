@@ -10,6 +10,7 @@ import {
   AuthUserDto,
   DEFAULT_STUDIO_ID,
   DisplayDeviceDto,
+  DisplayDeviceKind,
   DisplayDeviceStatus,
   MonitorTestPingPayload,
   PairDisplayResponseDto,
@@ -42,6 +43,7 @@ export class AuthService {
   private toDisplayDeviceDto(device: {
     id: string;
     name: string;
+    kind?: DisplayDeviceKind;
     pairingCode: string | null;
     pairingExpiresAt?: Date | null;
     pairedAt?: Date | null;
@@ -67,6 +69,7 @@ export class AuthService {
     return {
       id: device.id,
       name: device.name,
+      kind: device.kind ?? 'MONITOR',
       status,
       pairingCode: device.pairingCode,
       pairingExpiresAt: device.pairingExpiresAt
@@ -167,6 +170,7 @@ export class AuthService {
       data: {
         studioId,
         name: dto.name.trim(),
+        kind: dto.kind ?? 'MONITOR',
         pairingCode,
         pairingExpiresAt,
         pairedAt: null,
@@ -409,6 +413,8 @@ export class AuthService {
     type: 'STAFF' | 'DEVICE';
     name: string;
     deviceId?: string;
+    /** Eszköztokennél: Vendégmonitor vagy vendégfelvételi tablet (TICKET-56). */
+    deviceKind?: DisplayDeviceKind;
   }> {
     try {
       const payload = await this.jwtService.verifyAsync(token);
@@ -444,6 +450,7 @@ export class AuthService {
         type: 'DEVICE',
         name: device.name,
         deviceId: device.id,
+        deviceKind: device.kind ?? 'MONITOR',
       };
     }
   }

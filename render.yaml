@@ -38,3 +38,11 @@ services:
         sync: false
       - key: PUBLIC_WEB_URL
         sync: false
+      # Dokumentumtárolás (TICKET-56, Supabase Storage, privát bucket). Nélküle productionben a
+      # vendégfelvétel PDF-mentése „tárolás nincs beállítva” hibát ad (újrapróbálható).
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_STORAGE_BUCKET
+        sync: false

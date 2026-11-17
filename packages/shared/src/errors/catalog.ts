@@ -84,6 +84,31 @@ export const APP_ERROR_CATALOG = {
   'PAYMENT.NOT_FOUND': { status: 404, message: 'A fizetési tétel nem található.', action: 'notify' },
   'PAYMENT.ALREADY_CANCELLED': { status: 400, message: 'Ez a fizetési tétel már sztornózva lett.', action: 'notify' },
 
+  // Vendégfelvétel (TICKET-56)
+  'INTAKE.NOT_FOUND': { status: 404, message: 'A vendégfelvétel nem található.', action: 'notify' },
+  'INTAKE.PACKAGE_REQUIRED': { status: 400, message: 'Válassz legalább egy csomagot (Köredzés, Hypoxi).', action: 'notify' },
+  'INTAKE.PACKAGE_UNKNOWN': { status: 400, message: 'Ismeretlen vagy inaktív csomag.', action: 'notify' },
+  'INTAKE.GUEST_REQUIRED': { status: 400, message: 'Válassz meglévő vendéget, vagy add meg az új vendég nevét.', action: 'notify' },
+  'INTAKE.DUPLICATE_SUSPECTED': { status: 409, message: 'Hasonló adatokkal már van vendég. Válaszd ki a meglévőt, vagy erősítsd meg, hogy új vendéget veszel fel.', action: 'notify' },
+  'INTAKE.NOTHING_MISSING': { status: 409, message: 'A vendég a választott csomagok minden dokumentumát aláírta már.', action: 'notify' },
+  'INTAKE.INVALID_TRANSITION': { status: 409, message: 'A vendégfelvétel állapota időközben megváltozott, ez a lépés most nem végezhető el.', action: 'reload' },
+  'INTAKE.ANSWERS_INCOMPLETE': { status: 400, message: 'Néhány kötelező kérdés megválaszolatlan.', action: 'notify' },
+  'INTAKE.SIGNATURE_REQUIRED': { status: 400, message: 'A beküldéshez aláírás szükséges.', action: 'notify' },
+  'INTAKE.PHOTO_TOO_LARGE': { status: 413, message: 'A profilkép túl nagy. Készíts új képet.', action: 'notify' },
+  'INTAKE.GUEST_TOKEN_INVALID': { status: 401, message: 'A vendégmód lejárt vagy lezárult. Kérjük, fordulj a recepcióhoz.', action: 'notify' },
+  'INTAKE.EXIT_CODE_INVALID': { status: 403, message: 'Hibás kilépési kód.', action: 'notify' },
+  'INTAKE.EXIT_LOCKED': { status: 423, message: 'Túl sok hibás kilépési kód. A vendégmódot a recepció PC-jén lehet lezárni.', action: 'notify' },
+  'INTAKE.DEVICE_NOT_TABLET': { status: 400, message: 'A kiválasztott eszköz nem párosított tablet.', action: 'notify' },
+  'INTAKE.PROFILE_INCOMPLETE': { status: 400, message: 'A jóváhagyáshoz a vendég vezeték- és keresztneve szükséges.', action: 'notify' },
+  'INTAKE.DOCUMENT_NOT_FOUND': { status: 404, message: 'Az aláírt dokumentum nem található.', action: 'notify' },
+  'INTAKE.PDF_NOT_READY': { status: 409, message: 'A dokumentum PDF-je még nem készült el. Próbáld újra a lezárást.', action: 'notify' },
+  'INTAKE.EMAIL_MISSING': { status: 400, message: 'A vendégnek nincs e-mail címe, a dokumentum nem küldhető el.', action: 'notify' },
+  'INTAKE.MAIL_FAILED': { status: 502, message: 'A dokumentumot nem sikerült elküldeni. Próbáld újra később.', action: 'retry' },
+
+  // Fájltárolás (TICKET-56)
+  'STORAGE.NOT_CONFIGURED': { status: 424, message: 'A dokumentumtárolás nincs beállítva (Supabase Storage). Szólj a rendszergazdának.', action: 'notify' },
+  'STORAGE.UNAVAILABLE': { status: 502, message: 'A dokumentumtároló nem érhető el. Próbáld újra később.', action: 'retry' },
+  'STORAGE.LINK_INVALID': { status: 403, message: 'A letöltési link lejárt vagy érvénytelen.', action: 'notify' },
   // Vendégkommunikáció (TICKET-55)
   'MAIL.TEMPLATE_NOT_FOUND': { status: 404, message: 'Az e-mail-sablon nem található.', action: 'reload' },
   'MAIL.EMPTY_CONTENT': { status: 400, message: 'A levél tárgya és szövege nem lehet üres.', action: 'notify' },

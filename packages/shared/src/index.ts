@@ -11,4 +11,6 @@ export * from './greeting';
 export * from './guest-arrivals';
 export * from './measurements';
 export * from './tours';
+export * from './intake';
+export * from './intake-forms';
 export * from './email';

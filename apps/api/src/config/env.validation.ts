@@ -13,6 +13,14 @@ export interface EnvConfig {
   MAIL_FROM_NAME: string;
   /** Rögzített belépőkód teszteknek (E2E, CI); productionben nem engedélyezett. */
   AUTH_FIXED_LOGIN_CODE?: string;
+  /**
+   * Dokumentumtárolás (TICKET-56, Supabase Storage). Nélküle nem production módban helyi
+   * fájlrendszer (`LOCAL_STORAGE_DIR`), productionben a PDF-mentés „nincs beállítva” hibát ad.
+   */
+  SUPABASE_URL?: string;
+  SUPABASE_SERVICE_ROLE_KEY?: string;
+  SUPABASE_STORAGE_BUCKET: string;
+  LOCAL_STORAGE_DIR?: string;
   /** A kimenő sor óránkénti korlátja (TICKET-55); a SendPulse teszt csomaghoz 10. */
   MAIL_HOURLY_LIMIT: number;
   /** A webapp címe a levelekben (leiratkozó link); alapból a `CORS_ORIGIN` első címe. */
@@ -75,6 +83,10 @@ export function validateEnv(config: Record<string, unknown>): EnvConfig {
     MAIL_FROM_EMAIL: optional(config.MAIL_FROM_EMAIL) ?? 'devtest@sendpulseemail.com',
     MAIL_FROM_NAME: optional(config.MAIL_FROM_NAME) ?? 'ReformStudio Sync',
     AUTH_FIXED_LOGIN_CODE: fixedLoginCode,
+    SUPABASE_URL: optional(config.SUPABASE_URL),
+    SUPABASE_SERVICE_ROLE_KEY: optional(config.SUPABASE_SERVICE_ROLE_KEY),
+    SUPABASE_STORAGE_BUCKET: optional(config.SUPABASE_STORAGE_BUCKET) ?? 'guest-documents',
+    LOCAL_STORAGE_DIR: optional(config.LOCAL_STORAGE_DIR),
     MAIL_HOURLY_LIMIT: hourlyLimit,
     PUBLIC_WEB_URL: publicWebUrl.replace(/\/+$/, ''),
   };

@@ -1,9 +1,10 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Role } from '@reform/shared';
+import { DisplayDeviceKind, Role } from '@reform/shared';
 import { Transform } from 'class-transformer';
 import {
   IsEmail,
   IsEnum,
+  IsIn,
   IsNotEmpty,
   IsOptional,
   IsString,
@@ -48,6 +49,11 @@ export class InitDisplayPairingDto {
   @IsString()
   @IsNotEmpty({ message: 'Az eszköz nevének megadása kötelező.' })
   name: string;
+
+  @ApiPropertyOptional({ enum: ['MONITOR', 'TABLET'], default: 'MONITOR' })
+  @IsOptional()
+  @IsIn(['MONITOR', 'TABLET'])
+  kind?: DisplayDeviceKind;
 }
 
 export class VerifyDisplayPairingDto {

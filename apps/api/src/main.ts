@@ -1,14 +1,17 @@
 import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { AppExceptionFilter } from './common/filters/app-exception.filter';
 import { validationExceptionFactory } from './common/filters/validation-exception.factory';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
   const configService = app.get(ConfigService);
+  // Aláírás és profilkép data URL-ként érkezik (TICKET-56): a 100 KB-os alapkorlát kevés.
+  app.useBodyParser('json', { limit: '2mb' });
 
   app.setGlobalPrefix('api');
 
