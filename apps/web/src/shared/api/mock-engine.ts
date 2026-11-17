@@ -20,6 +20,7 @@ import {
   DEFAULT_MONITOR_GREETING_SECONDS,
   DEFAULT_STUDIO_ID,
   DisplayDeviceDto,
+  DisplayDeviceKind,
   DisplayDeviceStatus,
   DocumentStatus,
   DocumentType,
@@ -1238,6 +1239,7 @@ function normalizeDisplayDevice(d: Partial<DisplayDeviceDto> & { id: string; nam
   return {
     id: d.id,
     name: d.name,
+    kind: d.kind ?? 'MONITOR',
     status,
     pairingCode,
     pairingExpiresAt,
@@ -3006,6 +3008,14 @@ class MockStudioEngine {
       thighCm: input.thighCm ?? null,
       armCm: input.armCm ?? null,
       chestCm: input.chestCm ?? null,
+      // TICKET-56: Omron mérő, felvételi körfogatok és a forrás vendégfelvétel.
+      bmi: input.bmi ?? null,
+      skeletalMusclePct: input.skeletalMusclePct ?? null,
+      restingMetabolismKcal: input.restingMetabolismKcal ?? null,
+      abdomenCm: input.abdomenCm ?? null,
+      aboveKneeCm: input.aboveKneeCm ?? null,
+      calfCm: input.calfCm ?? null,
+      intakeSessionId: input.intakeSessionId ?? null,
       note: input.note?.trim() || null,
       recordedById: recordedBy?.id ?? null,
       recordedByName: recordedBy?.name ?? 'Recepciós Munkatárs',
@@ -3049,6 +3059,7 @@ class MockStudioEngine {
       height?: number;
       visibilityRole?: Role;
       note?: string | null;
+      purpose?: GuestPhotoDto['purpose'];
     },
   ): GuestPhotoDto {
     const state = this.load();
@@ -3069,6 +3080,7 @@ class MockStudioEngine {
       width: input.width ?? 0,
       height: input.height ?? 0,
       visibilityRole: input.visibilityRole ?? Role.RECEPTIONIST,
+      purpose: input.purpose ?? 'PROGRESS',
       note: input.note?.trim() || null,
     };
 
@@ -3244,7 +3256,7 @@ class MockStudioEngine {
     return trimmed;
   }
 
-  initDisplayPairing(name: string): DisplayDeviceDto {
+  initDisplayPairing(name: string, kind: DisplayDeviceKind = 'MONITOR'): DisplayDeviceDto {
     const state = this.load();
     const cleanName = this.ensureUniqueDeviceName(state.devices, name);
     const now = new Date();
@@ -3254,6 +3266,7 @@ class MockStudioEngine {
     const device: DisplayDeviceDto = {
       id: `dev-${Date.now()}`,
       name: cleanName,
+      kind,
       status: 'PENDING_PAIRING',
       pairingCode: code,
       pairingExpiresAt: expiresAt.toISOString(),

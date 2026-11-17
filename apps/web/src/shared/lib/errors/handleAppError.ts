@@ -14,7 +14,7 @@ let lastNetworkErrorAt = 0;
 const MONITOR_PATH = '/monitor';
 
 // A bejelentkezés és a Vendégmonitor oldaláról nem irányítunk át a bejelentkezésre.
-const NO_LOGIN_REDIRECT_PATHS = ['/login', MONITOR_PATH];
+const NO_LOGIN_REDIRECT_PATHS = ['/login', MONITOR_PATH, '/tablet/intake'];
 
 let queryClient: QueryClient | null = null;
 
