@@ -835,7 +835,7 @@ export class IntakeService {
         }),
       ]);
     } else {
-      const data: Prisma.IntakeSessionUpdateManyMutationInput = {
+      const data: Prisma.IntakeSessionUncheckedUpdateManyInput = {
         status,
         answers: toJson({ ...general, [form.key]: answers }),
       };
@@ -960,7 +960,7 @@ export class IntakeService {
     sessionId: string,
     studioId: string,
     event: IntakeEvent,
-    data: Prisma.IntakeSessionUpdateManyMutationInput = {},
+    data: Prisma.IntakeSessionUncheckedUpdateManyInput = {},
   ): Promise<IntakeStatus> {
     const session = await this.loadSession(sessionId, studioId);
     const current = session.status as IntakeStatus;
