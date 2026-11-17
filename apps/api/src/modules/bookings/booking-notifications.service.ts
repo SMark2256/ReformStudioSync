@@ -85,6 +85,7 @@ export class BookingNotificationsService {
             subject: message.subject,
             messageType,
             status,
+            sentAt: status === 'SENT' ? new Date() : null,
             errorDetails: errorDetails ?? null,
           },
         })

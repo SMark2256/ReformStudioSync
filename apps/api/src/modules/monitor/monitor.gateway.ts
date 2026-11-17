@@ -14,6 +14,8 @@ import {
   CheckInResultPayload,
   CheckInRevokedPayload,
   DEFAULT_STUDIO_ID,
+  IntakeDevicePayload,
+  IntakeSocketPayload,
   MonitorAuthRejectedPayload,
   MonitorDeviceRevokedPayload,
   MonitorStatePayload,
@@ -84,6 +86,11 @@ export class MonitorGateway
     return `${this.getRoomName(studioId)}:staff`;
   }
 
+  /** Egy párosított eszköz saját szobája (TICKET-56: a tabletre küldött vendégfelvétel). */
+  private getDeviceRoomName(deviceId: string): string {
+    return `device:${deviceId}`;
+  }
+
   isDeviceOnline(deviceId: string): boolean {
     for (const entry of this.clients.values()) {
       if (entry.deviceId === deviceId) return true;
@@ -122,8 +129,11 @@ export class MonitorGateway
       // teljes eredményt. A jelző csak szűkíthet, jogosultságot nem ad.
       const displayOnly = client.handshake.auth?.displayOnly === true;
       const isStaffDesk = validated.type === 'STAFF' && !displayOnly;
+      const deviceId =
+        validated.type === 'DEVICE' ? validated.deviceId : undefined;
       const rooms = [this.getRoomName(studioId)];
       if (isStaffDesk) rooms.push(this.getStaffRoomName(studioId));
+      if (deviceId) rooms.push(this.getDeviceRoomName(deviceId));
       for (const room of rooms) {
         await client.join(room);
       }
@@ -135,8 +145,6 @@ export class MonitorGateway
         return;
       }
 
-      const deviceId =
-        validated.type === 'DEVICE' ? validated.deviceId : undefined;
       // A hitelesítés alatt visszavont eszköz: a bontás a szobákból is kivezeti.
       if (deviceId && (this.revokedDevices.get(deviceId) ?? 0) > startedAtSeq) {
         throw appError('AUTH.DEVICE_TOKEN_INVALID');
@@ -145,7 +153,8 @@ export class MonitorGateway
       this.clients.set(client.id, {
         studioId,
         deviceId,
-        isDisplay: !isStaffDesk,
+        // A vendégfelvételi tablet nem kijelző (TICKET-56): nem számít a kijelzők közé.
+        isDisplay: !isStaffDesk && validated.deviceKind !== 'TABLET',
       });
       this.broadcastMonitorState(studioId);
     } catch (err) {
@@ -268,6 +277,23 @@ export class MonitorGateway
           .catch(() => {});
       }
     }
+  }
+
+  /** Vendégfelvétel a tabletre küldve / a vendégmód lezárva: csak az eszköz socketjei kapják. */
+  emitToDevice(
+    event: typeof SOCKET_EVENTS.INTAKE_ASSIGNED | typeof SOCKET_EVENTS.INTAKE_RELEASED,
+    payload: IntakeDevicePayload,
+  ) {
+    if (!this.server) return;
+    this.server.to(this.getDeviceRoomName(payload.deviceId)).emit(event, payload);
+  }
+
+  /** Egy vendégfelvétel állapota változott: csak a munkatársi szoba kapja (név, adat nélkül). */
+  emitIntakeUpdated(payload: IntakeSocketPayload, studioId = DEFAULT_STUDIO_ID) {
+    if (!this.server) return;
+    this.server
+      .to(this.getStaffRoomName(studioId))
+      .emit(SOCKET_EVENTS.INTAKE_UPDATED, payload);
   }
 
   emitTestPing(payload: MonitorTestPingPayload, studioId = DEFAULT_STUDIO_ID) {

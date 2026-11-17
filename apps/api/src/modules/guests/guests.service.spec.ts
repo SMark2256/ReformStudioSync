@@ -91,7 +91,7 @@ describe('GuestsService — belépések a vendégadatlapon (TICKET-40)', () => {
     prismaMock = { guest: { findFirst: vi.fn() } };
     const financeMock = { ensureDuesForGuest: vi.fn().mockResolvedValue(undefined) };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    service = new GuestsService(prismaMock as any, financeMock as any);
+    service = new GuestsService(prismaMock as any, financeMock as any, {} as any);
   });
 
   it('a lekérés a beléptetési naplót kéri, legújabb elöl, korlátozva, dupla beolvasás nélkül', async () => {
@@ -248,7 +248,7 @@ describe('GuestsService — mérés törlése (TICKET-8)', () => {
       $transaction: vi.fn((cb: (tx: any) => unknown) => cb(txMock)),
     };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    service = new GuestsService(prismaMock as any, {} as any);
+    service = new GuestsService(prismaMock as any, {} as any, {} as any);
   });
 
   it('a rögzítő munkatárs törölheti, a törlés naplózódik', async () => {

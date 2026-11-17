@@ -36,6 +36,15 @@ export const SOCKET_EVENTS = {
    * szobába megy, személyes adat nélkül: a recepciós naptár erre újratölti az érintett napokat.
    */
   BOOKING_CHANGED: 'booking:changed',
+  /**
+   * Vendégfelvétel (TICKET-56): a recepció egy kitöltést küldött erre a tabletre
+   * (`IntakeDevicePayload`). Csak az eszköz socketjei kapják; a token a `claim` hívással jön.
+   */
+  INTAKE_ASSIGNED: 'intake:assigned',
+  /** A recepció lezárta a tablet vendégmódját (`IntakeDevicePayload`). */
+  INTAKE_RELEASED: 'intake:released',
+  /** Egy kitöltés állapota változott (`IntakeSocketPayload`); csak a munkatársi szoba kapja. */
+  INTAKE_UPDATED: 'intake:updated',
 } as const;
 
 /**

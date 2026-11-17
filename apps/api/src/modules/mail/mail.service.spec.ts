@@ -72,4 +72,22 @@ describe('MailService — SendPulse (TICKET-35)', () => {
     expect(createService({ SENDPULSE_API_KEY: '' }).isConfigured).toBe(false);
     expect(createService({ SENDPULSE_API_KEY: 'sp-key' }).isConfigured).toBe(true);
   });
+
+  it('csatolmánnyal (TICKET-56): base64-ként az attachments_binary mezőben; nélküle nincs ilyen mező', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response('{"result":true}', { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    const service = createService({ SENDPULSE_API_KEY: 'sp-key' });
+
+    await service.send(to, message, {
+      attachments: [{ filename: 'Egészségügyi kérdőív.pdf', content: Buffer.from('%PDF-1.7') }],
+    });
+    await service.send(to, message);
+
+    const withAttachment = JSON.parse(String((fetchMock.mock.calls[0] as [string, RequestInit])[1].body));
+    expect(withAttachment.email.attachments_binary).toEqual({
+      'Egészségügyi kérdőív.pdf': Buffer.from('%PDF-1.7').toString('base64'),
+    });
+    const without = JSON.parse(String((fetchMock.mock.calls[1] as [string, RequestInit])[1].body));
+    expect(without.email).not.toHaveProperty('attachments_binary');
+  });
 });

@@ -11,6 +11,16 @@ export interface MailRecipient {
   name: string;
 }
 
+/** Csatolmány (TICKET-56): a SendPulse SMTP API `attachments_binary` mezőjébe base64-ként kerül. */
+export interface MailAttachment {
+  filename: string;
+  content: Buffer;
+}
+
+export interface MailSendOptions {
+  attachments?: MailAttachment[];
+}
+
 /**
  * Levélküldés a SendPulse SMTP REST API-ján (TICKET-35). A naplóba csak a HTTP státusz
  * kerül, a válasz törzse nem (a címzett adatait tartalmazhatja).
@@ -30,10 +40,15 @@ export class MailService {
     return Boolean(this.apiKey);
   }
 
-  async send(to: MailRecipient, message: RenderedEmail): Promise<void> {
+  async send(
+    to: MailRecipient,
+    message: RenderedEmail,
+    options: MailSendOptions = {},
+  ): Promise<void> {
     const apiKey = this.apiKey;
     if (!apiKey) throw appError('AUTH.MAIL_UNAVAILABLE');
 
+    const attachments = options.attachments ?? [];
     const body = {
       email: {
         subject: message.subject,
@@ -46,6 +61,13 @@ export class MailService {
             'devtest@sendpulseemail.com',
         },
         to: [{ email: to.email, name: to.name }],
+        ...(attachments.length > 0
+          ? {
+              attachments_binary: Object.fromEntries(
+                attachments.map((a) => [a.filename, a.content.toString('base64')]),
+              ),
+            }
+          : {}),
       },
     };
 

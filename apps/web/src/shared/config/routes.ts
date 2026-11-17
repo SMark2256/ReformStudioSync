@@ -5,8 +5,10 @@ export const APP_ROUTES = {
   monitor: { path: '/monitor', title: 'Vendégmonitor' },
   bookings: { path: '/bookings', title: 'Foglalások' },
   guests: { path: '/guests', title: 'Vendégek' },
+  intake: { path: '/intake', title: 'Vendégfelvétel' },
   passes: { path: '/passes', title: 'Bérletek és termékek' },
   finance: { path: '/finance', title: 'Pénzügy' },
+  mailing: { path: '/mailing', title: 'Levelezés' },
   news: { path: '/news', title: 'Újdonságok' },
   demo: { path: '/demo', title: 'Demó mód' },
   monitors: { path: '/monitors', title: 'Monitorok' },
@@ -21,6 +23,9 @@ export const PUBLIC_BOOKING_ROUTES = {
 } as const;
 
 export type AppRouteKey = keyof typeof APP_ROUTES;
+
+/** A tablet vendégmódja (TICKET-56): keret nélkül, a vendég tölti ki és írja alá. */
+export const TABLET_INTAKE_PATH = '/tablet/intake';
 
 // A react-router kis- és nagybetűtől, illetve a záró perjeltől függetlenül illeszt; az
 // útvonal szerinti keresések (oldalnév, recepciós fül) ugyanígy hasonlítsanak.

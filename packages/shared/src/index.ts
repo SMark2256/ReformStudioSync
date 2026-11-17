@@ -13,3 +13,6 @@ export * from './measurements';
 export * from './tours';
 export * from './booking-rules';
 export * from './booking-contracts';
+export * from './intake';
+export * from './intake-forms';
+export * from './email';

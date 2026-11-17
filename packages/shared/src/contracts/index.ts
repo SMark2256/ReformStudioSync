@@ -15,6 +15,7 @@ import {
   ServiceCategory,
   VisitType,
 } from '../enums';
+import { EmailCategory } from '../email';
 import { CheckInResultPayload } from '../socket-events';
 
 export interface AuthUserDto {
@@ -219,6 +220,15 @@ export interface MeasurementDto {
   thighCm: number | null;
   armCm: number | null;
   chestCm: number | null;
+  /** Az Omron mérő és a felvételi körfogatok (TICKET-56); régi méréseknél hiányozhatnak. */
+  bmi?: number | null;
+  skeletalMusclePct?: number | null;
+  restingMetabolismKcal?: number | null;
+  abdomenCm?: number | null;
+  aboveKneeCm?: number | null;
+  calfCm?: number | null;
+  /** A mérés vendégfelvételből jött (TICKET-56). */
+  intakeSessionId?: string | null;
   note: string | null;
   /** A rögzítő munkatárs; `null`, ha ismeretlen vagy a fiókja már nem létezik. */
   recordedById: string | null;
@@ -238,6 +248,8 @@ export interface GuestPhotoDto {
   width: number;
   height: number;
   visibilityRole: Role;
+  /** `PROFILE`: belső azonosító profilkép a vendégfelvételből (TICKET-56), nem marketingcélú. */
+  purpose?: 'PROGRESS' | 'PROFILE';
   note: string | null;
 }
 
@@ -264,16 +276,33 @@ export interface GuestNoteDto {
   createdAt: string;
 }
 
+/**
+ * Egy kimenő levél a sorban / naplóban (`message_logs`, TICKET-55). A TICKET-55 előtti sorok
+ * kevesebb adatot hordoznak (nincs sablon, próbálkozás, kategória).
+ */
 export interface MessageLogDto {
   id: string;
-  guestId: string;
+  /** Tesztlevélnél (munkatársnak) nincs vendég. */
+  guestId: string | null;
   guestName?: string;
   recipientEmail: string;
+  recipientName?: string | null;
   subject: string;
+  /** `EmailMessageType` (WELCOME, BIRTHDAY, …); a régi sorokban szabad szöveg. */
   messageType: string;
+  category?: EmailCategory;
   status: MessageStatus;
-  sentAt: string;
+  templateId?: string | null;
+  templateName?: string | null;
+  attempts?: number;
+  /** A sorba kerülés ideje. */
+  createdAt?: string;
+  /** A tényleges kiküldés ideje; várakozó vagy hibás levélnél `null`. */
+  sentAt: string | null;
+  /** Várakozó levélnél a következő próbálkozás ideje. */
+  nextAttemptAt?: string | null;
   errorDetails?: string | null;
+  createdByName?: string | null;
 }
 
 export interface AuditLogDto {
@@ -342,6 +371,15 @@ export interface GuestDto {
   documents?: GuestDocumentDto[];
   internalNotes?: GuestNoteDto[];
   messageLogs?: MessageLogDto[];
+  /**
+   * Marketingcélú levelek hozzájárulása (TICKET-55). A születés- és névnapi, valamint a csoportos
+   * levél csak ezzel megy ki. A régi mock-állapotban hiányozhat (= nincs hozzájárulás).
+   */
+  marketingConsent?: boolean;
+  /** A hozzájárulás utolsó változásának ideje (megadás vagy visszavonás). */
+  marketingConsentAt?: string | null;
+  /** A vendég a levélben kapott linkkel iratkozott le. */
+  unsubscribedAt?: string | null;
 }
 
 export interface LoggedCheckInDto {
@@ -489,9 +527,14 @@ export interface OfflineSyncResponseDto {
 
 export type DisplayDeviceStatus = 'PENDING_PAIRING' | 'PAIRED' | 'EXPIRED';
 
+/** A párosított eszköz szerepe (TICKET-56): Vendégmonitor vagy vendégfelvételi tablet. */
+export type DisplayDeviceKind = 'MONITOR' | 'TABLET';
+
 export interface DisplayDeviceDto {
   id: string;
   name: string;
+  /** Régi (TICKET-56 előtti) adatnál hiányozhat: ilyenkor Vendégmonitor. */
+  kind?: DisplayDeviceKind;
   status: DisplayDeviceStatus;
   pairingCode: string | null;
   pairingExpiresAt: string | null;
@@ -530,3 +573,5 @@ export type TourEventDto =
   | { kind: 'seen'; id: string; step: number }
   | { kind: 'all' }
   | { kind: 'reset' };
+
+export * from './email';

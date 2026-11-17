@@ -31,4 +31,20 @@ describe('validateEnv — levélküldés és tesztkód (TICKET-35)', () => {
     ).toThrow(/AUTH_FIXED_LOGIN_CODE/);
     expect(() => validateEnv({ AUTH_FIXED_LOGIN_CODE: '12345' })).toThrow(/AUTH_FIXED_LOGIN_CODE/);
   });
+
+  it('kimenő sor: óránkénti korlát és a webapp címe (TICKET-55)', () => {
+    expect(validateEnv({})).toMatchObject({ MAIL_HOURLY_LIMIT: 10, PUBLIC_WEB_URL: 'http://localhost:5173' });
+    expect(validateEnv({ MAIL_HOURLY_LIMIT: '120' }).MAIL_HOURLY_LIMIT).toBe(120);
+    expect(() => validateEnv({ MAIL_HOURLY_LIMIT: '0' })).toThrow(/MAIL_HOURLY_LIMIT/);
+    expect(() => validateEnv({ MAIL_HOURLY_LIMIT: 'sok' })).toThrow(/MAIL_HOURLY_LIMIT/);
+    expect(
+      validateEnv({ CORS_ORIGIN: '*' }).PUBLIC_WEB_URL,
+    ).toBe('http://localhost:5173');
+    expect(
+      validateEnv({ CORS_ORIGIN: 'https://reform.pages.dev,http://localhost:5173' }).PUBLIC_WEB_URL,
+    ).toBe('https://reform.pages.dev');
+    expect(
+      validateEnv({ PUBLIC_WEB_URL: 'https://app.reformstudio.hu/', CORS_ORIGIN: 'https://x.dev' }).PUBLIC_WEB_URL,
+    ).toBe('https://app.reformstudio.hu');
+  });
 });

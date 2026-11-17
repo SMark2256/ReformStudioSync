@@ -1,6 +1,8 @@
 import {
   CalendarDays,
+  ClipboardSignature,
   ConciergeBell,
+  Mail,
   MonitorSmartphone,
   Ticket,
   Users,
@@ -40,8 +42,10 @@ export const NAV_GROUPS: NavGroup[] = [
     label: 'Ügyfelek',
     items: [
       { route: 'guests', icon: Users },
+      { route: 'intake', icon: ClipboardSignature },
       { route: 'passes', icon: Ticket },
       { route: 'finance', icon: Wallet },
+      { route: 'mailing', icon: Mail },
     ],
   },
 ];

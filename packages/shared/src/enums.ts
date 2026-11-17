@@ -92,9 +92,13 @@ export enum DocumentType {
   TREATMENT_CONSENT = 'TREATMENT_CONSENT',
 }
 
+/**
+ * A kimenő levél állapota (TICKET-55): várakozik a sorban (újrapróbálás alatt is), elküldve, vagy
+ * végleg hibás. A régi `DELIVERED` sorok a migrációval `SENT`-té váltak.
+ */
 export enum MessageStatus {
+  PENDING = 'PENDING',
   SENT = 'SENT',
-  DELIVERED = 'DELIVERED',
   FAILED = 'FAILED',
 }
 

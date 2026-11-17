@@ -32,8 +32,19 @@ services:
         sync: false
       - key: MAIL_FROM_NAME
         sync: false
-      # Online foglalás (TICKET-57): a levelek linkjeinek címe (pl. https://app.reformstudio.hu).
+      # Kimenő levélsor (TICKET-55): óránkénti korlát (alapból 10, a SendPulse teszt csomaghoz) és
+      # a webapp nyilvános címe a leiratkozó linkhez (alapból a CORS_ORIGIN első címe).
+      - key: MAIL_HOURLY_LIMIT
+        sync: false
       - key: PUBLIC_WEB_URL
+        sync: false
+      # Dokumentumtárolás (TICKET-56, Supabase Storage, privát bucket). Nélküle productionben a
+      # vendégfelvétel PDF-mentése „tárolás nincs beállítva” hibát ad (újrapróbálható).
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_STORAGE_BUCKET
         sync: false
       # Google Naptár egyirányú szinkron (TICKET-57). Bármelyik hiányában a szinkron kikapcsolt.
       - key: GOOGLE_CALENDAR_ID

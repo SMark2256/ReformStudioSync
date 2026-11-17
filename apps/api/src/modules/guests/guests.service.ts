@@ -22,8 +22,6 @@ import {
   MeasurementDto,
   MembershipDueStatus,
   MembershipStatus,
-  MessageLogDto,
-  MessageStatus,
   PassType,
   PaymentMethod,
   Role,
@@ -32,13 +30,14 @@ import {
 import { randomInt } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { FinanceService } from '../finance/finance.service';
+import { EmailAutomationsService } from '../mailing/email-automations.service';
+import { MESSAGE_INCLUDE, toMessageLogDto } from '../mailing/mail-outbox.service';
 import {
   CreateGuestDocumentDto,
   CreateGuestDto,
   CreateGuestNoteDto,
   CreateGuestPhotoDto,
   CreateMeasurementDto,
-  SendGuestMessageDto,
   SignGuestDocumentDto,
   UpdateGuestDto,
 } from './guests.dto';
@@ -48,6 +47,7 @@ export class GuestsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly finance: FinanceService,
+    private readonly automations: EmailAutomationsService,
   ) {}
 
   private async generateUniqueBarcode(studioId: string): Promise<string> {
@@ -109,8 +109,11 @@ export class GuestsService {
         include: { author: true },
         orderBy: { createdAt: 'desc' as const },
       },
+      // Levelezési előzmények (TICKET-55): a kimenő sor legutóbbi levelei.
       messageLogs: {
-        orderBy: { sentAt: 'desc' as const },
+        include: MESSAGE_INCLUDE,
+        orderBy: { createdAt: 'desc' as const },
+        take: 50,
       },
       // Belépések (TICKET-40): a dupla beolvasás nem belépés.
       checkIns: {
@@ -212,9 +215,14 @@ export class GuestsService {
         gender: dto.gender,
         status: dto.status ?? GuestStatus.ACTIVE,
         notes: dto.notes?.trim() || null,
+        marketingConsent: dto.marketingConsent ?? false,
+        marketingConsentAt: dto.marketingConsent ? new Date() : null,
       },
       include: this.getFullGuestIncludes(),
     });
+
+    // Üdvözlő levél (ha be van kapcsolva); hibája nem buktatja el a felvételt.
+    await this.automations.onGuestCreated(created);
 
     return this.mapGuest(created);
   }
@@ -223,6 +231,7 @@ export class GuestsService {
     id: string,
     dto: UpdateGuestDto,
     studioId = DEFAULT_STUDIO_ID,
+    staffUserId?: string,
   ): Promise<GuestDto> {
     const existing = await this.prisma.guest.findFirst({
       where: { id, studioId },
@@ -245,9 +254,20 @@ export class GuestsService {
       }
     }
 
+    // Hozzájárulás változása (TICKET-55): időponttal; az újbóli megadás a leiratkozást is törli.
+    const consentChanged =
+      dto.marketingConsent !== undefined && dto.marketingConsent !== existing.marketingConsent;
+
     const updated = await this.prisma.guest.update({
       where: { id },
       data: {
+        ...(consentChanged
+          ? {
+              marketingConsent: dto.marketingConsent,
+              marketingConsentAt: new Date(),
+              ...(dto.marketingConsent ? { unsubscribedAt: null } : {}),
+            }
+          : {}),
         ...(dto.firstName !== undefined
           ? { firstName: dto.firstName.trim() }
           : {}),
@@ -269,6 +289,19 @@ export class GuestsService {
       },
       include: this.getFullGuestIncludes(),
     });
+
+    if (consentChanged && staffUserId) {
+      await this.prisma.auditLog.create({
+        data: {
+          studioId,
+          userId: staffUserId,
+          action: 'GUEST_MARKETING_CONSENT',
+          entityType: 'Guest',
+          entityId: id,
+          details: `Marketing hozzájárulás: ${dto.marketingConsent ? 'megadva' : 'visszavonva'}`,
+        },
+      });
+    }
 
     return this.mapGuest(updated);
   }
@@ -292,6 +325,12 @@ export class GuestsService {
         thighCm: dto.thighCm ?? null,
         armCm: dto.armCm ?? null,
         chestCm: dto.chestCm ?? null,
+        bmi: dto.bmi ?? null,
+        skeletalMusclePct: dto.skeletalMusclePct ?? null,
+        restingMetabolismKcal: dto.restingMetabolismKcal ?? null,
+        abdomenCm: dto.abdomenCm ?? null,
+        aboveKneeCm: dto.aboveKneeCm ?? null,
+        calfCm: dto.calfCm ?? null,
         note: dto.note?.trim() || null,
       },
       include: { recordedBy: true },
@@ -310,6 +349,13 @@ export class GuestsService {
       thighCm: created.thighCm,
       armCm: created.armCm,
       chestCm: created.chestCm,
+      bmi: created.bmi,
+      skeletalMusclePct: created.skeletalMusclePct,
+      restingMetabolismKcal: created.restingMetabolismKcal,
+      abdomenCm: created.abdomenCm,
+      aboveKneeCm: created.aboveKneeCm,
+      calfCm: created.calfCm,
+      intakeSessionId: created.intakeSessionId,
       note: created.note,
       recordedById: created.recordedById,
       recordedByName: created.recordedBy?.name ?? 'Recepció',
@@ -515,42 +561,6 @@ export class GuestsService {
     };
   }
 
-  async sendGuestEmailLog(
-    guestId: string,
-    dto: SendGuestMessageDto,
-  ): Promise<MessageLogDto> {
-    const guest = await this.prisma.guest.findUnique({
-      where: { id: guestId },
-    });
-    if (!guest) {
-      throw appError('GUEST.NOT_FOUND');
-    }
-
-    const created = await this.prisma.messageLog.create({
-      data: {
-        guestId,
-        recipientEmail: guest.email || 'nincs-megadva@reform.hu',
-        subject: dto.subject.trim(),
-        messageType: dto.messageType.trim(),
-        status: guest.email ? MessageStatus.DELIVERED : MessageStatus.FAILED,
-        errorDetails: guest.email
-          ? null
-          : 'A vendégnek nincs rögzített e-mail címe.',
-      },
-    });
-
-    return {
-      id: created.id,
-      guestId: created.guestId,
-      recipientEmail: created.recipientEmail,
-      subject: created.subject,
-      messageType: created.messageType,
-      status: created.status as unknown as MessageStatus,
-      sentAt: created.sentAt.toISOString(),
-      errorDetails: created.errorDetails,
-    };
-  }
-
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private mapGuest(g: any): GuestDto {
     const now = new Date();
@@ -739,6 +749,13 @@ export class GuestsService {
           thighCm: ms.thighCm,
           armCm: ms.armCm,
           chestCm: ms.chestCm,
+          bmi: ms.bmi ?? null,
+          skeletalMusclePct: ms.skeletalMusclePct ?? null,
+          restingMetabolismKcal: ms.restingMetabolismKcal ?? null,
+          abdomenCm: ms.abdomenCm ?? null,
+          aboveKneeCm: ms.aboveKneeCm ?? null,
+          calfCm: ms.calfCm ?? null,
+          intakeSessionId: ms.intakeSessionId ?? null,
           note: ms.note,
           recordedById: ms.recordedById ?? null,
           recordedByName: ms.recordedBy?.name ?? 'Recepciós Munkatárs',
@@ -759,6 +776,7 @@ export class GuestsService {
           width: ph.width,
           height: ph.height,
           visibilityRole: ph.visibilityRole as Role,
+          purpose: ph.purpose ?? 'PROGRESS',
           note: ph.note,
         }),
       ),
@@ -789,20 +807,10 @@ export class GuestsService {
           createdAt: nt.createdAt.toISOString(),
         }),
       ),
-      messageLogs: (g.messageLogs ?? []).map(
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (ml: any) => ({
-          id: ml.id,
-          guestId: ml.guestId,
-          guestName: guestFullName,
-          recipientEmail: ml.recipientEmail,
-          subject: ml.subject,
-          messageType: ml.messageType,
-          status: ml.status as MessageStatus,
-          sentAt: ml.sentAt.toISOString(),
-          errorDetails: ml.errorDetails,
-        }),
-      ),
+      messageLogs: (g.messageLogs ?? []).map(toMessageLogDto),
+      marketingConsent: g.marketingConsent ?? false,
+      marketingConsentAt: g.marketingConsentAt ? g.marketingConsentAt.toISOString() : null,
+      unsubscribedAt: g.unsubscribedAt ? g.unsubscribedAt.toISOString() : null,
     };
   }
 }
