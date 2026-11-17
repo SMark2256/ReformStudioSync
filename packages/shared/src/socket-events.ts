@@ -31,6 +31,11 @@ export const SOCKET_EVENTS = {
   MONITOR_AUTH_REJECTED: 'monitor:auth-rejected',
   TABLET_DOCUMENT_PUSHED: 'tablet:document_pushed',
   TABLET_DOCUMENT_SIGNED: 'tablet:document_signed',
+  /**
+   * A foglalási naptár változott (TICKET-57, `BookingChangedPayload`). Csak a munkatársi
+   * szobába megy, személyes adat nélkül: a recepciós naptár erre újratölti az érintett napokat.
+   */
+  BOOKING_CHANGED: 'booking:changed',
 } as const;
 
 /**
@@ -136,5 +141,23 @@ export interface MonitorAuthRejectedPayload {
   code: string;
   /** A katalógus magyar üzenete. */
   message: string;
+  timestamp: string;
+}
+
+export type BookingChangeKind =
+  | 'CREATED'
+  | 'RESCHEDULED'
+  | 'CANCELLED'
+  | 'STATUS'
+  | 'SETTINGS'
+  | 'WAITLIST'
+  | 'SYNC';
+
+/** A foglalási naptár változásának jelzése (TICKET-57), személyes adat nélkül. */
+export interface BookingChangedPayload {
+  studioId: string;
+  kind: BookingChangeKind;
+  /** Az érintett napok (`YYYY-MM-DD`); üres, ha a beállítás minden napot érint. */
+  dayKeys: string[];
   timestamp: string;
 }

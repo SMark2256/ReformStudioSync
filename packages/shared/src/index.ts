@@ -11,3 +11,5 @@ export * from './greeting';
 export * from './guest-arrivals';
 export * from './measurements';
 export * from './tours';
+export * from './booking-rules';
+export * from './booking-contracts';

@@ -83,6 +83,33 @@ export const APP_ERROR_CATALOG = {
   'PAYMENT.MULTIPLE_TARGETS': { status: 400, message: 'Egy befizetés allokáció egyszerre csak egy célhoz (havi tagdíj VAGY bérlet) rendelhető.', action: 'notify' },
   'PAYMENT.NOT_FOUND': { status: 404, message: 'A fizetési tétel nem található.', action: 'notify' },
   'PAYMENT.ALREADY_CANCELLED': { status: 400, message: 'Ez a fizetési tétel már sztornózva lett.', action: 'notify' },
+
+  // Időpontfoglalás (TICKET-57)
+  'BOOKING.NOT_FOUND': { status: 404, message: 'A foglalás nem található.', action: 'notify' },
+  'BOOKING.TREATMENT_NOT_FOUND': { status: 404, message: 'A kezelés nem található, vagy most nem foglalható.', action: 'notify' },
+  'BOOKING.NO_TREATMENTS': { status: 400, message: 'Válassz legalább egy kezelést.', action: 'notify' },
+  'BOOKING.CLOSED': { status: 400, message: 'Ebben az időpontban a stúdió zárva tart.', action: 'notify' },
+  'BOOKING.OUTSIDE_OPENING_HOURS': { status: 400, message: 'A kezelés a gép szünetével együtt nem fér bele a nyitvatartásba.', action: 'notify' },
+  'BOOKING.RESOURCE_BLOCKED': { status: 400, message: 'A gép ebben az időpontban nem foglalható (letiltva).', action: 'notify' },
+  'BOOKING.CAPACITY_FULL': { status: 409, message: 'Ez az időpont időközben betelt. Válassz másik időpontot.', action: 'reload' },
+  'BOOKING.GUEST_OVERLAP': { status: 409, message: 'A vendégnek ebben az időben már van másik kezelése.', action: 'notify' },
+  'BOOKING.IN_PAST': { status: 400, message: 'Elmúlt időpontra nem lehet foglalni.', action: 'notify' },
+  'BOOKING.TOO_LATE': { status: 400, message: 'Online legalább 30 perccel a kezdés előtt lehet foglalni.', action: 'notify' },
+  'BOOKING.TOO_FAR': { status: 400, message: 'Legfeljebb 30 nappal előre lehet foglalni.', action: 'notify' },
+  'BOOKING.CHANGE_CUTOFF': { status: 400, message: 'Online módosítás és lemondás a kezdés előtt legalább 24 órával lehetséges. Ezután a recepció tud segíteni.', action: 'notify' },
+  'BOOKING.INVALID_STATUS_CHANGE': { status: 400, message: 'Ez az állapotváltás nem lehetséges.', action: 'notify' },
+  'BOOKING.ALREADY_CANCELLED': { status: 400, message: 'Ez a foglalás már le van mondva.', action: 'notify' },
+  'BOOKING.CONTACT_REQUIRED': { status: 400, message: 'A foglaláshoz név, telefonszám és e-mail cím kell.', action: 'notify' },
+  'BOOKING.PRIVACY_REQUIRED': { status: 400, message: 'A foglaláshoz el kell fogadni az adatkezelési tájékoztatót.', action: 'notify' },
+  'BOOKING.LINK_INVALID': { status: 404, message: 'A foglaláskezelő link érvénytelen, vagy a foglalás már nem kezelhető.', action: 'notify' },
+  'BOOKING.GUEST_CODE_INVALID': { status: 400, message: 'Hibás vagy lejárt belépőkód. Ha lejárt, kérj újat.', action: 'notify' },
+  'BOOKING.GUEST_CODE_RATE_LIMITED': { status: 429, message: 'Túl sok kódkérés. Várj egy percet, és próbáld újra.', action: 'notify' },
+  'BOOKING.GUEST_SESSION_INVALID': { status: 401, message: 'A bejelentkezés lejárt. Kérj új belépőkódot.', action: 'notify' },
+  'BOOKING.RATE_LIMITED': { status: 429, message: 'Túl sok kérés érkezett. Próbáld újra egy perc múlva.', action: 'notify' },
+  'BOOKING.WAITLIST_OFFER_INVALID': { status: 404, message: 'A várólistás ajánlat lejárt, vagy már nem érvényes.', action: 'notify' },
+  'BOOKING.WAITLIST_NOT_FOUND': { status: 404, message: 'A várólistás jelentkezés nem található.', action: 'notify' },
+  'BOOKING.CLOSURE_INVALID': { status: 400, message: 'A zárvatartás vége a kezdete után legyen.', action: 'notify' },
+  'BOOKING.CLOSURE_NOT_FOUND': { status: 404, message: 'A zárvatartás nem található.', action: 'notify' },
 } as const satisfies Record<string, AppErrorDefinition>;
 
 export type AppErrorCode = keyof typeof APP_ERROR_CATALOG;

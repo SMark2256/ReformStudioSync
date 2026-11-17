@@ -107,6 +107,7 @@ model User {
   auditLogs    AuditLog[]
   notes        GuestNote[]
   measurements Measurement[]
+  bookings     Booking[]
 
   @@index([studioId])
   @@map("users")
@@ -140,6 +141,8 @@ model Guest {
   documents     GuestDocument[]
   internalNotes GuestNote[]
   messageLogs   MessageLog[]
+  bookings      Booking[]
+  waitlist      WaitlistEntry[]
 
   @@unique([studioId, barcode])
   @@index([studioId, lastName, firstName])
@@ -163,6 +166,7 @@ model Service {
   passUsages    PassUsageLog[]
   photos        GuestPhoto[]
   memberships   Membership[]
+  treatments    BookableTreatment[]
 
   @@index([studioId, isActive])
   @@map("services")
@@ -320,6 +324,7 @@ model PassUsageLog {
   service   Service?       @relation(fields: [serviceId], references: [id], onDelete: SetNull)
   employee  User?          @relation(fields: [employeeId], references: [id], onDelete: SetNull)
   checkIn   LoggedCheckIn? @relation(fields: [checkInId], references: [id], onDelete: SetNull)
+  booking   Booking?
 
   @@index([guestPassId, usedAt])
   @@map("pass_usage_logs")
@@ -366,14 +371,15 @@ model PaymentAllocation {
 model AuditLog {
   id         String   @id @default(uuid())
   studioId   String   @default("default-studio") @map("studio_id")
-  userId     String   @map("user_id")
+  /// `null`: a vendég saját online művelete (TICKET-57), nem munkatárs.
+  userId     String?  @map("user_id")
   action     String
   entityType String   @map("entity_type")
   entityId   String   @map("entity_id")
   details    String?
   createdAt  DateTime @default(now()) @map("created_at")
 
-  user User @relation(fields: [userId], references: [id])
+  user User? @relation(fields: [userId], references: [id], onDelete: Restrict)
 
   @@index([studioId, createdAt])
   @@map("audit_logs")
@@ -505,3 +511,244 @@ model LoginCode {
   @@map("login_codes")
 }
 
+
+// ---------------------------------------------------------------------------
+// Online időpontfoglalás (TICKET-57)
+// ---------------------------------------------------------------------------
+
+enum BookingStatus {
+  CONFIRMED
+  LATE
+  ARRIVED
+  NO_SHOW
+  CANCELLED
+}
+
+enum BookingSource {
+  ONLINE
+  RECEPTION
+  WAITLIST
+}
+
+enum WaitlistStatus {
+  WAITING
+  OFFERED
+  BOOKED
+  DECLINED
+  EXPIRED
+  CANCELLED
+}
+
+enum CalendarSyncOperation {
+  UPSERT
+  DELETE
+}
+
+enum CalendarSyncStatus {
+  PENDING
+  DONE
+  FAILED
+}
+
+/// Gép: az egyidejű kapacitás itt van. A HIEMT és az Intimpad közös, 1 fős gépet használ.
+model BookingResource {
+  id        String   @id @default(uuid())
+  studioId  String   @default("default-studio") @map("studio_id")
+  name      String
+  capacity  Int      @default(1)
+  isActive  Boolean  @default(true) @map("is_active")
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  treatments BookableTreatment[]
+  bookings   Booking[]
+  closures   BookingClosure[]
+
+  @@unique([studioId, name])
+  @@map("booking_resources")
+}
+
+/// Foglalható kezelés: időtartam, a gép szünete (foglaltság) és a többkezeléses sorrend.
+model BookableTreatment {
+  id              String   @id @default(uuid())
+  studioId        String   @default("default-studio") @map("studio_id")
+  resourceId      String   @map("resource_id")
+  /// A bérletillesztés szolgáltatása (`passCoversService`).
+  serviceId       String?  @map("service_id")
+  name            String
+  durationMinutes Int      @map("duration_minutes")
+  bufferMinutes   Int      @default(5) @map("buffer_minutes")
+  sortOrder       Int      @default(0) @map("sort_order")
+  isActive        Boolean  @default(true) @map("is_active")
+  isOnline        Boolean  @default(true) @map("is_online")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  resource BookingResource @relation(fields: [resourceId], references: [id])
+  service  Service?        @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+  bookings Booking[]
+  waitlist WaitlistEntry[]
+
+  @@unique([studioId, name])
+  @@map("bookable_treatments")
+}
+
+/// Kezelésenként egy sor; a többkezeléses foglalás sorai közös `groupId`-t kapnak.
+model Booking {
+  id                 String        @id @default(uuid())
+  studioId           String        @default("default-studio") @map("studio_id")
+  groupId            String        @map("group_id")
+  guestId            String        @map("guest_id")
+  treatmentId        String        @map("treatment_id")
+  resourceId         String        @map("resource_id")
+  startsAt           DateTime      @map("starts_at")
+  endsAt             DateTime      @map("ends_at")
+  /// A kezelés vége + a gép szünete: eddig foglalt a gép.
+  blockedUntil       DateTime      @map("blocked_until")
+  status             BookingStatus @default(CONFIRMED)
+  source             BookingSource @default(RECEPTION)
+  note               String?
+  /// Bérlet-figyelmeztetés a foglaláskor (`BookingPassWarning`), levonás és tartozás nélkül.
+  passWarning        String?       @map("pass_warning")
+  /// A kezelőlink tokenjének SHA-256 hash-e; maga a token nincs tárolva.
+  manageTokenHash    String?       @unique @map("manage_token_hash")
+  /// A foglaláshoz tartozó (pontosan egy) alkalomlevonás.
+  passUsageId        String?       @unique @map("pass_usage_id")
+  /// A levonás idempotenciakulcsának sorszáma: visszavonás után nő.
+  deductionSeq       Int           @default(0) @map("deduction_seq")
+  googleEventId      String?       @map("google_event_id")
+  confirmationSentAt DateTime?     @map("confirmation_sent_at")
+  reminderSentAt     DateTime?     @map("reminder_sent_at")
+  reminderAttempts   Int           @default(0) @map("reminder_attempts")
+  arrivedAt          DateTime?     @map("arrived_at")
+  noShowAt           DateTime?     @map("no_show_at")
+  cancelledAt        DateTime?     @map("cancelled_at")
+  cancelReason       String?       @map("cancel_reason")
+  createdById        String?       @map("created_by_id")
+  createdAt          DateTime      @default(now()) @map("created_at")
+  updatedAt          DateTime      @updatedAt @map("updated_at")
+
+  guest     Guest                @relation(fields: [guestId], references: [id], onDelete: Cascade)
+  treatment BookableTreatment    @relation(fields: [treatmentId], references: [id])
+  resource  BookingResource      @relation(fields: [resourceId], references: [id])
+  passUsage PassUsageLog?        @relation(fields: [passUsageId], references: [id], onDelete: SetNull)
+  createdBy User?                @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  syncItems CalendarSyncOutbox[]
+
+  @@index([studioId, startsAt])
+  @@index([resourceId, startsAt])
+  @@index([guestId, startsAt])
+  @@index([groupId])
+  @@index([status, startsAt])
+  @@map("bookings")
+}
+
+/// Stúdiószintű beállítások: heti nyitvatartás és a foglalási korlátok.
+model BookingSettings {
+  studioId          String   @id @default("default-studio") @map("studio_id")
+  /// 7 elem (hétfő…vasárnap): `{ opensAt, closesAt }` percben, vagy `null` (zárva).
+  openingHours      Json     @map("opening_hours")
+  maxAdvanceDays    Int      @default(30) @map("max_advance_days")
+  minLeadMinutes    Int      @default(30) @map("min_lead_minutes")
+  changeCutoffHours Int      @default(24) @map("change_cutoff_hours")
+  holdMinutes       Int      @default(30) @map("hold_minutes")
+  slotStepMinutes   Int      @default(15) @map("slot_step_minutes")
+  locationText      String   @default("") @map("location_text")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  @@map("booking_settings")
+}
+
+/// Rendkívüli (teljes vagy részleges) zárvatartás, vagy `resourceId`-vel gépenkénti letiltás.
+/// A meglévő foglalásokat nem módosítja, csak jelzi.
+model BookingClosure {
+  id          String   @id @default(uuid())
+  studioId    String   @default("default-studio") @map("studio_id")
+  resourceId  String?  @map("resource_id")
+  startsAt    DateTime @map("starts_at")
+  endsAt      DateTime @map("ends_at")
+  reason      String?
+  createdById String?  @map("created_by_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  resource BookingResource? @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+
+  @@index([studioId, startsAt])
+  @@map("booking_closures")
+}
+
+/// Munkaszüneti nap felülírása (nyitva), vagy egy nap zárása.
+model BookingHolidayOverride {
+  id        String   @id @default(uuid())
+  studioId  String   @default("default-studio") @map("studio_id")
+  dayKey    String   @map("day_key")
+  isOpen    Boolean  @map("is_open")
+  note      String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([studioId, dayKey])
+  @@map("booking_holiday_overrides")
+}
+
+/// Várólista: kezelésre és napra/idősávra. Felszabaduláskor a legrégebbi megfelelő jelentkező
+/// kap ajánlatot és kizárólagos tartást (`OFFERED`, `offerExpiresAt`-ig a kapacitásba számít).
+model WaitlistEntry {
+  id             String         @id @default(uuid())
+  studioId       String         @default("default-studio") @map("studio_id")
+  guestId        String         @map("guest_id")
+  treatmentId    String         @map("treatment_id")
+  dayKey         String         @map("day_key")
+  fromMinutes    Int            @map("from_minutes")
+  toMinutes      Int            @map("to_minutes")
+  status         WaitlistStatus @default(WAITING)
+  offerStartsAt  DateTime?      @map("offer_starts_at")
+  offerExpiresAt DateTime?      @map("offer_expires_at")
+  offerTokenHash String?        @unique @map("offer_token_hash")
+  offeredAt      DateTime?      @map("offered_at")
+  bookingId      String?        @map("booking_id")
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+
+  guest     Guest             @relation(fields: [guestId], references: [id], onDelete: Cascade)
+  treatment BookableTreatment @relation(fields: [treatmentId], references: [id], onDelete: Cascade)
+
+  @@index([studioId, dayKey, status])
+  @@index([status, offerExpiresAt])
+  @@map("booking_waitlist")
+}
+
+/// Egyirányú Google Naptár szinkron sora. Foglalásonként legfeljebb egy függő tétel.
+model CalendarSyncOutbox {
+  id            String                @id @default(uuid())
+  studioId      String                @default("default-studio") @map("studio_id")
+  bookingId     String                @map("booking_id")
+  operation     CalendarSyncOperation
+  status        CalendarSyncStatus    @default(PENDING)
+  attempts      Int                   @default(0)
+  nextAttemptAt DateTime              @default(now()) @map("next_attempt_at")
+  lastError     String?               @map("last_error")
+  processedAt   DateTime?             @map("processed_at")
+  createdAt     DateTime              @default(now()) @map("created_at")
+  updatedAt     DateTime              @updatedAt @map("updated_at")
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@index([status, nextAttemptAt])
+  @@index([bookingId, status])
+  @@map("calendar_sync_outbox")
+}
+
+/// Vendég belépőkódja a nyilvános foglalóhoz (a `LoginCode` mintájára, külön táblában).
+model GuestLoginCode {
+  id         String    @id @default(uuid())
+  email      String
+  /// HMAC-SHA256 hexában; maga a kód nincs tárolva.
+  codeHash   String    @map("code_hash")
+  attempts   Int       @default(0)
+  expiresAt  DateTime  @map("expires_at")
+  consumedAt DateTime? @map("consumed_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  @@index([email, createdAt])
+  @@index([createdAt])
+  @@map("guest_login_codes")
+}
