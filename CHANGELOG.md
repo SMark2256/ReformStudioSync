@@ -5,6 +5,7 @@ A verziók a legújabbtól a legrégebbiig. A `demo` ágon gyűlő változások 
 ## v0.3 — a `demo`-n, a következő `main` kiadással élesedik
 
 ### Új funkciók és oldalak
+- **Levelezés:** új menüpont sablonokkal (személyre szabható mezők, kép és hivatkozás, élő előnézet, tesztlevél), automatikus üdvözlő, születésnapi és névnapi levéllel (külön kapcsolhatók, egy alkalomra egy levél), csoportos küldéssel (szűrés szolgáltatás, bérletállapot és utolsó látogatás szerint, címzettlista, csak hozzájárulással, leiratkozó linkkel) és az elküldött e-mailek szűrhető naplójával. A levelek kimenő sorban, óránkénti korláttal mennek ki, a hibás újraküldhető. A vendégadatlapon új Levelek fül (egyéni levél, előzmények) és marketing-hozzájárulás; nyilvános leiratkozó oldal. (TICKET-55)
 - **Belépés e-mailben kapott kóddal:** jelszó helyett a megadott e-mail címre érkező 6 jegyű kóddal lehet belépni; a kód 10 percig érvényes, és csak egyszer használható. (TICKET-35)
 - **Új oldalsáv és Beállítások:** sötét, lebegő bal oldali menü; a nevedre kattintva felcsúszó panelből éred el a Beállításokat, a téma kapcsolót és a kijelentkezést. A téma mellett a felület színe is választható. (TICKET-28)
 - **Monitorok oldal:** a vendégmonitorok és tabletek kezelése saját oldalt kapott, a profilpanelből érhető el. (TICKET-38)
