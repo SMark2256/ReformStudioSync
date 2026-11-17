@@ -80,6 +80,29 @@ enum DocumentStatus {
   SIGNED
 }
 
+// TICKET-56: a párosított eszköz szerepe.
+enum DisplayDeviceKind {
+  MONITOR
+  TABLET
+}
+
+// TICKET-56: a vendégfelvétel állapotai (állapotgép: packages/shared/src/intake.ts).
+enum IntakeStatus {
+  PREPARED
+  GUEST_FILLING
+  AWAITING_REVIEW
+  APPROVED
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+// TICKET-56: a vendégfotó célja; a belső azonosító profilkép nem marketingcélú.
+enum PhotoPurpose {
+  PROGRESS
+  PROFILE
+}
+
 enum MessageStatus {
   SENT
   DELIVERED
@@ -100,46 +123,51 @@ model User {
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
-  checkIns     LoggedCheckIn[]
-  payments     Payment[]
-  visits       Visit[]
-  passUsages   PassUsageLog[]
-  auditLogs    AuditLog[]
-  notes        GuestNote[]
-  measurements Measurement[]
+  checkIns        LoggedCheckIn[]
+  payments        Payment[]
+  visits          Visit[]
+  passUsages      PassUsageLog[]
+  auditLogs       AuditLog[]
+  notes           GuestNote[]
+  measurements    Measurement[]
+  createdIntakes  IntakeSession[] @relation("IntakeCreatedBy")
+  approvedIntakes IntakeSession[] @relation("IntakeApprovedBy")
 
   @@index([studioId])
   @@map("users")
 }
 
 model Guest {
-  id          String      @id @default(uuid())
-  studioId    String      @default("default-studio") @map("studio_id")
-  barcode     String
-  firstName   String      @map("first_name")
-  lastName    String      @map("last_name")
-  email       String?
-  phone       String?
-  birthDate   DateTime?   @map("birth_date")
-  nameDay     String?     @map("name_day")
-  gender      Gender      @default(UNSPECIFIED)
-  status      GuestStatus @default(ACTIVE)
-  notes       String?
-  isActive    Boolean     @default(true) @map("is_active")
-  createdAt   DateTime    @default(now()) @map("created_at")
-  updatedAt   DateTime    @updatedAt @map("updated_at")
+  id        String      @id @default(uuid())
+  studioId  String      @default("default-studio") @map("studio_id")
+  barcode   String
+  firstName String      @map("first_name")
+  lastName  String      @map("last_name")
+  email     String?
+  phone     String?
+  birthDate DateTime?   @map("birth_date")
+  nameDay   String?     @map("name_day")
+  gender    Gender      @default(UNSPECIFIED)
+  status    GuestStatus @default(ACTIVE)
+  notes     String?
+  isActive  Boolean     @default(true) @map("is_active")
+  createdAt DateTime    @default(now()) @map("created_at")
+  updatedAt DateTime    @updatedAt @map("updated_at")
 
-  passes        GuestPass[]
-  memberships   Membership[]
-  checkIns      LoggedCheckIn[]
-  visits        Visit[]
-  passUsages    PassUsageLog[]
-  payments      Payment[]
-  measurements  Measurement[]
-  photos        GuestPhoto[]
-  documents     GuestDocument[]
-  internalNotes GuestNote[]
-  messageLogs   MessageLog[]
+  passes              GuestPass[]
+  memberships         Membership[]
+  checkIns            LoggedCheckIn[]
+  visits              Visit[]
+  passUsages          PassUsageLog[]
+  payments            Payment[]
+  measurements        Measurement[]
+  photos              GuestPhoto[]
+  documents           GuestDocument[]
+  internalNotes       GuestNote[]
+  messageLogs         MessageLog[]
+  intakeSessions      IntakeSession[]
+  intakeHealthRecords IntakeHealthRecord[]
+  intakeSnapshots     IntakeDocumentSnapshot[]
 
   @@unique([studioId, barcode])
   @@index([studioId, lastName, firstName])
@@ -380,40 +408,51 @@ model AuditLog {
 }
 
 model Measurement {
-  id           String   @id @default(uuid())
-  guestId      String   @map("guest_id")
-  recordedById String?  @map("recorded_by_id")
-  measuredAt   DateTime @default(now()) @map("measured_at")
-  weightKg     Float?   @map("weight_kg")
-  bodyFatPct   Float?   @map("body_fat_pct")
-  muscleMassKg Float?   @map("muscle_mass_kg")
-  visceralFat  Float?   @map("visceral_fat")
-  waistCm      Float?   @map("waist_cm")
-  hipCm        Float?   @map("hip_cm")
-  thighCm      Float?   @map("thigh_cm")
-  armCm        Float?   @map("arm_cm")
-  chestCm      Float?   @map("chest_cm")
-  note         String?
+  id                    String   @id @default(uuid())
+  guestId               String   @map("guest_id")
+  recordedById          String?  @map("recorded_by_id")
+  measuredAt            DateTime @default(now()) @map("measured_at")
+  weightKg              Float?   @map("weight_kg")
+  bodyFatPct            Float?   @map("body_fat_pct")
+  muscleMassKg          Float?   @map("muscle_mass_kg")
+  visceralFat           Float?   @map("visceral_fat")
+  waistCm               Float?   @map("waist_cm")
+  hipCm                 Float?   @map("hip_cm")
+  thighCm               Float?   @map("thigh_cm")
+  armCm                 Float?   @map("arm_cm")
+  chestCm               Float?   @map("chest_cm")
+  // TICKET-56: az Omron mérő értékei és a felvételi körfogatok.
+  bmi                   Float?   @map("bmi")
+  skeletalMusclePct     Float?   @map("skeletal_muscle_pct")
+  restingMetabolismKcal Float?   @map("resting_metabolism_kcal")
+  abdomenCm             Float?   @map("abdomen_cm")
+  aboveKneeCm           Float?   @map("above_knee_cm")
+  calfCm                Float?   @map("calf_cm")
+  /// A mérés a vendégfelvétel jóváhagyásakor jött létre.
+  intakeSessionId       String?  @map("intake_session_id")
+  note                  String?
 
-  guest      Guest @relation(fields: [guestId], references: [id], onDelete: Cascade)
-  recordedBy User? @relation(fields: [recordedById], references: [id], onDelete: SetNull)
+  guest         Guest          @relation(fields: [guestId], references: [id], onDelete: Cascade)
+  recordedBy    User?          @relation(fields: [recordedById], references: [id], onDelete: SetNull)
+  intakeSession IntakeSession? @relation(fields: [intakeSessionId], references: [id], onDelete: SetNull)
 
   @@index([guestId, measuredAt])
   @@map("measurements")
 }
 
 model GuestPhoto {
-  id                  String   @id @default(uuid())
-  guestId             String   @map("guest_id")
-  serviceId           String?  @map("service_id")
-  takenAt             DateTime @default(now()) @map("taken_at")
-  fileUrl             String   @map("file_url")
-  mimeType            String   @default("image/webp") @map("mime_type")
-  originalSizeBytes   Int      @default(0) @map("original_size_bytes")
-  compressedSizeBytes Int      @default(0) @map("compressed_size_bytes")
-  width               Int      @default(0)
-  height              Int      @default(0)
-  visibilityRole      Role     @default(RECEPTIONIST) @map("visibility_role")
+  id                  String       @id @default(uuid())
+  guestId             String       @map("guest_id")
+  serviceId           String?      @map("service_id")
+  takenAt             DateTime     @default(now()) @map("taken_at")
+  fileUrl             String       @map("file_url")
+  mimeType            String       @default("image/webp") @map("mime_type")
+  originalSizeBytes   Int          @default(0) @map("original_size_bytes")
+  compressedSizeBytes Int          @default(0) @map("compressed_size_bytes")
+  width               Int          @default(0)
+  height              Int          @default(0)
+  visibilityRole      Role         @default(RECEPTIONIST) @map("visibility_role")
+  purpose             PhotoPurpose @default(PROGRESS)
   note                String?
 
   guest   Guest    @relation(fields: [guestId], references: [id], onDelete: Cascade)
@@ -472,17 +511,20 @@ model MessageLog {
 }
 
 model DisplayDevice {
-  id               String    @id @default(uuid())
-  studioId         String    @default("default-studio") @map("studio_id")
+  id               String            @id @default(uuid())
+  studioId         String            @default("default-studio") @map("studio_id")
   name             String
-  pairingCode      String?   @unique @map("pairing_code")
-  pairingExpiresAt DateTime? @map("pairing_expires_at")
-  pairedAt         DateTime? @map("paired_at")
-  deviceToken      String    @unique @map("device_token")
-  isActive         Boolean   @default(true) @map("is_active")
-  lastSeenAt       DateTime? @map("last_seen_at")
-  lastActivityType String?   @map("last_activity_type")
-  createdAt        DateTime  @default(now()) @map("created_at")
+  kind             DisplayDeviceKind @default(MONITOR)
+  pairingCode      String?           @unique @map("pairing_code")
+  pairingExpiresAt DateTime?         @map("pairing_expires_at")
+  pairedAt         DateTime?         @map("paired_at")
+  deviceToken      String            @unique @map("device_token")
+  isActive         Boolean           @default(true) @map("is_active")
+  lastSeenAt       DateTime?         @map("last_seen_at")
+  lastActivityType String?           @map("last_activity_type")
+  createdAt        DateTime          @default(now()) @map("created_at")
+
+  intakeSessions IntakeSession[]
 
   @@unique([studioId, name])
   @@map("display_devices")
@@ -505,3 +547,142 @@ model LoginCode {
   @@map("login_codes")
 }
 
+// ---------------------------------------------------------------------------------------------
+// Tabletes vendégfelvétel (TICKET-56)
+// ---------------------------------------------------------------------------------------------
+
+/// Felvételi csomag (Köredzés, Hypoxi, később továbbiak); a beépítetteket az API induláskor tölti fel.
+model IntakePackage {
+  id          String   @id @default(uuid())
+  studioId    String   @default("default-studio") @map("studio_id")
+  key         String
+  label       String
+  description String   @default("")
+  /// A csomag szolgáltatásspecifikus űrlapjainak kulcsai (a közös űrlapok mindig hozzáadódnak).
+  formKeys    String[] @map("form_keys")
+  sortOrder   Int      @default(0) @map("sort_order")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@unique([studioId, key])
+  @@map("intake_packages")
+}
+
+/// Verziózott kérdőív / dokumentum definíció. Új szöveg új verzió; a régi nem módosul.
+model IntakeFormDefinition {
+  id                 String   @id @default(uuid())
+  key                String
+  version            Int
+  title              String
+  kind               String
+  /// `COMMON` vagy a csomag kulcsa.
+  scope              String
+  sortOrder          Int      @map("sort_order")
+  bodyText           String   @map("body_text")
+  questions          Json
+  requiresSignature  Boolean  @default(true) @map("requires_signature")
+  legalReviewPending Boolean  @default(true) @map("legal_review_pending")
+  isActive           Boolean  @default(true) @map("is_active")
+  createdAt          DateTime @default(now()) @map("created_at")
+
+  @@unique([key, version])
+  @@map("intake_form_definitions")
+}
+
+model IntakeSession {
+  id                  String       @id @default(uuid())
+  studioId            String       @default("default-studio") @map("studio_id")
+  /// Meglévő vendég, vagy jóváhagyás után az új vendég.
+  guestId             String?      @map("guest_id")
+  /// Duplikátumnál: jóváhagyáskor ehhez a meglévő vendéghez kerülnek az adatok.
+  linkGuestId         String?      @map("link_guest_id")
+  status              IntakeStatus @default(PREPARED)
+  source              String       @default("PC")
+  packageKeys         String[]     @map("package_keys")
+  /// A kért űrlapok kulcsa és verziója (`[{ key, version }]`), az előkészítéskor rögzítve.
+  formRefs            Json         @map("form_refs")
+  profileDraft        Json         @default("{}") @map("profile_draft")
+  /// A nem egészségügyi űrlapok válaszai; az egészségügyiek: intake_health_records.
+  answers             Json         @default("{}")
+  measurementDraft    Json         @default("{}") @map("measurement_draft")
+  profilePhotoDataUrl String?      @map("profile_photo_data_url")
+  signatureDataUrl    String?      @map("signature_data_url")
+  signedAt            DateTime?    @map("signed_at")
+  /// SHA-256(vendégtoken); maga a token nincs tárolva.
+  guestTokenHash      String?      @unique @map("guest_token_hash")
+  guestTokenExpiresAt DateTime?    @map("guest_token_expires_at")
+  /// HMAC(kilépési kód); a vendégmódból csak ezzel (vagy a recepció PC-jéről) lehet kilépni.
+  exitCodeHash        String?      @map("exit_code_hash")
+  exitAttempts        Int          @default(0) @map("exit_attempts")
+  /// A vendégmódot ezen az eszközön indító munkatárs: kilépéskor ő kap új munkamenetet.
+  handoverUserId      String?      @map("handover_user_id")
+  assignedDeviceId    String?      @map("assigned_device_id")
+  createdById         String       @map("created_by_id")
+  approvedById        String?      @map("approved_by_id")
+  approvedAt          DateTime?    @map("approved_at")
+  completedAt         DateTime?    @map("completed_at")
+  failureReason       String?      @map("failure_reason")
+  createdAt           DateTime     @default(now()) @map("created_at")
+  updatedAt           DateTime     @updatedAt @map("updated_at")
+
+  guest          Guest?                   @relation(fields: [guestId], references: [id], onDelete: SetNull)
+  assignedDevice DisplayDevice?           @relation(fields: [assignedDeviceId], references: [id], onDelete: SetNull)
+  createdBy      User                     @relation("IntakeCreatedBy", fields: [createdById], references: [id])
+  approvedBy     User?                    @relation("IntakeApprovedBy", fields: [approvedById], references: [id])
+  healthRecord   IntakeHealthRecord?
+  snapshots      IntakeDocumentSnapshot[]
+  measurements   Measurement[]
+
+  @@index([studioId, status, updatedAt])
+  @@index([guestId])
+  @@index([assignedDeviceId, status])
+  @@map("intake_sessions")
+}
+
+/// Egészségügyi válaszok, a vendég általános adataitól elkülönítve. Minden olvasás auditnaplóba kerül.
+model IntakeHealthRecord {
+  id             String    @id @default(uuid())
+  sessionId      String    @unique @map("session_id")
+  guestId        String?   @map("guest_id")
+  /// Űrlapkulcs → válaszok (egészségügyi kérdőív és ellenjavallatok).
+  answers        Json      @default("{}")
+  consentGivenAt DateTime? @map("consent_given_at")
+  approvedAt     DateTime? @map("approved_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  session IntakeSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  guest   Guest?        @relation(fields: [guestId], references: [id], onDelete: SetNull)
+
+  @@index([guestId])
+  @@map("intake_health_records")
+}
+
+/// Az aláírt dokumentum változatlan pillanatképe (szöveg, verzió, válaszok, aláírás, időbélyeg).
+/// A tartalmi oszlopok módosítását adatbázis-trigger tiltja; csak a PDF adatai tölthetők ki utólag.
+model IntakeDocumentSnapshot {
+  id                 String    @id @default(uuid())
+  sessionId          String    @map("session_id")
+  guestId            String    @map("guest_id")
+  formKey            String    @map("form_key")
+  formVersion        Int       @map("form_version")
+  title              String
+  bodyText           String    @map("body_text")
+  answers            Json
+  signatureDataUrl   String    @map("signature_data_url")
+  signedAt           DateTime  @map("signed_at")
+  legalReviewPending Boolean   @map("legal_review_pending")
+  /// SHA-256 a tartalmi mezőkből: a változatlanság ellenőrizhető.
+  contentHash        String    @map("content_hash")
+  pdfStorageKey      String?   @map("pdf_storage_key")
+  pdfSizeBytes       Int?      @map("pdf_size_bytes")
+  pdfCreatedAt       DateTime? @map("pdf_created_at")
+  createdAt          DateTime  @default(now()) @map("created_at")
+
+  session IntakeSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  guest   Guest         @relation(fields: [guestId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, formKey])
+  @@index([guestId, signedAt])
+  @@map("intake_document_snapshots")
+}

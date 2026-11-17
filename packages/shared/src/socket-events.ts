@@ -31,6 +31,15 @@ export const SOCKET_EVENTS = {
   MONITOR_AUTH_REJECTED: 'monitor:auth-rejected',
   TABLET_DOCUMENT_PUSHED: 'tablet:document_pushed',
   TABLET_DOCUMENT_SIGNED: 'tablet:document_signed',
+  /**
+   * Vendégfelvétel (TICKET-56): a recepció egy kitöltést küldött erre a tabletre
+   * (`IntakeDevicePayload`). Csak az eszköz socketjei kapják; a token a `claim` hívással jön.
+   */
+  INTAKE_ASSIGNED: 'intake:assigned',
+  /** A recepció lezárta a tablet vendégmódját (`IntakeDevicePayload`). */
+  INTAKE_RELEASED: 'intake:released',
+  /** Egy kitöltés állapota változott (`IntakeSocketPayload`); csak a munkatársi szoba kapja. */
+  INTAKE_UPDATED: 'intake:updated',
 } as const;
 
 /**
