@@ -75,6 +75,7 @@ import {
 import { arrivalsForPass } from '../model/arrivals';
 import { GuestArrivalsSection, PassArrivals } from './GuestArrivals';
 import { GuestPhotoGrid } from './GuestPhotos';
+import { GuestIntakeDocuments } from './GuestIntakeDocuments';
 
 const DUE_STATUS_LABEL: Record<MembershipDueStatus, string> = {
   [MembershipDueStatus.PENDING]: 'függőben',
@@ -1616,6 +1617,8 @@ export const GuestModal: React.FC<GuestModalProps> = ({
         {/* DOKUMENTUMOK, TABLET ALÁÍRÁS ÉS E-MAIL NAPLÓ (6.3, 6.4) */}
         {guest && activeTab === 'documents' && (
           <div className="space-y-6">
+            <GuestIntakeDocuments guestId={guest.id} />
+
             <div className="space-y-4 rounded-lg border border-border p-4 md:p-5">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <SectionTitle>

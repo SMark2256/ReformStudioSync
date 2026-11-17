@@ -1,4 +1,5 @@
 import {
+  ClipboardSignature,
   ConciergeBell,
   MonitorSmartphone,
   Ticket,
@@ -38,6 +39,7 @@ export const NAV_GROUPS: NavGroup[] = [
     label: 'Ügyfelek',
     items: [
       { route: 'guests', icon: Users },
+      { route: 'intake', icon: ClipboardSignature },
       { route: 'passes', icon: Ticket },
       { route: 'finance', icon: Wallet },
     ],
