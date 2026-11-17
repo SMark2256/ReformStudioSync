@@ -788,6 +788,87 @@ async function deleteDemoGuest(guestId: string) {
   });
 }
 
+// Online foglalás (TICKET-57): gépek és foglalható kezelések. A migráció is felveszi őket; a
+// seed csak a hiányzót pótolja, a recepción átírt értékeket nem módosítja.
+const BOOKING_RESOURCES = [
+  { name: 'Hypoxi Trainer', capacity: 3, sortOrder: 1 },
+  { name: 'Nyirokmasszázs gép', capacity: 2, sortOrder: 2 },
+  // A HIEMT és az Intimpad közös, egyszemélyes gépen fut.
+  { name: 'HIEMT / Intimpad gép', capacity: 1, sortOrder: 3 },
+  { name: 'Ceragem', capacity: 1, sortOrder: 4 },
+  { name: 'Flabelos', capacity: 1, sortOrder: 5 },
+] as const;
+
+const BOOKABLE_TREATMENTS = [
+  { name: 'Hypoxi Trainer', resource: 'Hypoxi Trainer', service: 'Hypoxi', durationMinutes: 30, sortOrder: 1 },
+  { name: 'Gépi nyirokmasszázs', resource: 'Nyirokmasszázs gép', service: 'Gépi nyirokmasszázs', durationMinutes: 30, sortOrder: 2 },
+  { name: 'HIEMT', resource: 'HIEMT / Intimpad gép', service: 'HIEMT', durationMinutes: 30, sortOrder: 3 },
+  { name: 'Intimpad', resource: 'HIEMT / Intimpad gép', service: 'Intimpad', durationMinutes: 30, sortOrder: 4 },
+  { name: 'Ceragem', resource: 'Ceragem', service: 'Ceragem', durationMinutes: 40, sortOrder: 5 },
+  { name: 'Flabelos', resource: 'Flabelos', service: 'Flabelos', durationMinutes: 10, sortOrder: 6 },
+] as const;
+
+/** Minden kezelés után 5 perc szünet: a gép foglalt, a vendéget nem köti. */
+const BOOKING_BUFFER_MINUTES = 5;
+
+async function ensureBookingSetup(): Promise<{ resources: number; treatments: number }> {
+  const resourceIds = new Map<string, string>();
+  let resources = 0;
+  for (const spec of BOOKING_RESOURCES) {
+    const existing = await prisma.bookingResource.findUnique({
+      where: { studioId_name: { studioId, name: spec.name } },
+    });
+    if (existing) {
+      resourceIds.set(spec.name, existing.id);
+      continue;
+    }
+    const created = await prisma.bookingResource.create({ data: { studioId, ...spec } });
+    resourceIds.set(spec.name, created.id);
+    resources++;
+  }
+
+  let treatments = 0;
+  for (const spec of BOOKABLE_TREATMENTS) {
+    const existing = await prisma.bookableTreatment.findUnique({
+      where: { studioId_name: { studioId, name: spec.name } },
+    });
+    if (existing) continue;
+    let service = await prisma.service.findFirst({ where: { studioId, name: spec.service } });
+    if (!service) {
+      service = await prisma.service.create({
+        data: {
+          studioId,
+          name: spec.service,
+          category: ServiceCategory.BODY_SHAPING,
+          durationMinutes: spec.durationMinutes,
+          priceHuf: 0,
+        },
+      });
+    }
+    await prisma.bookableTreatment.create({
+      data: {
+        studioId,
+        name: spec.name,
+        resourceId: resourceIds.get(spec.resource)!,
+        serviceId: service.id,
+        durationMinutes: spec.durationMinutes,
+        bufferMinutes: BOOKING_BUFFER_MINUTES,
+        sortOrder: spec.sortOrder,
+      },
+    });
+    treatments++;
+  }
+
+  const settings = await prisma.bookingSettings.findUnique({ where: { studioId } });
+  if (!settings) {
+    const weekday = { opensAt: 7 * 60, closesAt: 18 * 60 };
+    await prisma.bookingSettings.create({
+      data: { studioId, openingHours: [weekday, weekday, weekday, weekday, weekday, null, null] },
+    });
+  }
+  return { resources, treatments };
+}
+
 async function main() {
   // Munkatársak (Megrendelő, 2026-11-11): létrehozza vagy frissíti, jelszó nélkül.
   const staff = await Promise.all(
@@ -841,6 +922,8 @@ async function main() {
     createdTemplates++;
   }
 
+  const bookingSetup = await ensureBookingSetup();
+
   // Tesztvendégek: vonalkód szerint; meglévőt csak SEED_DEMO_RESET=1 esetén építünk újra.
   const guestResults: string[] = [];
   for (const spec of DEMO_GUESTS) {
@@ -886,6 +969,7 @@ async function main() {
     deactivatedLegacyStaff,
     createdServices,
     createdTemplates,
+    bookingSetup,
     guests: guestResults,
   });
 }
