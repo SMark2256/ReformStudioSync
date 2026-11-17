@@ -7,6 +7,13 @@ import {
   DeductPassUsageRequestDto,
   DisplayDeviceDto,
   DocumentType,
+  EmailAudienceFilterDto,
+  EmailAudiencePreviewDto,
+  EmailAutomationDto,
+  EmailAutomationKind,
+  EmailMessageListDto,
+  EmailMessageListQueryDto,
+  EmailTemplateDto,
   Gender,
   GuestDocumentDto,
   GuestDto,
@@ -16,6 +23,7 @@ import {
   GuestStatus,
   LoggedCheckInDto,
   LoginResponseDto,
+  MailStatusDto,
   MeasurementDto,
   MembershipDto,
   MembershipDueDto,
@@ -33,24 +41,35 @@ import {
   RecordPaymentRequestDto,
   RequestLoginCodeResponseDto,
   Role,
+  SaveEmailTemplateDto,
+  SendBulkEmailDto,
+  SendBulkEmailResultDto,
+  SendGuestEmailDto,
+  SendTestEmailDto,
   ServiceCategory,
   ServiceDto,
   TodayDashboardDto,
   toAppError,
   TourEventDto,
   TourStateDto,
+  UnsubscribeInfoDto,
+  UpdateEmailAutomationDto,
   VisitType,
 } from '@reform/shared';
 import { broadcastToLocalMonitors } from '@/shared/lib/monitor-channel';
 import { useAuthStore } from '@/shared/auth';
 import { isDemoMode } from './demo-mode';
 import { mockStudioEngine } from './mock-engine';
+import { mockMailEngine } from './mock-mail';
 
 const API_BASE_URL =
   import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
 /** Demó módban, API nélkül ezzel a kóddal lehet belépni (a mock nem küld levelet). */
 const DEMO_LOGIN_CODE = '123456';
+
+/** A mock jogosultság-ellenőrzéséhez: a bejelentkezett munkatárs. */
+const currentUser = () => useAuthStore.getState().user;
 
 function isNetworkError(err: unknown): err is TypeError {
   return err instanceof TypeError && err.message.toLowerCase().includes('fetch');
@@ -176,6 +195,7 @@ export const api = {
     gender: Gender;
     status?: GuestStatus;
     notes?: string;
+    marketingConsent?: boolean;
   }): Promise<GuestDto> {
     return request(
       '/guests',
@@ -183,7 +203,11 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(data),
       },
-      () => mockStudioEngine.createGuest(data),
+      () => {
+        const created = mockStudioEngine.createGuest(data);
+        mockMailEngine.onGuestCreated(created);
+        return created;
+      },
     );
   },
 
@@ -200,6 +224,7 @@ export const api = {
       gender: Gender;
       status: GuestStatus;
       notes: string;
+      marketingConsent: boolean;
     }>,
   ): Promise<GuestDto> {
     return request(
@@ -587,17 +612,134 @@ export const api = {
     );
   },
 
-  sendGuestEmailLog(
+  /** Levelezés (TICKET-55): a levélküldés állapota (beállítva-e, korlát, sor). */
+  getMailStatus(): Promise<MailStatusDto> {
+    return request('/mail/status', {}, () => mockMailEngine.getStatus());
+  },
+
+  getEmailTemplates(): Promise<EmailTemplateDto[]> {
+    return request('/mail/templates', {}, () => mockMailEngine.getTemplates());
+  },
+
+  createEmailTemplate(data: SaveEmailTemplateDto): Promise<EmailTemplateDto> {
+    return request(
+      '/mail/templates',
+      { method: 'POST', body: JSON.stringify(data) },
+      () => mockMailEngine.createTemplate(data, currentUser()),
+    );
+  },
+
+  updateEmailTemplate(
+    id: string,
+    data: SaveEmailTemplateDto,
+  ): Promise<EmailTemplateDto> {
+    return request(
+      `/mail/templates/${id}`,
+      { method: 'PATCH', body: JSON.stringify(data) },
+      () => mockMailEngine.updateTemplate(id, data, currentUser()),
+    );
+  },
+
+  deleteEmailTemplate(id: string): Promise<{ deletedId: string }> {
+    return request(`/mail/templates/${id}`, { method: 'DELETE' }, () =>
+      mockMailEngine.deleteTemplate(id, currentUser()),
+    );
+  },
+
+  /** Tesztlevél a bejelentkezett munkatárs címére. */
+  sendTestEmail(data: SendTestEmailDto): Promise<MessageLogDto> {
+    return request(
+      '/mail/test',
+      { method: 'POST', body: JSON.stringify(data) },
+      () => mockMailEngine.sendTest(data, currentUser()),
+    );
+  },
+
+  getEmailAutomations(): Promise<EmailAutomationDto[]> {
+    return request('/mail/automations', {}, () =>
+      mockMailEngine.getAutomations(currentUser()),
+    );
+  },
+
+  updateEmailAutomation(
+    kind: EmailAutomationKind,
+    data: UpdateEmailAutomationDto,
+  ): Promise<EmailAutomationDto> {
+    return request(
+      `/mail/automations/${kind}`,
+      { method: 'PATCH', body: JSON.stringify(data) },
+      () => mockMailEngine.updateAutomation(kind, data, currentUser()),
+    );
+  },
+
+  /** Csoportos küldés: a szűrőnek megfelelő, hozzájáruló címzettek. */
+  previewEmailAudience(
+    filter: EmailAudienceFilterDto,
+  ): Promise<EmailAudiencePreviewDto> {
+    return request(
+      '/mail/audience/preview',
+      { method: 'POST', body: JSON.stringify({ filter }) },
+      () => mockMailEngine.previewAudience(filter, currentUser()),
+    );
+  },
+
+  sendBulkEmail(data: SendBulkEmailDto): Promise<SendBulkEmailResultDto> {
+    return request(
+      '/mail/bulk',
+      { method: 'POST', body: JSON.stringify(data) },
+      () => mockMailEngine.sendBulk(data, currentUser()),
+    );
+  },
+
+  getEmailMessages(
+    query: EmailMessageListQueryDto = {},
+  ): Promise<EmailMessageListDto> {
+    const qs = new URLSearchParams();
+    for (const [key, value] of Object.entries(query)) {
+      if (value !== undefined && value !== '') qs.set(key, String(value));
+    }
+    const suffix = qs.toString() ? `?${qs.toString()}` : '';
+    return request(`/mail/messages${suffix}`, {}, () =>
+      mockMailEngine.getMessages(query),
+    );
+  },
+
+  retryEmailMessage(id: string): Promise<MessageLogDto> {
+    return request(`/mail/messages/${id}/retry`, { method: 'POST' }, () =>
+      mockMailEngine.retryMessage(id),
+    );
+  },
+
+  getGuestEmailMessages(guestId: string): Promise<MessageLogDto[]> {
+    return request(`/mail/guests/${guestId}/messages`, {}, () =>
+      mockMailEngine.getGuestMessages(guestId),
+    );
+  },
+
+  /** Egyéni levél a vendégadatlapról (recepciós is küldheti). */
+  sendGuestEmail(
     guestId: string,
-    data: { subject: string; messageType: string },
+    data: SendGuestEmailDto,
   ): Promise<MessageLogDto> {
     return request(
-      `/guests/${guestId}/messages`,
-      {
-        method: 'POST',
-        body: JSON.stringify(data),
-      },
-      () => mockStudioEngine.sendGuestEmailLog(guestId, data),
+      `/mail/guests/${guestId}/messages`,
+      { method: 'POST', body: JSON.stringify(data) },
+      () => mockMailEngine.sendToGuest(guestId, data, currentUser()),
+    );
+  },
+
+  /** Nyilvános leiratkozó oldal (belépés nélkül, a levélben kapott tokennel). */
+  getUnsubscribeInfo(token: string): Promise<UnsubscribeInfoDto> {
+    return request(`/public/unsubscribe/${encodeURIComponent(token)}`, {}, () =>
+      mockMailEngine.getUnsubscribeInfo(token),
+    );
+  },
+
+  unsubscribe(token: string): Promise<UnsubscribeInfoDto> {
+    return request(
+      `/public/unsubscribe/${encodeURIComponent(token)}`,
+      { method: 'POST' },
+      () => mockMailEngine.unsubscribe(token),
     );
   },
 

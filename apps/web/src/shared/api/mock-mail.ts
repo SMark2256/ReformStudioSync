@@ -4,7 +4,6 @@ import {
   AuthUserDto,
   CheckInStatus,
   DEFAULT_MAIL_HOURLY_LIMIT,
-  DEFAULT_STUDIO_ID,
   EMAIL_BULK_MAX_RECIPIENTS,
   EmailAudienceFilterDto,
   EmailAudiencePreviewDto,
@@ -32,6 +31,7 @@ import {
   SendGuestEmailDto,
   SendTestEmailDto,
   STUDIO_DISPLAY_NAME,
+  studioDayRange,
   UnsubscribeInfoDto,
   UpdateEmailAutomationDto,
 } from '@reform/shared';
@@ -439,10 +439,14 @@ class MockMailEngine {
 
   getMessages(query: EmailMessageListQueryDto = {}): EmailMessageListDto {
     const q = query.q?.trim().toLowerCase();
+    const { gte, lt } = studioDayRange(query.from, query.to);
     const filtered = this.load().messages.filter(
       (m) =>
         (!query.status || m.status === query.status) &&
         (!query.messageType || m.messageType === query.messageType) &&
+        (!query.templateId || m.templateId === query.templateId) &&
+        (!gte || new Date(m.createdAt ?? m.sentAt ?? 0) >= gte) &&
+        (!lt || new Date(m.createdAt ?? m.sentAt ?? 0) < lt) &&
         (!q ||
           m.recipientEmail.toLowerCase().includes(q) ||
           (m.recipientName ?? '').toLowerCase().includes(q) ||
@@ -499,4 +503,3 @@ class MockMailEngine {
 }
 
 export const mockMailEngine = new MockMailEngine();
-export { DEFAULT_STUDIO_ID as MOCK_MAIL_STUDIO_ID };

@@ -37,7 +37,7 @@ import React, {
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { normalizeScannedCode } from '@/shared/lib/barcode-scanner';
 import { broadcastToScannerChannel } from '@/shared/lib/monitor-channel';
-import { mockStudioEngine } from '@/shared/api';
+import { mockMailEngine, mockStudioEngine } from '@/shared/api';
 import { handleAppError } from '@/shared/lib/errors';
 import { notify } from '@/shared/lib/notify';
 import { useOfflineQueueStore } from '@/entities/check-in';
@@ -323,6 +323,7 @@ export const DemoSandboxPage: React.FC = () => {
 
   const handleResetDemo = () => {
     mockStudioEngine.resetDatabase();
+    mockMailEngine.resetMail();
     clearQueue();
     setMonitorResult(null);
     setRevokedBanner(null);

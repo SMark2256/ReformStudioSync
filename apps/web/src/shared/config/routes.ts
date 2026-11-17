@@ -6,6 +6,7 @@ export const APP_ROUTES = {
   guests: { path: '/guests', title: 'Vendégek' },
   passes: { path: '/passes', title: 'Bérletek és termékek' },
   finance: { path: '/finance', title: 'Pénzügy' },
+  mailing: { path: '/mailing', title: 'Levelezés' },
   news: { path: '/news', title: 'Újdonságok' },
   demo: { path: '/demo', title: 'Demó mód' },
   monitors: { path: '/monitors', title: 'Monitorok' },
