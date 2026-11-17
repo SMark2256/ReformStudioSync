@@ -109,6 +109,26 @@ export const getJiraIssueUrl = (jiraKey: string): string =>
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    id: 'v0.3-feature-tablet-guest-intake',
+    version: '0.3',
+    date: '2026-11-17',
+    kind: 'NEW_FEATURE',
+    title: 'Tabletes vendégfelvétel',
+    summary:
+      'Az új vendég (vagy új szolgáltatás) adatlapját a vendég a tableten tölti ki és írja alá; a recepció ellenőrzi és jóváhagyja, a vendégprofil és az aláírt PDF-ek automatikusan elkészülnek.',
+    details: [
+      'Indítás a Vendégfelvétel oldalon: új vagy meglévő vendég, Köredzés és Hypoxi csomag; hasonló adatú vendégnél figyelmeztetés.',
+      'Átadás ezen az eszközön vagy valós időben a párosított vendégfelvételi tabletre (Monitorok oldal: „Vendégfelvételi tablet”).',
+      'A tableten csak az adott kitöltés látszik; kilépni a munkatárs kilépési kódjával lehet.',
+      'Egészségügyi kérdőív, ellenjavallatok, tagsági szerződés, hozzájárulások; kockázatos válasznál figyelmeztetés a kérdés alatt.',
+      'Meglévő vendégnél csak a még hiányzó dokumentumokat kéri.',
+      'Profilkép, mérések (Omron, körfogatok), érintőceruzás aláírás; jóváhagyás után a PDF-ek a vendégprofil Dokumentumok fülén, e-mailben újraküldhetők.',
+      'A dokumentumszövegek helyőrzők: jogi és szakmai felülvizsgálatra várnak.',
+    ],
+    jiraKey: 'TICKET-56',
+    link: { type: 'route', path: '/intake', label: 'Vendégfelvétel megnyitása' },
+  },
+  {
     id: 'v0.3-fix-demo-sandbox-new-guests',
     version: '0.3',
     date: '2026-11-14',

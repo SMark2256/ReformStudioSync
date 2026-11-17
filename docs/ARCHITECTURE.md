@@ -18,10 +18,10 @@ Az `apps/web/src` könyvtár rétegei felülről lefelé. Egy réteg csak az ala
 | Réteg | Slice-ok | Tartalom |
 | :--- | :--- | :--- |
 | `app/` | — | Belépési pont (`index.tsx`), QueryClient + Toaster providerek, router (`App.tsx`), globális stílusok |
-| `pages/` | `login`, `reception`, `monitor`, `monitors`, `settings`, `tablet-document`, `demo-sandbox` | Útvonalanként egy oldal |
+| `pages/` | `login`, `reception`, `monitor`, `monitors`, `settings`, `tablet-document`, `guest-intake`, `tablet-intake`, `demo-sandbox` | Útvonalanként egy oldal |
 | `widgets/` | `guest-profile`, `version-changelog` | Önálló, összetett UI blokkok |
 | `features/` | `scanner-channel`, `sell-pass`, `deduct-treatment`, `record-payment`, `toggle-theme`, `guided-tour` | Felhasználói műveletek (`guided-tour`: oldalbemutató — felajánlás, reflektoros réteg, fejléc „?” gomb; forgatókönyv minden alkalmazásoldalon, kivéve a Demót és a Monitorokat (`config/tours.ts`); a célpontok `data-tour` horgonyok az oldalakon, a kötelezőket az `e2e/tour-targets.spec.ts` ellenőrzi; újdonság-reflektor: a `ReleaseNote.spotlight` 45 napig egy lépéses bemutatóként felajánlva, látott-állapota `spotlight:<bejegyzés id>`) |
-| `entities/` | `guest`, `check-in`, `display-device`, `release-note` | Üzleti entitások UI-ja és állapota (offline puffer, szkenner csatorna store, kijelzőlista lekérdezése, Újdonságok adatai) |
+| `entities/` | `guest`, `check-in`, `display-device`, `intake`, `release-note` | Üzleti entitások UI-ja és állapota (offline puffer, szkenner csatorna store, kijelzőlista lekérdezése, vendégfelvétel lekérdezései és aláírt PDF-ek, Újdonságok adatai) |
 | `shared/` | `api`, `auth`, `config`, `theme`, `lib/*` | REST kliens + mock motor, session store, útvonalak és a futó verzió (`config`), téma store, notify/sound/szkenner/monitor csatorna segédek |
 
 A szabályokat a [Steiger](https://github.com/feature-sliced/steiger) linter ellenőrzi: `npm run lint:fsd`. A TypeScript- és React-szabályokat az ESLint (`eslint.config.mjs`) a teljes monorepón: `npm run lint` / `npm run lint:fix`.
@@ -71,6 +71,14 @@ A szabályokat a [Steiger](https://github.com/feature-sliced/steiger) linter ell
 - **Ütemezés:** a folyó hónapig minden hónapnak van esedékessége (hónap elejétől befizethető). Ha a kezdés (vagy az utolsó újraaktiválás, `memberships.resumed_at`) napja későbbi a `dueDay`-nél, az első esedékesség a következő hónapé. Szünet / megszűnés alatt nincs új esedékesség; a leállás napja után esedékes, érintetlen díj törlődik.
 - **Pótlás:** `FinanceService.ensureDuesUpTo(now)` (stúdiószinten) és `ensureDuesForGuest(guestId, now?, tx?)` (vendégszinten, hívó tranzakciójában is). Futás: `MembershipDuesScheduler` indításkor és óránként, az elmaradás-lekérdezéskor, a vendég adatlapján és státuszváltás előtt. Csak a legutóbbi meglévő időszak utáni hónapok jönnek létre, a `@@unique([membershipId, period])` + `skipDuplicates` miatt ismételt futás sem duplikál.
 
+### ADR-08: Tabletes vendégfelvétel (TICKET-56)
+- **Modul:** `apps/api/src/modules/intake` (+ `storage`). Táblák: `intake_packages`, `intake_form_definitions` (verziózott, adatvezérelt kérdőívek; a beépítettek: `packages/shared/src/intake-forms.ts`, indításkor és seedkor feltöltve, meglévő kulcs+verzió nem íródik felül), `intake_sessions`, `intake_health_records` (egészségügyi válaszok külön, csak a `GET /intake/sessions/:id/health` adja ki, minden olvasás és jóváhagyás `AuditLog`), `intake_document_snapshots` (aláíráskori szöveg, verzió, válaszok, aláírás, időbélyeg, SHA-256; adatbázis-trigger tiltja a tartalom módosítását). Bővült: `display_devices.kind` (`MONITOR`/`TABLET`), `photos.purpose` (`PROGRESS`/`PROFILE`), `measurements` (BMI, vázizom %, nyugalmi anyagcsere, has, térd feletti, vádli, `intake_session_id`).
+- **Állapotgép:** `packages/shared/src/intake.ts` (`nextIntakeStatus`): előkészítve → vendég kitölti → ellenőrzésre vár → jóváhagyva → aláírva/lezárva; a lezárás (PDF, tárolás) hibája `FAILED`, újrapróbálható. Az API és a kliens mock (`shared/api/mock-intake.ts`) ugyanezt hívja; az átmenetek feltételes `updateMany`-vel védettek a párhuzamos kérések ellen.
+- **Vendégmód:** a munkatárs indítja (`guest-mode`: ezen az eszközön, a kliens eldobja a munkatársi tokent) vagy párosított tabletre küldi (`send-to-device` → `intake:assigned` csak az eszköz szobájába → a tablet `POST /intake/device/claim`-mel átveszi). A vendégtoken (fejléc `x-intake-token`, 120 perc, az adatbázisban csak a hash) egy kitöltéshez kötött; az `intake/guest/*` végpontok azonosítót nem fogadnak, így más vendég vagy recepciós adat nem érhető el. Kilépés csak a munkatárs 6 jegyű kilépési kódjával (HMAC, 5 hibás próbálkozás után zárol).
+- **Jóváhagyás:** egy `$transaction`-ben az állapot, a vendégprofil (új, meglévő, vagy duplikátumnál a kiválasztott meglévő), a pillanatképek, a mérés, a profilkép és a napló. Utána a PDF-ek: `pdf-lib` + `@pdf-lib/fontkit`, beágyazott Noto Sans (`apps/api/assets/fonts`, OFL), az aláírással, verzióval és időponttal.
+- **Tárolás:** `StorageService` a Supabase Storage REST API-jára (`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_STORAGE_BUCKET`, privát bucket, 10 perces aláírt link). Beállítás nélkül nem production módban helyi fájlrendszer (`LOCAL_STORAGE_DIR`, alapértelmezés `.local-storage/`, HMAC-cel aláírt, lejáró `/api/storage/local/:token` link); productionben `STORAGE.NOT_CONFIGURED`, a kitöltés `FAILED` lesz és beállítás után újrapróbálható.
+- **E-mail:** `MailService.send(to, message, { attachments })` (SendPulse `attachments_binary`, base64); a levél a `MessageLog`-ba kerül (`INTAKE_DOCUMENT`).
+
 ---
 
 ## 3. REST API Végpontok Összefoglalója
@@ -98,5 +106,14 @@ Interaktív Swagger/OpenAPI felület elérhető: `GET /api/docs`
 | **Check-Ins** | `POST /api/check-ins/sync-offline` | Offline puffer idempotens kötegelt szinkronizálása | JWT |
 | **Finance** | `GET /api/finance/daily-summary` | Napi kasszazárás és bevételi bontás fizetési mód szerint | JWT |
 | **Finance** | `POST /api/finance/payments/:id/cancel` | Téves bérleteladás és fizetés sztornózása | JWT |
+| **Intake** | `GET /api/intake/packages`, `GET /api/intake/forms` | Felvételi csomagok és aktív kérdőív-definíciók | JWT |
+| **Intake** | `POST /api/intake/duplicates` | Duplikáció-ellenőrzés (név + születési dátum, telefon, e-mail) | JWT |
+| **Intake** | `GET/POST /api/intake/sessions`, `GET/PATCH /api/intake/sessions/:id` | Vendégfelvételek listája, előkészítése, részletei, ellenőrzés (profil, mérések, duplikátumhoz kapcsolás) | JWT |
+| **Intake** | `GET /api/intake/sessions/:id/health` | Egészségügyi válaszok (minden olvasás auditnaplóba kerül) | JWT |
+| **Intake** | `POST /api/intake/sessions/:id/{guest-mode,send-to-device,release,return,approve,retry,cancel}` | Átadás, visszaküldés, jóváhagyás, lezárás újrapróbálása, megszakítás | JWT |
+| **Intake** | `GET /api/guests/:id/intake-documents`, `POST /api/intake/documents/:id/{link,email}` | Aláírt PDF-ek, lejáró link (naplózva), e-mailes küldés | JWT |
+| **Intake** | `POST /api/intake/device/claim` | A tabletre küldött kitöltés átvétele | `x-device-token` (tablet) |
+| **Intake** | `GET /api/intake/guest/session`, `PUT …/answers`, `PUT …/photo`, `POST …/submit`, `POST …/exit` | Vendégmód: csak a saját kitöltés | `x-intake-token` |
+| **Storage** | `GET /api/storage/local/:token` | Helyi tároló lejáró, aláírt letöltési linkje (csak Supabase nélkül) | Aláírt link |
 | **Tours** | `GET /api/tours` | A fiók látott oldalbemutatói (`users.tour_state`) | JWT |
 | **Tours** | `POST /api/tours` | Bemutató bezárva (`seen`), „Többet ne mutass” (`all`), újraindítás (`reset`) | JWT |
