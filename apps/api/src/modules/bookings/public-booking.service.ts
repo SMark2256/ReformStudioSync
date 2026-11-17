@@ -292,7 +292,7 @@ export class PublicBookingService {
         name: p.name,
         serviceName: p.serviceName,
         type: p.type as unknown as GuestPassSummaryDto['type'],
-        remainingPasses: p.remainingPasses,
+        remainingPasses: p.remainingPasses ?? null,
         totalPasses: p.row.totalPasses,
         expirationDate: p.row.expirationDate.toISOString(),
         status: getPassStatus(p, now),
