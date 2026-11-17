@@ -3,6 +3,7 @@ import {
   INTAKE_DUPLICATE_REASON_LABELS,
   INTAKE_LEGAL_REVIEW_LABEL,
   INTAKE_MEASUREMENT_FIELDS,
+  intakeAnswerText,
   IntakeHealthDto,
   IntakeMeasurementDraft,
   IntakeProfileDraft,
@@ -48,7 +49,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/shared/ui';
-import { answerText } from '../model/answerText';
 
 const GENDER_LABELS: Record<Gender, string> = {
   [Gender.FEMALE]: 'Nő',
@@ -90,7 +90,10 @@ export const IntakeReviewPanel: React.FC<{ session: IntakeSessionDetailDto }> = 
   const [handover, setHandover] = useState<Handover | null>(null);
   const [health, setHealth] = useState<IntakeHealthDto | null>(null);
 
-  useEffect(() => setHealth(null), [session.id]);
+  // Másik kitöltésre váltva az egészségügyi válaszok újra csak naplózott megnyitással látszanak.
+  useEffect(() => {
+    setHealth(null);
+  }, [session.id]);
 
   const refresh = (detail?: IntakeSessionDetailDto) => {
     if (detail) queryClient.setQueryData(INTAKE_QUERY_KEYS.session(detail.id), detail);
@@ -240,7 +243,7 @@ export const IntakeReviewPanel: React.FC<{ session: IntakeSessionDetailDto }> = 
                 .filter((q) => isQuestionVisible(q, session.answers[form.key] ?? {}))
                 .map((q) => (
                   <DataListItem key={q.id} label={q.label}>
-                    {answerText(q, session.answers[form.key]?.[q.id])}
+                    {intakeAnswerText(q, session.answers[form.key]?.[q.id])}
                   </DataListItem>
                 ))}
             </DataList>
@@ -284,7 +287,7 @@ export const IntakeReviewPanel: React.FC<{ session: IntakeSessionDetailDto }> = 
                           .map((q) => (
                             <DataListItem key={q.id} label={q.label}>
                               <span className={flagged.has(q.id) ? 'text-warning' : undefined}>
-                                {answerText(q, answers[q.id])}
+                                {intakeAnswerText(q, answers[q.id])}
                                 {flagged.has(q.id) && ' (figyelmeztetés)'}
                               </span>
                             </DataListItem>
@@ -557,7 +560,7 @@ const MeasurementsEditor: React.FC<{
                   Object.entries(draft)
                     .filter(([, v]) => v.trim() !== '')
                     .map(([k, v]) => [k, Number(v.replace(',', '.'))]),
-                ),
+                ) as IntakeMeasurementDraft,
               )
             }
           >

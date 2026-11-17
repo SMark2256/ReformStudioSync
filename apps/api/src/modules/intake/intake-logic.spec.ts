@@ -5,6 +5,7 @@ import {
   hasSignableIntakeForms,
   INTAKE_PACKAGE_CIRCUIT,
   INTAKE_PACKAGE_HYPOXI,
+  intakeAnswerText,
   intakeWarnings,
   IntakeEvent,
   IntakeStatus,
@@ -229,6 +230,21 @@ describe('duplikáció-ellenőrzés', () => {
       { guestId: 'g2', matchedOn: ['NAME'] },
     );
     expect(findIntakeDuplicates({ lastName: 'Kovács', firstName: 'Anna' }, guests, 'g2')).toEqual([]);
+  });
+});
+
+describe('válaszok olvasható formában', () => {
+  const question = (formKey: string, id: string) =>
+    form(formKey).questions.find((q) => q.id === id)!;
+
+  it('választásnál a címke, több értéknél vesszővel; elfogadás; üres', () => {
+    expect(intakeAnswerText(question('health-questionnaire', 'surgeryLast6Weeks'), 'YES')).toBe('Igen');
+    expect(intakeAnswerText(question('health-questionnaire', 'goals'), ['WEIGHT_LOSS', 'FITNESS'])).toBe(
+      'Fogyás, Erőnlét, állóképesség',
+    );
+    expect(intakeAnswerText(question('privacy-notice', 'privacyRead'), 'ACCEPTED')).toBe('Elfogadva');
+    expect(intakeAnswerText(question('guest-profile', 'lastName'), undefined)).toBe('—');
+    expect(intakeAnswerText(question('guest-profile', 'lastName'), 'Fekete')).toBe('Fekete');
   });
 });
 

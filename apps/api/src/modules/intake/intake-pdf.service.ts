@@ -4,6 +4,7 @@ import {
   IntakeAnswers,
   IntakeFormDefinitionDto,
   INTAKE_LEGAL_REVIEW_LABEL,
+  intakeAnswerText,
   isQuestionVisible,
 } from '@reform/shared';
 import { existsSync, readFileSync } from 'fs';
@@ -93,7 +94,7 @@ export class IntakePdfService {
       writer.subheading('Válaszok');
       for (const q of answered) {
         writer.paragraph(q.label, { font: bold, after: 2 });
-        writer.paragraph(answerLabel(q, input.answers[q.id]), { indent: 12 });
+        writer.paragraph(intakeAnswerText(q, input.answers[q.id]), { indent: 12 });
       }
     }
 
@@ -105,19 +106,6 @@ export class IntakePdfService {
 
     return Buffer.from(await pdf.save());
   }
-}
-
-function answerLabel(
-  question: IntakeFormDefinitionDto['questions'][number],
-  value: IntakeAnswers[string] | undefined,
-): string {
-  if (value === undefined || (Array.isArray(value) && value.length === 0) || value === '') {
-    return '—';
-  }
-  if (question.type === 'ACCEPT') return value === 'ACCEPTED' ? 'Elfogadva' : 'Nem fogadta el';
-  const labels = new Map((question.options ?? []).map((o) => [o.value, o.label]));
-  const values = Array.isArray(value) ? value : [value];
-  return values.map((v) => labels.get(v) ?? v).join(', ');
 }
 
 interface WriteOptions {

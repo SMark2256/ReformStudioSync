@@ -236,6 +236,17 @@ export function intakeWarnings(
   });
 }
 
+/** Egy válasz olvasható formában (a választható értékek a címkéjükkel): PDF és ellenőrző nézet. */
+export function intakeAnswerText(
+  question: Pick<IntakeQuestion, 'type' | 'options'>,
+  value: IntakeAnswerValue | undefined,
+): string {
+  if (isEmptyAnswer(value)) return '—';
+  if (question.type === 'ACCEPT') return value === 'ACCEPTED' ? 'Elfogadva' : 'Nem fogadta el';
+  const labels = new Map((question.options ?? []).map((o) => [o.value, o.label]));
+  return (Array.isArray(value) ? value : [value!]).map((v) => labels.get(v) ?? v).join(', ');
+}
+
 /** A rejtett (feltételhez kötött, de most nem látható) kérdések válaszait elhagyja. */
 export function pruneHiddenAnswers(
   form: Pick<IntakeFormDefinitionDto, 'questions'>,
