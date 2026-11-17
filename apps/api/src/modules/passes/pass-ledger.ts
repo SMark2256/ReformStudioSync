@@ -66,7 +66,8 @@ export async function recordDeduction(
   data: {
     guestId: string;
     staffUserId: string;
-    checkInId: string;
+    /** A levonáshoz tartozó beléptetés; „Nem jelent meg” levonásnál (TICKET-57) nincs. */
+    checkInId: string | null;
     serviceId?: string | null;
     operationKey?: string | null;
     note: string;

@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { validateEnv } from './config/env.validation';
 import { AuthModule } from './modules/auth/auth.module';
+import { BookingsModule } from './modules/bookings/bookings.module';
 import { CheckInsModule } from './modules/check-ins/check-ins.module';
 import { FinanceModule } from './modules/finance/finance.module';
 import { GuestsModule } from './modules/guests/guests.module';
@@ -28,6 +29,7 @@ import { PrismaModule } from './prisma/prisma.module';
     MonitorModule,
     CheckInsModule,
     ToursModule,
+    BookingsModule,
     IntakeModule,
     MailingModule,
   ],

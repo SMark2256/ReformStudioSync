@@ -1,4 +1,5 @@
 import {
+  CalendarDays,
   ClipboardSignature,
   ConciergeBell,
   Mail,
@@ -33,6 +34,7 @@ export const NAV_GROUPS: NavGroup[] = [
     label: 'Napi működés',
     items: [
       { route: 'reception', icon: ConciergeBell },
+      { route: 'bookings', icon: CalendarDays },
       { route: 'monitor', icon: MonitorSmartphone, opensWindow: true },
     ],
   },

@@ -7,12 +7,18 @@ import {
   Routes,
 } from 'react-router-dom';
 import { GlobalScannerChannel } from '@/features/scanner-channel';
+import { BookingsPage } from '@/pages/bookings';
 import { LoginPage } from '@/pages/login';
 import { MailingPage } from '@/pages/mailing';
 import { DemoSandboxPage } from '@/pages/demo-sandbox';
 import { GuestIntakePage } from '@/pages/guest-intake';
 import { MonitorPage } from '@/pages/monitor';
 import { MonitorsPage } from '@/pages/monitors';
+import {
+  ManageBookingPage,
+  PublicBookingPage,
+  WaitlistOfferPage,
+} from '@/pages/public-booking';
 import {
   RECEPTION_PATHS,
   ReceptionPage,
@@ -27,6 +33,7 @@ import { useIntakeGuestStore } from '@/shared/auth';
 import {
   APP_RELEASE_VERSION,
   APP_ROUTES,
+  PUBLIC_BOOKING_ROUTES,
   TABLET_INTAKE_PATH,
 } from '@/shared/config';
 
@@ -82,6 +89,7 @@ export const App: React.FC = () => {
           {RECEPTION_PATHS.map((path) => (
             <Route key={path} path={path} element={<ReceptionPage />} />
           ))}
+          <Route path={APP_ROUTES.bookings.path} element={<BookingsPage />} />
           <Route path={APP_ROUTES.intake.path} element={<GuestIntakePage />} />
           <Route path={APP_ROUTES.demo.path} element={<DemoSandboxPage />} />
           <Route path={APP_ROUTES.monitors.path} element={<MonitorsPage />} />
@@ -102,6 +110,14 @@ export const App: React.FC = () => {
           )}
         </Route>
         <Route path={APP_ROUTES.monitor.path} element={<MonitorPage />} />
+        <Route path="/tablet" element={<TabletDocumentPage />} />
+        {/* Nyilvános foglaló (TICKET-57): munkatársi belépés nélkül. */}
+        <Route path={PUBLIC_BOOKING_ROUTES.book} element={<PublicBookingPage />} />
+        <Route path={PUBLIC_BOOKING_ROUTES.manage} element={<ManageBookingPage />} />
+        <Route
+          path={PUBLIC_BOOKING_ROUTES.waitlistOffer}
+          element={<WaitlistOfferPage />}
+        />
         <Route
           path="/tablet"
           element={

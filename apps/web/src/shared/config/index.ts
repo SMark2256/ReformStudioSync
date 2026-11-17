@@ -1,4 +1,4 @@
-export { APP_ROUTES, normalizePathname, TABLET_INTAKE_PATH } from './routes';
+export { APP_ROUTES, normalizePathname, PUBLIC_BOOKING_ROUTES, TABLET_INTAKE_PATH } from './routes';
 export type { AppRouteKey } from './routes';
 export {
   APP_RELEASE_VERSION,

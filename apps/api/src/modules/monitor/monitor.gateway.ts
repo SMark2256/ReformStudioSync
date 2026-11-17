@@ -10,6 +10,7 @@ import {
 import {
   APP_ERROR_CATALOG,
   appError,
+  BookingChangedPayload,
   CheckInResultPayload,
   CheckInRevokedPayload,
   DEFAULT_STUDIO_ID,
@@ -236,6 +237,14 @@ export class MonitorGateway
       studioId,
       `Beléptetés megjelenítve (${payload.guestName})`,
     );
+  }
+
+  /** A foglalási naptár változása (TICKET-57): csak a munkatársi szobának, személyes adat nélkül. */
+  emitBookingChanged(payload: BookingChangedPayload) {
+    if (!this.server) return;
+    this.server
+      .to(this.getStaffRoomName(payload.studioId))
+      .emit(SOCKET_EVENTS.BOOKING_CHANGED, payload);
   }
 
   emitCheckInRevoked(
