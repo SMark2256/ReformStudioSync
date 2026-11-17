@@ -56,7 +56,7 @@ function isNetworkError(err: unknown): err is TypeError {
   return err instanceof TypeError && err.message.toLowerCase().includes('fetch');
 }
 
-async function request<T>(
+export async function request<T>(
   path: string,
   options: RequestInit = {},
   fallbackFn?: () => T | Promise<T>,
