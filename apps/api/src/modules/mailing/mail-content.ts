@@ -77,7 +77,7 @@ export function htmlToText(html: string): string {
     .replace(/<hr\b[^>]*>/gi, '\n---\n')
     .replace(/<[^>]+>/g, '')
     .replace(/&(amp|lt|gt|quot|#39|nbsp);/g, (_m, name: string) => ENTITIES[name])
-    .replace(/ /g, ' ')
+    .replace(/\u00a0/g, ' ')
     .replace(/[ \t]+\n/g, '\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
