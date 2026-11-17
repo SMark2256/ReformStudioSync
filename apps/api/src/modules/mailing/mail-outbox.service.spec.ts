@@ -151,7 +151,7 @@ describe('MailOutboxService — kimenő sor (TICKET-55)', () => {
     expect(ctx.mail.send).not.toHaveBeenCalled();
     expect(ctx.prisma.messageLog.update.mock.calls[0][0].data).toMatchObject({
       status: MessageStatus.FAILED,
-      errorDetails: expect.stringMatching(/hozzájárul/),
+      errorDetails: expect.stringMatching(/nem járult hozzá/),
     });
   });
 
