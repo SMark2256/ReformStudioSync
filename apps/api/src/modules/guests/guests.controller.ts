@@ -19,7 +19,6 @@ import {
   CreateGuestNoteDto,
   CreateGuestPhotoDto,
   CreateMeasurementDto,
-  SendGuestMessageDto,
   SignGuestDocumentDto,
   UpdateGuestDto,
 } from './guests.dto';
@@ -78,7 +77,7 @@ export class GuestsController {
     @Body() dto: UpdateGuestDto,
     @CurrentUser() user: AuthUserDto,
   ) {
-    return this.guestsService.update(id, dto, user.studioId);
+    return this.guestsService.update(id, dto, user.studioId, user.id);
   }
 
   @Post('guests/:id/measurements')
@@ -146,14 +145,5 @@ export class GuestsController {
     @CurrentUser() user: AuthUserDto,
   ) {
     return this.guestsService.addInternalNote(id, dto, user.id);
-  }
-
-  @Post('guests/:id/messages')
-  @ApiOperation({ summary: 'E-mail értesítés kiküldése és naplózása (message_logs)' })
-  sendMessage(
-    @Param('id') id: string,
-    @Body() dto: SendGuestMessageDto,
-  ) {
-    return this.guestsService.sendGuestEmailLog(id, dto);
   }
 }

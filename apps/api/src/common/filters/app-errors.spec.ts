@@ -17,7 +17,7 @@ import {
 import { describe, expect, it } from 'vitest';
 
 const codes = Object.keys(APP_ERROR_CATALOG) as AppErrorCode[];
-const AREAS = ['COMMON', 'AUTH', 'GUEST', 'PASS', 'CHECKIN', 'MEMBERSHIP', 'PAYMENT'];
+const AREAS = ['COMMON', 'AUTH', 'GUEST', 'PASS', 'CHECKIN', 'MEMBERSHIP', 'PAYMENT', 'MAIL'];
 
 describe('Hibakatalógus', () => {
   it.each(codes)('%s: TERÜLET.OK formátum, ismert terület', (code) => {

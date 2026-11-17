@@ -80,10 +80,23 @@ enum DocumentStatus {
   SIGNED
 }
 
+// TICKET-55: a kimenő sor állapota (várakozik → elküldve / hibás).
 enum MessageStatus {
+  PENDING
   SENT
-  DELIVERED
   FAILED
+}
+
+// TICKET-55: tranzakciós (üdvözlő, egyéni) vagy marketing (köszöntő, csoportos) levél.
+enum EmailCategory {
+  TRANSACTIONAL
+  MARKETING
+}
+
+enum EmailAutomationKind {
+  WELCOME
+  BIRTHDAY
+  NAME_DAY
 }
 
 model User {
@@ -107,6 +120,8 @@ model User {
   auditLogs    AuditLog[]
   notes        GuestNote[]
   measurements Measurement[]
+  emailTemplates EmailTemplate[]
+  sentMessages   MessageLog[]
 
   @@index([studioId])
   @@map("users")
@@ -128,6 +143,12 @@ model Guest {
   isActive    Boolean     @default(true) @map("is_active")
   createdAt   DateTime    @default(now()) @map("created_at")
   updatedAt   DateTime    @updatedAt @map("updated_at")
+  // TICKET-55: marketing levelek hozzájárulása; az időpont az utolsó változásé (megadás / visszavonás).
+  marketingConsent   Boolean   @default(false) @map("marketing_consent")
+  marketingConsentAt DateTime? @map("marketing_consent_at")
+  // Leiratkozó link vendégenként (`/leiratkozas/:token`); a leiratkozás a hozzájárulást is visszavonja.
+  unsubscribeToken   String    @unique @default(uuid()) @map("unsubscribe_token")
+  unsubscribedAt     DateTime? @map("unsubscribed_at")
 
   passes        GuestPass[]
   memberships   Membership[]
@@ -455,20 +476,83 @@ model GuestNote {
   @@map("notes")
 }
 
+// Kimenő levelek sora és naplója (TICKET-55). Minden levél ide kerül (várakozik), és a
+// `MailingScheduler` küldi ki az óránkénti korláttal, hibánál visszalépő újrapróbálással.
+// A TICKET-55 előtti sorok is itt maradtak (`created_at` = a régi `sent_at`).
 model MessageLog {
   id             String        @id @default(uuid())
-  guestId        String        @map("guest_id")
+  studioId       String        @default("default-studio") @map("studio_id")
+  // Tesztlevélnél nincs vendég; a vendég törlése után a napló megmarad.
+  guestId        String?       @map("guest_id")
   recipientEmail String        @map("recipient_email")
+  recipientName  String?       @map("recipient_name")
   subject        String
+  /// WELCOME, BIRTHDAY, NAME_DAY, MANUAL, BULK, TEST (a régi sorokban szabad szöveg).
   messageType    String        @map("message_type")
-  status         MessageStatus @default(SENT)
-  sentAt         DateTime      @default(now()) @map("sent_at")
+  category       EmailCategory @default(TRANSACTIONAL)
+  status         MessageStatus @default(PENDING)
+  html           String?
+  text           String?
+  templateId     String?       @map("template_id")
+  /// A sablon neve a küldéskor (a sablon törlése vagy átnevezése után is olvasható).
+  templateName   String?       @map("template_name")
+  batchId        String?       @map("batch_id")
+  /// Dupla küldés kizárása, pl. `BIRTHDAY:<vendég>:2026`: egy kulccsal csak egy sor lehet.
+  dedupeKey      String?       @unique @map("dedupe_key")
+  attempts       Int           @default(0)
+  nextAttemptAt  DateTime      @default(now()) @map("next_attempt_at")
+  lastAttemptAt  DateTime?     @map("last_attempt_at")
+  createdById    String?       @map("created_by_id")
+  createdAt      DateTime      @default(now()) @map("created_at")
+  /// A tényleges kiküldés ideje; várakozó vagy hibás levélnél üres.
+  sentAt         DateTime?     @map("sent_at")
   errorDetails   String?       @map("error_details")
 
-  guest Guest @relation(fields: [guestId], references: [id], onDelete: Cascade)
+  guest     Guest?         @relation(fields: [guestId], references: [id], onDelete: SetNull)
+  template  EmailTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  createdBy User?          @relation(fields: [createdById], references: [id], onDelete: SetNull)
 
-  @@index([guestId, sentAt])
+  @@index([guestId, createdAt])
+  @@index([studioId, createdAt])
+  @@index([status, nextAttemptAt])
+  @@index([status, sentAt])
   @@map("message_logs")
+}
+
+// E-mail-sablon (TICKET-55): tárgy és szanitizált HTML törzs `{{mezo}}` helyőrzőkkel.
+model EmailTemplate {
+  id          String   @id @default(uuid())
+  studioId    String   @default("default-studio") @map("studio_id")
+  name        String
+  subject     String
+  bodyHtml    String   @map("body_html")
+  updatedById String?  @map("updated_by_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  updatedBy   User?             @relation(fields: [updatedById], references: [id], onDelete: SetNull)
+  automations EmailAutomation[]
+  messages    MessageLog[]
+
+  @@index([studioId, name])
+  @@map("email_templates")
+}
+
+// Automatikus levél (TICKET-55): stúdiónként fajtánként egy sor, külön ki- és bekapcsolható.
+model EmailAutomation {
+  id         String              @id @default(uuid())
+  studioId   String              @default("default-studio") @map("studio_id")
+  kind       EmailAutomationKind
+  enabled    Boolean             @default(false)
+  templateId String?             @map("template_id")
+  /// Az utolsó bekapcsolás: a pótlás ennél korábbi napra nem küld.
+  enabledAt  DateTime?           @map("enabled_at")
+  updatedAt  DateTime            @updatedAt @map("updated_at")
+
+  template EmailTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+
+  @@unique([studioId, kind])
+  @@map("email_automations")
 }
 
 model DisplayDevice {
