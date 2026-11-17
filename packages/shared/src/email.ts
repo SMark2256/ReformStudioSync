@@ -291,6 +291,30 @@ export function automationDays(
   return days;
 }
 
+const DAY_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+/** A stúdió (Budapest) naptári napjának kezdete (`ÉÉÉÉ-HH-NN`); éjfélkor nincs óraátállítás. */
+export function studioDayStart(day: string): Date | null {
+  const match = DAY_PATTERN.exec(day);
+  if (!match) return null;
+  const utcMidnight = Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  return new Date(utcMidnight - studioHour(new Date(utcMidnight)) * 60 * 60 * 1000);
+}
+
+/** A napló dátumszűrője: `from` napjának elejétől `to` napjának végéig (mindkettő a stúdió napja). */
+export function studioDayRange(from?: string, to?: string): { gte?: Date; lt?: Date } {
+  const range: { gte?: Date; lt?: Date } = {};
+  const start = from ? studioDayStart(from) : null;
+  if (start) range.gte = start;
+  const end = to ? studioDayStart(to) : null;
+  if (end) {
+    const next = addCalendarDays(getStudioDate(new Date(end.getTime() + 12 * 60 * 60 * 1000)), 1);
+    const pad = (n: number) => String(n).padStart(2, '0');
+    range.lt = studioDayStart(`${next.year}-${pad(next.month)}-${pad(next.day)}`)!;
+  }
+  return range;
+}
+
 /** A dupla küldést kizáró kulcs (`message_logs.dedupe_key`, egyedi). */
 export function automationDedupeKey(
   kind: EmailAutomationKind,

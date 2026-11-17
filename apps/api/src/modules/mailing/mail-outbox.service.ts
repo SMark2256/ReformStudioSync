@@ -16,6 +16,7 @@ import {
   marketingExclusion,
   MessageLogDto,
   MessageStatus,
+  studioDayRange,
 } from '@reform/shared';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
@@ -293,6 +294,8 @@ export class MailOutboxService {
       studioId,
       ...(query.status ? { status: query.status } : {}),
       ...(query.messageType ? { messageType: query.messageType } : {}),
+      ...(query.templateId ? { templateId: query.templateId } : {}),
+      ...(query.from || query.to ? { createdAt: studioDayRange(query.from, query.to) } : {}),
       ...(q
         ? {
             OR: [

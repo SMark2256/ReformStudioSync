@@ -95,6 +95,11 @@ export interface EmailMessageListQueryDto {
   messageType?: string;
   /** Címzett neve, címe vagy a tárgy. */
   q?: string;
+  templateId?: string;
+  /** A sorba kerülés napja ettől (`ÉÉÉÉ-HH-NN`, stúdióidő szerint)… */
+  from?: string;
+  /** …eddig a napig, bezárólag. */
+  to?: string;
   limit?: number;
   offset?: number;
 }

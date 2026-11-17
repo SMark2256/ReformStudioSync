@@ -10,6 +10,7 @@ import {
   marketingExclusion,
   matchesAudienceFilter,
   parseNameDay,
+  studioDayRange,
 } from '@reform/shared';
 import { describe, expect, it } from 'vitest';
 
@@ -151,5 +152,29 @@ describe('Kimenő sor újrapróbálása (TICKET-55)', () => {
   it('visszalépő várakozás: 5, 10, 20, 40 perc, legfeljebb 2 óra', () => {
     const minutes = [1, 2, 3, 4, 5, 6].map((n) => emailRetryDelayMs(n) / 60_000);
     expect(minutes).toEqual([5, 10, 20, 40, 80, 120]);
+  });
+});
+
+describe('A napló dátumszűrője (TICKET-55)', () => {
+  it('a stúdió napja szerint szűr: télen UTC+1, nyáron UTC+2, a záró nap bezárólag', () => {
+    expect(studioDayRange('2026-01-10', '2026-01-10')).toEqual({
+      gte: new Date('2026-01-09T23:00:00.000Z'),
+      lt: new Date('2026-01-10T23:00:00.000Z'),
+    });
+    expect(studioDayRange('2026-07-01', undefined)).toEqual({
+      gte: new Date('2026-06-30T22:00:00.000Z'),
+    });
+  });
+
+  it('az óraátállítás napján és hónap végén is a következő nap elejéig tart', () => {
+    // 2026. márc. 29.: 02:00-kor 03:00 lesz, a nap 23 órás.
+    expect(studioDayRange(undefined, '2026-03-29')).toEqual({
+      lt: new Date('2026-03-29T22:00:00.000Z'),
+    });
+    expect(studioDayRange(undefined, '2026-12-31').lt).toEqual(new Date('2026-12-31T23:00:00.000Z'));
+  });
+
+  it('a hibás alakú dátumot figyelmen kívül hagyja', () => {
+    expect(studioDayRange('2026/01/10', 'tegnap')).toEqual({});
   });
 });
