@@ -38,7 +38,10 @@ export function snapshotContentHash(content: IntakeSnapshotContent): string {
     .digest('hex');
 }
 
-export function verifySnapshot(content: IntakeSnapshotContent, contentHash: string): boolean {
+/** Csak a tartalmi mezőket hash-eli, így a tárolt sor (azonosító, PDF-kulcs …) is ellenőrizhető. */
+export function verifySnapshot(row: IntakeSnapshotContent, contentHash: string): boolean {
+  const { formKey, formVersion, title, bodyText, answers, signatureDataUrl, signedAt, legalReviewPending } = row;
+  const content = { formKey, formVersion, title, bodyText, answers, signatureDataUrl, signedAt, legalReviewPending };
   return snapshotContentHash(content) === contentHash;
 }
 
