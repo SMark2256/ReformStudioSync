@@ -1,6 +1,7 @@
 import {
   ClipboardSignature,
   ConciergeBell,
+  Mail,
   MonitorSmartphone,
   Ticket,
   Users,
@@ -42,6 +43,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { route: 'intake', icon: ClipboardSignature },
       { route: 'passes', icon: Ticket },
       { route: 'finance', icon: Wallet },
+      { route: 'mailing', icon: Mail },
     ],
   },
 ];

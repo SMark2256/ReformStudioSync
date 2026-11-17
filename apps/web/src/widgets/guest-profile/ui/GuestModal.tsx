@@ -59,6 +59,7 @@ import {
   CardActions,
   CardHeader,
   CardTitle,
+  Checkbox,
   ConfirmActionButton,
   Input,
   Label,
@@ -74,6 +75,7 @@ import {
 } from '@/shared/ui';
 import { arrivalsForPass } from '../model/arrivals';
 import { GuestArrivalsSection, PassArrivals } from './GuestArrivals';
+import { GuestEmails } from './GuestEmails';
 import { GuestPhotoGrid } from './GuestPhotos';
 import { GuestIntakeDocuments } from './GuestIntakeDocuments';
 
@@ -117,7 +119,8 @@ type GuestSheetTab =
   | 'payments'
   | 'measurements'
   | 'photos'
-  | 'documents';
+  | 'documents'
+  | 'emails';
 
 type GuestPayment = NonNullable<GuestDto['payments']>[number];
 type GuestMeasurement = NonNullable<GuestDto['measurements']>[number];
@@ -277,6 +280,7 @@ interface GuestModalProps {
     nameDay?: string | null;
     gender: Gender;
     notes?: string;
+    marketingConsent?: boolean;
   }) => void;
   onExtendPass?: (passId: string, additionalDays: number, note: string) => void;
   onToggleFreezePass?: (passId: string, note?: string) => void;
@@ -313,6 +317,7 @@ export const GuestModal: React.FC<GuestModalProps> = ({
   const [email, setEmail] = useState('');
   const [birthDate, setBirthDate] = useState('');
   const [nameDay, setNameDay] = useState('');
+  const [marketingConsent, setMarketingConsent] = useState(false);
   // Új vendégnél kötelező; a keresztnévből előtöltjük, amíg a recepciós kézzel nem választ.
   const [gender, setGender] = useState<Gender | ''>('');
   const [genderPicked, setGenderPicked] = useState(false);
@@ -368,13 +373,6 @@ export const GuestModal: React.FC<GuestModalProps> = ({
   const [docType, setDocType] = useState<DocumentType>(
     DocumentType.GDPR_CONSENT,
   );
-  const [emailSubject, setEmailSubject] = useState<string>(
-    'RE-FORM Stúdió — Tagsági értesítő',
-  );
-  const [emailBody, setEmailBody] = useState<string>(
-    'Kedves Vendégünk! Köszönjük, hogy a RE-FORM Stúdiót választod!',
-  );
-
   useEffect(() => {
     if (!isOpen) return;
     const st =
@@ -392,6 +390,7 @@ export const GuestModal: React.FC<GuestModalProps> = ({
       setEmail(guest.email ?? '');
       setBirthDate(guest.birthDate ?? '');
       setNameDay(guest.nameDay ?? '');
+      setMarketingConsent(Boolean(guest.marketingConsent));
       setGender(guest.gender);
       setNotes(guest.notes ?? '');
       setPhotoServiceId(services[0]?.id ?? '');
@@ -403,6 +402,7 @@ export const GuestModal: React.FC<GuestModalProps> = ({
       setEmail('');
       setBirthDate('');
       setNameDay('');
+      setMarketingConsent(false);
       setGender('');
       setNotes('');
     }
@@ -430,6 +430,7 @@ export const GuestModal: React.FC<GuestModalProps> = ({
       nameDay: nameDay.trim() || null,
       gender,
       notes: notes.trim() || undefined,
+      marketingConsent,
     });
   };
 
@@ -628,17 +629,6 @@ export const GuestModal: React.FC<GuestModalProps> = ({
     onRefreshAll?.();
   };
 
-  const handleSendEmailLog = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!guest || !emailSubject.trim()) return;
-    await api.sendGuestEmailLog(guest.id, {
-      subject: emailSubject.trim(),
-      messageType: emailBody.trim() || 'CUSTOM_NOTIFICATION',
-    });
-    notify.success('E-mail-értesítés elküldve és naplózva.');
-    onRefreshAll?.();
-  };
-
   const allUsageLogs = (guest?.passes ?? [])
     .flatMap((p) =>
       (p.usageLogs ?? []).map((u) => ({
@@ -689,6 +679,7 @@ export const GuestModal: React.FC<GuestModalProps> = ({
       label: 'Dokumentumok',
       count: guest?.documents?.length ?? 0,
     },
+    { id: 'emails', label: 'Levelek' },
   ];
 
   const handleSelectTab = (nextTab: GuestSheetTab) => {
@@ -975,6 +966,35 @@ export const GuestModal: React.FC<GuestModalProps> = ({
                         autoComplete="email"
                       />
                     </Field>
+                  </div>
+                  {/* Marketing levél (köszöntő, hírlevél) csak ezzel megy ki (TICKET-55). */}
+                  <div className="mt-4 flex items-start gap-2">
+                    <Checkbox
+                      id={id('marketingConsent')}
+                      checked={marketingConsent}
+                      onCheckedChange={(c) => setMarketingConsent(c === true)}
+                      className="mt-0.5"
+                    />
+                    <div className="min-w-0">
+                      <Label
+                        htmlFor={id('marketingConsent')}
+                        className="text-[13px] font-normal text-foreground"
+                      >
+                        Hozzájárul a hírlevelekhez és köszöntőkhöz (születés- és névnap)
+                      </Label>
+                      {guest?.unsubscribedAt ? (
+                        <p className="text-xs text-muted-foreground">
+                          A levélben leiratkozott: {formatDateTime(guest.unsubscribedAt)}.
+                          Újra csak a vendég kérésére jelöld be.
+                        </p>
+                      ) : (
+                        guest?.marketingConsentAt && (
+                          <p className="text-xs text-muted-foreground">
+                            Utoljára módosítva: {formatDateTime(guest.marketingConsentAt)}
+                          </p>
+                        )
+                      )}
+                    </div>
                   </div>
                 </FormSection>
                 <FormSection id={id('cardTitle')} title="Kártya">
@@ -1697,62 +1717,11 @@ export const GuestModal: React.FC<GuestModalProps> = ({
                 </List>
               )}
             </div>
-
-            {/* E-mail kommunikációs napló */}
-            <div className="space-y-4 rounded-lg border border-border p-4 md:p-5">
-              <SectionTitle>Kimenő e-mail-értesítés és napló</SectionTitle>
-              <form
-                onSubmit={handleSendEmailLog}
-                className="grid grid-cols-1 items-end gap-4 sm:grid-cols-3"
-              >
-                <Field id={id('emailSubject')} label="Tárgy">
-                  <Input
-                    id={id('emailSubject')}
-                    data-barcode-ignore
-                    value={emailSubject}
-                    onChange={(e) => setEmailSubject(e.target.value)}
-                  />
-                </Field>
-                <Field id={id('emailBody')} label="Üzenet">
-                  <Input
-                    id={id('emailBody')}
-                    data-barcode-ignore
-                    value={emailBody}
-                    onChange={(e) => setEmailBody(e.target.value)}
-                  />
-                </Field>
-                <Button type="submit" variant="secondary">
-                  E-mail küldése és naplózása
-                </Button>
-              </form>
-
-              {(guest.messageLogs ?? []).length > 0 && (
-                <List label="Elküldött e-mailek">
-                  {(guest.messageLogs ?? []).map((msg) => (
-                    <ListRow key={msg.id}>
-                      <div className="min-w-0">
-                        <p>
-                          <span className="font-medium text-foreground">
-                            {msg.subject}
-                          </span>{' '}
-                          <span className="text-muted-foreground">
-                            → {msg.recipientEmail}
-                          </span>
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {msg.messageType}
-                        </p>
-                      </div>
-                      <span className="font-mono text-xs text-muted-foreground">
-                        {msg.status} ({formatDate(msg.sentAt)})
-                      </span>
-                    </ListRow>
-                  ))}
-                </List>
-              )}
-            </div>
           </div>
         )}
+
+        {/* LEVELEK (TICKET-55) */}
+        {guest && activeTab === 'emails' && <GuestEmails guest={guest} />}
       </div>
     </Card>
   );

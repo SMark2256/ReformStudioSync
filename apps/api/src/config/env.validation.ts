@@ -1,3 +1,5 @@
+import { DEFAULT_MAIL_HOURLY_LIMIT } from '@reform/shared';
+
 export interface EnvConfig {
   NODE_ENV: string;
   PORT: number;
@@ -19,6 +21,10 @@ export interface EnvConfig {
   SUPABASE_SERVICE_ROLE_KEY?: string;
   SUPABASE_STORAGE_BUCKET: string;
   LOCAL_STORAGE_DIR?: string;
+  /** A kimenő sor óránkénti korlátja (TICKET-55); a SendPulse teszt csomaghoz 10. */
+  MAIL_HOURLY_LIMIT: number;
+  /** A webapp címe a levelekben (leiratkozó link); alapból a `CORS_ORIGIN` első címe. */
+  PUBLIC_WEB_URL: string;
 }
 
 const optional = (value: unknown): string | undefined => {
@@ -55,6 +61,17 @@ export function validateEnv(config: Record<string, unknown>): EnvConfig {
     throw new Error('AUTH_FIXED_LOGIN_CODE 6 számjegy legyen.');
   }
 
+  const hourlyLimitRaw = optional(config.MAIL_HOURLY_LIMIT);
+  const hourlyLimit = hourlyLimitRaw === undefined ? DEFAULT_MAIL_HOURLY_LIMIT : Number(hourlyLimitRaw);
+  if (!Number.isInteger(hourlyLimit) || hourlyLimit < 1 || hourlyLimit > 10_000) {
+    throw new Error('MAIL_HOURLY_LIMIT 1 és 10000 közötti egész szám legyen.');
+  }
+
+  const publicWebUrl =
+    optional(config.PUBLIC_WEB_URL) ??
+    corsOrigin.split(',').map((o) => o.trim()).find((o) => /^https?:\/\//.test(o)) ??
+    'http://localhost:5173';
+
   return {
     NODE_ENV: nodeEnv,
     PORT: Number.isNaN(port) ? 3001 : port,
@@ -70,5 +87,7 @@ export function validateEnv(config: Record<string, unknown>): EnvConfig {
     SUPABASE_SERVICE_ROLE_KEY: optional(config.SUPABASE_SERVICE_ROLE_KEY),
     SUPABASE_STORAGE_BUCKET: optional(config.SUPABASE_STORAGE_BUCKET) ?? 'guest-documents',
     LOCAL_STORAGE_DIR: optional(config.LOCAL_STORAGE_DIR),
+    MAIL_HOURLY_LIMIT: hourlyLimit,
+    PUBLIC_WEB_URL: publicWebUrl.replace(/\/+$/, ''),
   };
 }

@@ -170,6 +170,28 @@ interface GuestSpec {
   extras?: (guestId: string, staffId: string, tx: Prisma.TransactionClient) => Promise<void>;
 }
 
+// Kezdő e-mail-sablonok (TICKET-55); az automatikus levelek kikapcsolva maradnak, a Levelezés
+// oldalon kapcsolhatók be.
+const EMAIL_TEMPLATES = [
+  {
+    name: 'Üdvözlő levél',
+    subject: 'Üdvözlünk a {{studio_nev}} vendégei között',
+    bodyHtml:
+      '<p>Kedves {{keresztnev}}!</p><p>Örülünk, hogy nálunk jársz. A belépőkártyádat a recepción kapod meg, kérdés esetén keress minket bátran.</p><p>Üdvözlettel:<br>a {{studio_nev}} csapata</p>',
+  },
+  {
+    name: 'Születésnapi köszöntő',
+    subject: 'Boldog születésnapot, {{keresztnev}}!',
+    bodyHtml:
+      '<p>Kedves {{keresztnev}}!</p><p>Nagyon boldog születésnapot kíván a {{studio_nev}} csapata.</p>',
+  },
+  {
+    name: 'Névnapi köszöntő',
+    subject: 'Boldog névnapot, {{keresztnev}}!',
+    bodyHtml: '<p>Kedves {{keresztnev}}!</p><p>Boldog névnapot kíván a {{studio_nev}} csapata.</p>',
+  },
+];
+
 const DEMO_GUESTS: GuestSpec[] = [
   {
     barcode: '100001',
@@ -333,7 +355,8 @@ const DEMO_GUESTS: GuestSpec[] = [
           recipientEmail: 'anna.kovacs@reform.hu',
           subject: 'RE-FORM Stúdió — Bérletvásárlás visszaigazolás',
           messageType: 'PASS_PURCHASE_CONFIRMATION',
-          status: MessageStatus.DELIVERED,
+          status: MessageStatus.SENT,
+          createdAt: daysAgo(20),
           sentAt: daysAgo(20),
         },
       });
@@ -846,6 +869,14 @@ async function main() {
   // Vendégfelvétel (TICKET-56): a beépített csomagok és verziózott kérdőívek. Ugyanaz, amit az
   // API induláskor futtat; meglévő (kulcs, verzió) párt nem ír felül.
   await new IntakeDefinitionsService(prisma as unknown as PrismaService).ensureBuiltIns(studioId);
+  // E-mail-sablonok (TICKET-55): név szerint, a meglévőt nem írjuk felül.
+  let createdEmailTemplates = 0;
+  for (const tpl of EMAIL_TEMPLATES) {
+    const exists = await prisma.emailTemplate.findFirst({ where: { studioId, name: tpl.name } });
+    if (exists) continue;
+    await prisma.emailTemplate.create({ data: { ...tpl, studioId, updatedById: owner.id } });
+    createdEmailTemplates++;
+  }
 
   // Tesztvendégek: vonalkód szerint; meglévőt csak SEED_DEMO_RESET=1 esetén építünk újra.
   const guestResults: string[] = [];
@@ -892,6 +923,7 @@ async function main() {
     deactivatedLegacyStaff,
     createdServices,
     createdTemplates,
+    createdEmailTemplates,
     guests: guestResults,
   });
 }

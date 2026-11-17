@@ -129,6 +129,24 @@ export const RELEASE_NOTES: ReleaseNote[] = [
     link: { type: 'route', path: '/intake', label: 'Vendégfelvétel megnyitása' },
   },
   {
+    id: 'v0.3-new-feature-mailing',
+    version: '0.3',
+    date: '2026-11-17',
+    kind: 'NEW_FEATURE',
+    title: 'Levelezés: sablonok, automatikus és csoportos levelek',
+    summary:
+      'Új Levelezés menüpont: e-mail-sablonok élő előnézettel, üdvözlő, születésnapi és névnapi levél, csoportos küldés szűréssel és a kiküldött levelek naplója.',
+    details: [
+      'Sablonok személyre szabható mezőkkel ({{keresztnev}}, {{teljes_nev}} …), képpel és hivatkozással; tesztlevél a saját címedre.',
+      'Az automatikus levelek külön kapcsolhatók, mindegyikhez sablon rendelhető; egy vendég egy alkalomra csak egyszer kap levelet.',
+      'Csoportos küldés szolgáltatás, bérletállapot és utolsó látogatás szerint, a címzettek listájával; csak a hozzájáruló vendégek kapják, leiratkozó linkkel.',
+      'A vendégadatlap Levelek fülén egyéni levél írható, és látszanak a vendég korábbi levelei.',
+      'A levelek kimenő sorban, óránkénti korláttal mennek ki; a hibás levél újraküldhető.',
+    ],
+    jiraKey: 'TICKET-55',
+    link: { type: 'route', path: '/mailing', label: 'Levelezés megnyitása' },
+  },
+  {
     id: 'v0.3-fix-demo-sandbox-new-guests',
     version: '0.3',
     date: '2026-11-14',

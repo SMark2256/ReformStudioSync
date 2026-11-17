@@ -736,6 +736,7 @@ export class IntakeService {
           subject: message.subject,
           messageType: 'INTAKE_DOCUMENT',
           status: 'SENT',
+          sentAt: new Date(),
         },
       }),
       this.prisma.auditLog.create({

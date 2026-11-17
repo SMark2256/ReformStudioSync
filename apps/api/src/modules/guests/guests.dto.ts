@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { DocumentType, Gender, GuestStatus, Role } from '@reform/shared';
 import {
+  IsBoolean,
   IsDateString,
   IsEmail,
   IsEnum,
@@ -68,6 +69,14 @@ export class CreateGuestDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Hozzájárul-e a marketing levelekhez (születés- és névnapi, csoportos levél; TICKET-55).',
+  })
+  @IsOptional()
+  @IsBoolean()
+  marketingConsent?: boolean;
 }
 
 export class UpdateGuestDto {
@@ -120,6 +129,14 @@ export class UpdateGuestDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Hozzájárul-e a marketing levelekhez (születés- és névnapi, csoportos levél; TICKET-55).',
+  })
+  @IsOptional()
+  @IsBoolean()
+  marketingConsent?: boolean;
 }
 
 export class CreateMeasurementDto {
@@ -268,14 +285,4 @@ export class CreateGuestNoteDto {
   @IsString()
   @IsNotEmpty({ message: 'A megjegyzés szövege nem lehet üres.' })
   content: string;
-}
-
-export class SendGuestMessageDto {
-  @IsString()
-  @IsNotEmpty()
-  subject: string;
-
-  @IsString()
-  @IsNotEmpty()
-  messageType: string;
 }

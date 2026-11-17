@@ -13,3 +13,4 @@ export * from './measurements';
 export * from './tours';
 export * from './intake';
 export * from './intake-forms';
+export * from './email';

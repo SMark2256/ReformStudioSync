@@ -109,6 +109,16 @@ export const APP_ERROR_CATALOG = {
   'STORAGE.NOT_CONFIGURED': { status: 424, message: 'A dokumentumtárolás nincs beállítva (Supabase Storage). Szólj a rendszergazdának.', action: 'notify' },
   'STORAGE.UNAVAILABLE': { status: 502, message: 'A dokumentumtároló nem érhető el. Próbáld újra később.', action: 'retry' },
   'STORAGE.LINK_INVALID': { status: 403, message: 'A letöltési link lejárt vagy érvénytelen.', action: 'notify' },
+  // Vendégkommunikáció (TICKET-55)
+  'MAIL.TEMPLATE_NOT_FOUND': { status: 404, message: 'Az e-mail-sablon nem található.', action: 'reload' },
+  'MAIL.EMPTY_CONTENT': { status: 400, message: 'A levél tárgya és szövege nem lehet üres.', action: 'notify' },
+  'MAIL.GUEST_NO_EMAIL': { status: 400, message: 'A vendégnek nincs rögzített e-mail címe. Add meg az adatlapon, és küldd újra.', action: 'notify' },
+  'MAIL.NO_RECIPIENTS': { status: 400, message: 'Nincs olyan címzett, aki megkaphatná a levelet (cím és hozzájárulás kell).', action: 'notify' },
+  'MAIL.TOO_MANY_RECIPIENTS': { status: 400, message: 'Egyszerre legfeljebb 2000 címzettnek küldhető levél. Szűkítsd a szűrőt.', action: 'notify' },
+  'MAIL.AUTOMATION_TEMPLATE_REQUIRED': { status: 400, message: 'Bekapcsolás előtt válassz sablont az automatikus levélhez.', action: 'notify' },
+  'MAIL.MESSAGE_NOT_FOUND': { status: 404, message: 'A levél nem található.', action: 'reload' },
+  'MAIL.NOT_RETRYABLE': { status: 400, message: 'Csak hibás levél küldhető újra.', action: 'reload' },
+  'MAIL.UNSUBSCRIBE_INVALID': { status: 404, message: 'A leiratkozó link érvénytelen vagy elavult.', action: 'notify' },
 } as const satisfies Record<string, AppErrorDefinition>;
 
 export type AppErrorCode = keyof typeof APP_ERROR_CATALOG;
