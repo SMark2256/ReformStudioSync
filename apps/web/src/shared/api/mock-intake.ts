@@ -48,6 +48,7 @@ import {
   UpdateIntakeSessionRequestDto,
 } from '@reform/shared';
 import { mockStudioEngine } from './mock-engine';
+import { mockMailEngine } from './mock-mail';
 
 // A vendégfelvétel (TICKET-56) demó/mock párja: ugyanazok a szabályok, mint az API `intake`
 // moduljában (a közös tiszta függvényekkel), saját localStorage-kulccsal. A vendég-, mérés- és
@@ -561,10 +562,15 @@ export class MockIntakeEngine {
     if (!snapshot) throw appError('INTAKE.DOCUMENT_NOT_FOUND');
     const guest = mockStudioEngine.getGuestById(snapshot.guestId);
     if (!guest.email) throw appError('INTAKE.EMAIL_MISSING');
-    mockStudioEngine.sendGuestEmailLog(guest.id, {
-      subject: `${snapshot.title} – aláírt dokumentum`,
-      messageType: 'INTAKE_DOCUMENT',
-    });
+    // A demó a levelezés (TICKET-55) kimenő sorába teszi, így a Levelek fülön is látszik.
+    mockMailEngine.sendToGuest(
+      guest.id,
+      {
+        subject: `${snapshot.title} – aláírt dokumentum`,
+        bodyHtml: '<p>Csatolva küldjük az aláírt dokumentumot.</p>',
+      },
+      user,
+    );
     this.audit(state, 'INTAKE_DOCUMENT_EMAILED', snapshotId, user);
     this.save(state);
     return { sent: true };
