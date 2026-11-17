@@ -5,6 +5,7 @@ A verziók a legújabbtól a legrégebbiig. A `demo` ágon gyűlő változások 
 ## v0.3 — a `demo`-n, a következő `main` kiadással élesedik
 
 ### Új funkciók és oldalak
+- **Online időpontfoglalás:** új Foglalások oldal valós idejű napi és heti (gépenkénti) naptárral, várólistával és foglalási beállításokkal (nyitvatartás, munkaszüneti napok, zárvatartás, gépletiltás, kezelési sorrend). A vendégek a `/foglalas` oldalon belépés nélkül, vagy e-mailes kóddal belépve foglalhatnak; visszaigazolás, 24 órás emlékeztető és kezelőlink e-mailben. A kapacitás (közös HIEMT/Intimpad gép, 5 perc szünet) nem írható felül; bérletlevonás csak megérkezéskor vagy „Nem jelent meg”-nél, pontosan egyszer. Várólista 30 perces tartással, egyirányú Google Naptár szinkron. (TICKET-57)
 - **Belépés e-mailben kapott kóddal:** jelszó helyett a megadott e-mail címre érkező 6 jegyű kóddal lehet belépni; a kód 10 percig érvényes, és csak egyszer használható. (TICKET-35)
 - **Új oldalsáv és Beállítások:** sötét, lebegő bal oldali menü; a nevedre kattintva felcsúszó panelből éred el a Beállításokat, a téma kapcsolót és a kijelentkezést. A téma mellett a felület színe is választható. (TICKET-28)
 - **Monitorok oldal:** a vendégmonitorok és tabletek kezelése saját oldalt kapott, a profilpanelből érhető el. (TICKET-38)

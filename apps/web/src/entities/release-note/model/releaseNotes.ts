@@ -109,6 +109,26 @@ export const getJiraIssueUrl = (jiraKey: string): string =>
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    id: 'v0.3-online-booking',
+    version: '0.3',
+    date: '2026-11-17',
+    kind: 'NEW_PAGE',
+    title: 'Online időpontfoglalás',
+    summary:
+      'Új Foglalások oldal: valós idejű napi naptár gépenként, heti nézet egy gépre, várólista és foglalási szabályok. A vendégek a /foglalas oldalon belépés nélkül foglalhatnak.',
+    details: [
+      'A kapacitást a rendszer ellenőrzi (Hypoxi 3 fő, nyirokmasszázs 2 fő, a HIEMT és az Intimpad közös 1 fős gépen), a kezelés utáni 5 perc szünet is foglaltság.',
+      'Több kezelés egymás után, a beállított sorrendben foglalható; részleges lemondásnál a többi megmarad.',
+      'Foglaláskor nincs levonás: megérkezéskor vagy a „Nem jelent meg” rögzítésekor pontosan 1 alkalom vonódik le, ami visszaállítással visszavonható.',
+      'Nyitvatartás, munkaszüneti napok (felülírható), rendkívüli zárvatartás és gépletiltás a Beállítások fülön; a zárvatartás csak jelzi az érintett foglalásokat.',
+      'A vendég e-mailben visszaigazolást, 24 órás emlékeztetőt és kezelőlinket kap; online módosítás és lemondás legalább 24 órával előtte.',
+      'Felszabaduló helyre a legrégebben várakozó vendég kap ajánlatot, 30 percig neki tartjuk.',
+      'Google Naptár egyirányú szinkron, ha be van állítva.',
+    ],
+    jiraKey: 'TICKET-57',
+    link: { type: 'route', path: '/bookings', label: 'Foglalások megnyitása' },
+  },
+  {
     id: 'v0.3-fix-demo-sandbox-new-guests',
     version: '0.3',
     date: '2026-11-14',

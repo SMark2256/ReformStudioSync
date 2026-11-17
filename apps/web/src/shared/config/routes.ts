@@ -3,6 +3,7 @@
 export const APP_ROUTES = {
   reception: { path: '/reception', title: 'Recepció' },
   monitor: { path: '/monitor', title: 'Vendégmonitor' },
+  bookings: { path: '/bookings', title: 'Foglalások' },
   guests: { path: '/guests', title: 'Vendégek' },
   passes: { path: '/passes', title: 'Bérletek és termékek' },
   finance: { path: '/finance', title: 'Pénzügy' },
@@ -10,6 +11,13 @@ export const APP_ROUTES = {
   demo: { path: '/demo', title: 'Demó mód' },
   monitors: { path: '/monitors', title: 'Monitorok' },
   settings: { path: '/settings', title: 'Beállítások' },
+} as const;
+
+/** A nyilvános foglaló (TICKET-57) útvonalai: munkatársi belépés nélkül, keret nélkül. */
+export const PUBLIC_BOOKING_ROUTES = {
+  book: '/foglalas',
+  manage: '/foglalas/kezeles/:token',
+  waitlistOffer: '/foglalas/varolista/:token',
 } as const;
 
 export type AppRouteKey = keyof typeof APP_ROUTES;

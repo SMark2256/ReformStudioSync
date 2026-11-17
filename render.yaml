@@ -32,3 +32,13 @@ services:
         sync: false
       - key: MAIL_FROM_NAME
         sync: false
+      # Online foglalás (TICKET-57): a levelek linkjeinek címe (pl. https://app.reformstudio.hu).
+      - key: PUBLIC_WEB_URL
+        sync: false
+      # Google Naptár egyirányú szinkron (TICKET-57). Bármelyik hiányában a szinkron kikapcsolt.
+      - key: GOOGLE_CALENDAR_ID
+        sync: false
+      - key: GOOGLE_SERVICE_ACCOUNT_EMAIL
+        sync: false
+      - key: GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY
+        sync: false

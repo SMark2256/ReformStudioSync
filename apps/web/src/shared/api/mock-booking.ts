@@ -756,11 +756,11 @@ class MockBookingEngine {
     const now = new Date();
     const state = this.load(now);
     const booking = this.findBooking(state, id);
-    const target = dto.status as BookingStatusValue;
+    const target = dto.status as string as BookingStatusValue;
     if (target === 'CANCELLED') {
       throw appError('BOOKING.INVALID_STATUS_CHANGE', { message: 'Lemondáshoz a Lemondás műveletet használd.' });
     }
-    const from = booking.status as BookingStatusValue;
+    const from = booking.status as string as BookingStatusValue;
     const transition = bookingTransition(from, target);
     if (!transition.allowed) {
       throw appError(from === 'CANCELLED' ? 'BOOKING.ALREADY_CANCELLED' : 'BOOKING.INVALID_STATUS_CHANGE');
@@ -804,7 +804,7 @@ class MockBookingEngine {
         }
       }
     }
-    booking.status = target as BookingStatus;
+    booking.status = target as string as BookingStatus;
     this.log(
       state,
       booking.id,
