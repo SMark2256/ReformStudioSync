@@ -1,11 +1,9 @@
 import {
-  BookingDeductionOutcome,
   BookingDto,
   BookingSource,
   BookingStatus,
   toAppError,
   toStudioDayKey,
-  UpdateBookingStatusResponseDto,
 } from '@reform/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import React, { useEffect, useId, useState } from 'react';
@@ -13,6 +11,7 @@ import {
   BOOKING_QUERY_KEYS,
   BookingStatusBadge,
   bookingStatusLabel,
+  deductionText,
   formatBookingMoment,
   formatBookingTime,
   passWarningText,
@@ -45,25 +44,6 @@ const SOURCE_LABEL: Record<BookingSource, string> = {
 };
 
 const OPEN = [BookingStatus.CONFIRMED, BookingStatus.LATE];
-
-function deductionText(outcome: BookingDeductionOutcome, result: UpdateBookingStatusResponseDto): string | undefined {
-  switch (outcome) {
-    case 'DEDUCTED':
-      return result.passName
-        ? `1 alkalom levonva: ${result.passName}${result.remainingPasses !== null ? `, maradt: ${result.remainingPasses}` : ''}.`
-        : '1 alkalom levonva.';
-    case 'ALREADY_DEDUCTED':
-      return 'A levonás már megtörtént, nem vontunk le újra.';
-    case 'LINKED_EXISTING':
-      return 'A mai levonáshoz kapcsolva, nem vontunk le újra.';
-    case 'NO_USABLE_PASS':
-      return 'Nincs felhasználható bérlet: levonás és tartozás nélkül rögzítve.';
-    case 'REVERSED':
-      return 'A levonás visszavonva.';
-    default:
-      return undefined;
-  }
-}
 
 interface BookingDetailsDialogProps {
   booking: BookingDto | null;
@@ -120,7 +100,7 @@ export const BookingDetailsDialog: React.FC<BookingDetailsDialogProps> = ({ book
         `${result.booking.guestName}: ${result.booking.treatmentName}, ${
           result.booking.status === BookingStatus.CONFIRMED ? 'állapot visszaállítva' : `„${bookingStatusLabel(result.booking.status)}”`
         }`,
-        deductionText(result.deduction, result),
+        deductionText(result),
       );
       refresh();
     },

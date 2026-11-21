@@ -82,6 +82,28 @@ test.describe('Online foglalás', () => {
     await expect(toasts(page)).toContainText('Szabó Eszter áthelyezve');
   });
 
+  test('TICKET-59: helyben beengedés kozmetikai kezelésre, megérkezéskor levonás a kozmetikai bérletből', async ({
+    page,
+  }) => {
+    await openBookings(page);
+    // A „Kozmetikus 1” saját oszlop a napi naptárban.
+    await expect(page.getByRole('region', { name: /^Kozmetikus 1/ })).toBeVisible();
+
+    await page.getByRole('button', { name: 'Új foglalás' }).click();
+    const dialog = page.getByRole('dialog');
+    await dialog.getByRole('searchbox').fill('Kovács Anna');
+    await dialog.getByRole('group', { name: 'Vendég találatok' }).getByRole('button', { name: /Kovács Anna/ }).click();
+    await dialog.getByLabel('Tisztító arckezelés (120 perc)').check();
+    await dialog.getByRole('radio', { name: 'Most kezdődik' }).click();
+    await expect(dialog.getByLabel('Megérkezett (az alkalom levonása a bérletből)')).toBeChecked();
+    await dialog.getByRole('button', { name: 'Beengedés rögzítése' }).click();
+
+    await expect(toasts(page)).toContainText('Kovács Anna beengedve');
+    await expect(toasts(page)).toContainText('Tisztító arckezelés: „Megérkezett”');
+    await expect(toasts(page)).toContainText('1 alkalom levonva: 5 Alkalmas Prémium Kozmetikai Bérlet');
+    await expect(page.getByRole('button', { name: /^Kovács Anna, Tisztító arckezelés/ })).toBeVisible();
+  });
+
   test('„Nem jelent meg” rögzítése, majd visszaállítás', async ({ page }) => {
     await openBookings(page);
     const dialog = await openBooking(page, /^Kovács Anna, Hypoxi Trainer/);

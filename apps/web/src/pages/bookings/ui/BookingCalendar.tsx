@@ -133,7 +133,7 @@ const CalendarColumnView: React.FC<ColumnViewProps> = ({ column, data, range, he
         {(!day?.hours || resourceInactive) && (
           <div className="absolute inset-0 flex items-start justify-center bg-muted/70 p-3 text-center text-xs text-muted-foreground">
             {resourceInactive
-              ? 'A gép le van tiltva'
+              ? 'Le van tiltva'
               : day?.holidayName
                 ? `${day.holidayName} (munkaszüneti nap)`
                 : day?.closedReason

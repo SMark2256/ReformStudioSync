@@ -17,6 +17,7 @@ import {
   Max,
   MaxLength,
   Min,
+  ValidateIf,
   ValidateNested,
 } from 'class-validator';
 
@@ -41,14 +42,20 @@ export class CreateStaffBookingDto {
   @IsString({ each: true })
   treatmentIds: string[];
 
-  @ApiProperty({ example: '2026-11-20T08:00:00.000Z' })
+  @ApiPropertyOptional({ example: '2026-11-20T08:00:00.000Z', description: 'Helyben beengedésnél nem kell.' })
+  @ValidateIf((o: CreateStaffBookingDto) => !o.walkIn)
   @IsISO8601({}, { message: 'Érvényes kezdési időpontot adj meg.' })
-  startsAt: string;
+  startsAt?: string;
 
   @ApiPropertyOptional()
   @IsOptional()
   @IsBoolean()
   overrideRules?: boolean;
+
+  @ApiPropertyOptional({ description: 'Helyben beengedés: a kezdés most (5 percre lefelé kerekítve).' })
+  @IsOptional()
+  @IsBoolean()
+  walkIn?: boolean;
 
   @ApiPropertyOptional()
   @IsOptional()
@@ -133,7 +140,7 @@ export class UpsertHolidayOverrideDto {
 }
 
 export class UpdateBookingSettingsDto {
-  @ApiPropertyOptional({ description: '7 elem (hétfő…vasárnap): { opensAt, closesAt } percben, vagy null.' })
+  @ApiPropertyOptional({ description: '7 elem (hétfő…vasárnap): { opensAt, closesAt, lastStartAt } percben, vagy null.' })
   @IsOptional()
   @IsArray()
   @ArrayMinSize(7)

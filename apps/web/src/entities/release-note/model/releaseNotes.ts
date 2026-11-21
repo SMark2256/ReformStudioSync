@@ -109,6 +109,23 @@ export const getJiraIssueUrl = (jiraKey: string): string =>
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    id: 'v0.3-beauty-basics',
+    version: '0.3',
+    date: '2026-11-21',
+    kind: 'NEW_FEATURE',
+    title: 'Kozmetikai kezelések és helyben beengedés',
+    summary: 'Kozmetikai kezelések a foglalási naptárban, és helyben beengedés szabad helyre.',
+    details: [
+      'A „Kozmetikus 1” saját oszlopot kap a napi naptárban; egyszerre egy vendéggel dolgozik.',
+      'Arckezelések (120 perc), arcmasszázs, laminálás, lifting (60 perc) és lézeres szőrtelenítés területenként (30 vagy 60 perc); egyelőre csak a recepción foglalhatók.',
+      '„Most kezdődik”: az új foglalás ablakában a vendég azonnal beengedhető szabad helyre, a 30 perces határ nélkül, és rögtön „Megérkezett” lehet.',
+      'A kozmetikai bérletből megérkezéskor 1 alkalom vonódik le, ugyanúgy, mint a gépi kezeléseknél.',
+      'Nyitvatartás: hétköznap 07:00–19:00, utolsó kezdés 18:00; a kezelésnek a zárásig bele kell férnie. Az utolsó kezdés a Beállítások fülön módosítható.',
+    ],
+    jiraKey: 'TICKET-59',
+    link: { type: 'route', path: '/bookings', label: 'Foglalások megnyitása' },
+  },
+  {
     id: 'v0.3-online-booking',
     version: '0.3',
     date: '2026-11-17',

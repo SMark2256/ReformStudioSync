@@ -4,6 +4,7 @@ export {
   BOOKING_QUERY_KEYS,
   BOOKING_STATUS_BADGE,
   bookingStatusLabel,
+  deductionText,
   formatBookingMoment,
   formatBookingTime,
   formatDayKey,

@@ -15,6 +15,9 @@ import {
   VisitType,
 } from '@prisma/client';
 import {
+  COSMETIC_RESOURCE_NAME,
+  COSMETIC_TREATMENTS,
+  DEFAULT_OPENING_HOURS,
   formatPeriod,
   getDueDate,
   getMembershipDueSchedule,
@@ -822,6 +825,8 @@ const BOOKING_RESOURCES = [
   { name: 'HIEMT / Intimpad gép', capacity: 1, sortOrder: 3 },
   { name: 'Ceragem', capacity: 1, sortOrder: 4 },
   { name: 'Flabelos', capacity: 1, sortOrder: 5 },
+  // Beauty alap (TICKET-59): a kozmetikus egyszerre egy vendéggel dolgozik.
+  { name: COSMETIC_RESOURCE_NAME, capacity: 1, sortOrder: 6 },
 ] as const;
 
 const BOOKABLE_TREATMENTS = [
@@ -833,8 +838,30 @@ const BOOKABLE_TREATMENTS = [
   { name: 'Flabelos', resource: 'Flabelos', service: 'Flabelos', durationMinutes: 10, sortOrder: 6 },
 ] as const;
 
-/** Minden kezelés után 5 perc szünet: a gép foglalt, a vendéget nem köti. */
+/** Minden gépi kezelés után 5 perc szünet: a gép foglalt, a vendéget nem köti. */
 const BOOKING_BUFFER_MINUTES = 5;
+
+/** A kozmetikai kezelések a kozmetikai bérlet szolgáltatásához kötve: megérkezéskor abból von le. */
+const COSMETIC_SERVICE: ServiceName = 'Hialuronos Arckezelés & Rádiófrekvencia';
+
+const TREATMENT_SPECS = [
+  ...BOOKABLE_TREATMENTS.map((t) => ({
+    ...t,
+    category: ServiceCategory.BODY_SHAPING,
+    bufferMinutes: BOOKING_BUFFER_MINUTES,
+    isOnline: true,
+  })),
+  ...COSMETIC_TREATMENTS.map(({ name, durationMinutes }, index) => ({
+    name,
+    resource: COSMETIC_RESOURCE_NAME,
+    service: COSMETIC_SERVICE,
+    durationMinutes,
+    sortOrder: BOOKABLE_TREATMENTS.length + 1 + index,
+    category: ServiceCategory.COSMETIC,
+    bufferMinutes: 0,
+    isOnline: false,
+  })),
+];
 
 async function ensureBookingSetup(): Promise<{ resources: number; treatments: number }> {
   const resourceIds = new Map<string, string>();
@@ -853,7 +880,7 @@ async function ensureBookingSetup(): Promise<{ resources: number; treatments: nu
   }
 
   let treatments = 0;
-  for (const spec of BOOKABLE_TREATMENTS) {
+  for (const spec of TREATMENT_SPECS) {
     const existing = await prisma.bookableTreatment.findUnique({
       where: { studioId_name: { studioId, name: spec.name } },
     });
@@ -864,7 +891,7 @@ async function ensureBookingSetup(): Promise<{ resources: number; treatments: nu
         data: {
           studioId,
           name: spec.service,
-          category: ServiceCategory.BODY_SHAPING,
+          category: spec.category,
           durationMinutes: spec.durationMinutes,
           priceHuf: 0,
         },
@@ -877,8 +904,9 @@ async function ensureBookingSetup(): Promise<{ resources: number; treatments: nu
         resourceId: resourceIds.get(spec.resource)!,
         serviceId: service.id,
         durationMinutes: spec.durationMinutes,
-        bufferMinutes: BOOKING_BUFFER_MINUTES,
+        bufferMinutes: spec.bufferMinutes,
         sortOrder: spec.sortOrder,
+        isOnline: spec.isOnline,
       },
     });
     treatments++;
@@ -886,9 +914,8 @@ async function ensureBookingSetup(): Promise<{ resources: number; treatments: nu
 
   const settings = await prisma.bookingSettings.findUnique({ where: { studioId } });
   if (!settings) {
-    const weekday = { opensAt: 7 * 60, closesAt: 18 * 60 };
     await prisma.bookingSettings.create({
-      data: { studioId, openingHours: [weekday, weekday, weekday, weekday, weekday, null, null] },
+      data: { studioId, openingHours: DEFAULT_OPENING_HOURS as unknown as Prisma.InputJsonValue },
     });
   }
   return { resources, treatments };

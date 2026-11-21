@@ -27,14 +27,16 @@ const DAY_MS = 24 * HOUR_MS;
 export interface DayHours {
   opensAt: number;
   closesAt: number;
+  /** Utolsó kezdés (TICKET-59); hiányzik: a zárásig bármikor kezdődhet, ami belefér. */
+  lastStartAt?: number;
 }
 
 /** Heti nyitvatartás: 0 = hétfő … 6 = vasárnap; `null` = zárva. */
 export type WeeklyOpeningHours = (DayHours | null)[];
 
-const WEEKDAY_HOURS: DayHours = { opensAt: 7 * 60, closesAt: 18 * 60 };
+const WEEKDAY_HOURS: DayHours = { opensAt: 7 * 60, closesAt: 19 * 60, lastStartAt: 18 * 60 };
 
-/** Hétfő–péntek 07:00–18:00, hétvégén zárva. */
+/** Hétfő–péntek 07:00–19:00, utolsó kezdés 18:00, hétvégén zárva. */
 export const DEFAULT_OPENING_HOURS: WeeklyOpeningHours = [
   WEEKDAY_HOURS,
   WEEKDAY_HOURS,
@@ -73,7 +75,7 @@ export function normalizeOpeningHours(value: unknown): WeeklyOpeningHours {
   if (!Array.isArray(value) || value.length !== 7) return DEFAULT_OPENING_HOURS;
   return value.map((day) => {
     if (!day || typeof day !== 'object') return null;
-    const { opensAt, closesAt } = day as Partial<DayHours>;
+    const { opensAt, closesAt, lastStartAt } = day as Partial<DayHours>;
     if (
       typeof opensAt !== 'number' ||
       typeof closesAt !== 'number' ||
@@ -85,8 +87,19 @@ export function normalizeOpeningHours(value: unknown): WeeklyOpeningHours {
     ) {
       return null;
     }
-    return { opensAt, closesAt };
+    // Hibás vagy hiányzó utolsó kezdés: nincs külön korlát, csak a zárás.
+    const validLastStart =
+      typeof lastStartAt === 'number' &&
+      Number.isInteger(lastStartAt) &&
+      lastStartAt >= opensAt &&
+      lastStartAt <= closesAt;
+    return { opensAt, closesAt, lastStartAt: validLastStart ? lastStartAt : closesAt };
   });
+}
+
+/** A nap utolsó kezdési perce (a régi, utolsó kezdés nélküli beállításnál a zárás). */
+export function lastStartOf(hours: DayHours): number {
+  return hours.lastStartAt ?? hours.closesAt;
 }
 
 // ---------------------------------------------------------------------------
@@ -320,6 +333,37 @@ export interface BookingResourceRule {
   isActive: boolean;
 }
 
+/** Beauty alap (TICKET-59): a kozmetikus erőforrása, egyszerre egy vendéggel. */
+export const COSMETIC_RESOURCE_NAME = 'Kozmetikus 1';
+
+/**
+ * A kozmetikai kezelések (TICKET-59), a seed és a mock közös listája; az éles adatot a
+ * `20261121100000_beauty_basics` migráció ugyanezzel a listával veszi fel. Szünet nélkül (a
+ * 120 perc az előkészítést és az elpakolást is tartalmazza), egyelőre csak recepciós foglalással.
+ */
+export const COSMETIC_TREATMENTS: readonly { name: string; durationMinutes: number }[] = [
+  { name: 'Fúziós plazma', durationMinutes: 120 },
+  { name: 'Hollywood Peel', durationMinutes: 120 },
+  { name: 'Hydrodermabrázió', durationMinutes: 120 },
+  { name: 'Mikrodermabrázió', durationMinutes: 120 },
+  { name: 'Dermapen', durationMinutes: 120 },
+  { name: 'Tű nélküli mezoterápia', durationMinutes: 120 },
+  { name: 'Rádiófrekvenciás arckezelés', durationMinutes: 120 },
+  { name: 'Anti-aging arckezelés', durationMinutes: 120 },
+  { name: 'Tisztító arckezelés', durationMinutes: 120 },
+  { name: 'Arcmasszázs', durationMinutes: 60 },
+  { name: 'Szemöldök-laminálás festéssel', durationMinutes: 60 },
+  { name: 'Szempilla-lifting festéssel', durationMinutes: 60 },
+  { name: 'Lézeres szőrtelenítés: hónalj', durationMinutes: 30 },
+  { name: 'Lézeres szőrtelenítés: bikinivonal', durationMinutes: 30 },
+  { name: 'Lézeres szőrtelenítés: lábszár', durationMinutes: 60 },
+  { name: 'Lézeres szőrtelenítés: comb', durationMinutes: 60 },
+  { name: 'Lézeres szőrtelenítés: teljes láb', durationMinutes: 60 },
+  { name: 'Lézeres szőrtelenítés: teljes kar', durationMinutes: 60 },
+  { name: 'Lézeres szőrtelenítés: hát', durationMinutes: 60 },
+  { name: 'Lézeres szőrtelenítés: teljes intim', durationMinutes: 60 },
+];
+
 export interface BookableTreatmentRule {
   id: string;
   resourceId: string;
@@ -445,7 +489,8 @@ export function planItem(treatment: BookableTreatmentRule, startsAt: Date): Plan
 }
 
 /**
- * Egy kezelés elhelyezhető-e: nyitvatartás (a szünettel együtt), zárvatartás és gépletiltás,
+ * Egy kezelés elhelyezhető-e: nyitvatartás (legkésőbb az utolsó kezdéskor indul, és a szünettel
+ * együtt a zárásig véget ér), zárvatartás és gépletiltás,
  * kapacitás (a szünet is foglaltság), a vendég önátfedése. A kapacitás soha nem írható felül.
  */
 export function checkPlacement(
@@ -460,7 +505,11 @@ export function checkPlacement(
 
   const startMinute = studioMinutesOfDay(item.startsAt);
   const blockedMinutes = Math.round((item.blockedUntil.getTime() - item.startsAt.getTime()) / MINUTE_MS);
-  if (startMinute < day.hours.opensAt || startMinute + blockedMinutes > day.hours.closesAt) {
+  if (
+    startMinute < day.hours.opensAt ||
+    startMinute > lastStartOf(day.hours) ||
+    startMinute + blockedMinutes > day.hours.closesAt
+  ) {
     return 'OUTSIDE_OPENING_HOURS';
   }
 
@@ -501,6 +550,18 @@ export function checkBookingWindow(
   const lastDay = addDaysToDayKey(toStudioDayKey(now), settings.maxAdvanceDays);
   if (toStudioDayKey(startsAt) > lastDay) return 'TOO_FAR';
   return null;
+}
+
+/** A helyben beengedés („Most kezdődik”) percrácsa. */
+export const WALK_IN_ROUND_MINUTES = 5;
+
+/**
+ * Helyben beengedés kezdése: a mostani idő 5 percre lefelé kerekítve (a vendég már itt van). A
+ * stúdió időzónájának eltolása egész óra, így az UTC szerinti kerekítés a helyi időre is áll.
+ */
+export function walkInStart(now: Date): Date {
+  const step = WALK_IN_ROUND_MINUTES * MINUTE_MS;
+  return new Date(Math.floor(now.getTime() / step) * step);
 }
 
 /** Online módosítás / lemondás: legalább `changeCutoffHours` órával a kezdés előtt. */
@@ -629,7 +690,7 @@ export function findSequenceSlots(input: FindSlotsInput): SequenceSlot[] {
   const step = Math.max(5, ctx.settings.slotStepMinutes);
   const slots: SequenceSlot[] = [];
 
-  for (let minute = day.hours.opensAt; minute < day.hours.closesAt; minute += step) {
+  for (let minute = day.hours.opensAt; minute <= lastStartOf(day.hours); minute += step) {
     const startsAt = studioDateTime(dayKey, minute);
     // A tavaszi óraátállításkor kimaradó perc másik napra vagy időre esne.
     if (toStudioDayKey(startsAt) !== dayKey || studioMinutesOfDay(startsAt) !== minute) continue;

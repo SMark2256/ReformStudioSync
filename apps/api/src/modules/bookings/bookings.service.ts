@@ -29,6 +29,7 @@ import {
   resolveDayHours,
   toStudioDayKey,
   UpdateBookingStatusResponseDto,
+  walkInStart,
   type HolidayOverrideInput,
 } from '@reform/shared';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -243,14 +244,25 @@ export class BookingsService {
   // Foglalás, áthelyezés, lemondás
   // -------------------------------------------------------------------------
 
+  /**
+   * Recepciós foglalás. Helyben beengedésnél (`walkIn`, TICKET-59) a kezdés a mostani idő 5
+   * percre lefelé kerekítve, és az időablak (30 perc) nem köti; a nyitvatartás és a kapacitás
+   * ugyanúgy érvényes. A „Megérkezett” állapotot a kliens utána külön állítja be.
+   */
   async create(
     studioId: string,
     dto: CreateStaffBookingDto,
     staffUserId: string,
     now: Date = new Date(),
   ): Promise<CreateBookingResponseDto> {
-    const startsAt = new Date(dto.startsAt);
-    const actor: BookingActor = { kind: 'STAFF', userId: staffUserId, override: Boolean(dto.overrideRules) };
+    const walkIn = Boolean(dto.walkIn);
+    // A `startsAt` meglétét a DTO ellenőrzi (`ValidateIf`), ha nem helyben beengedés.
+    const startsAt = walkIn ? walkInStart(now) : new Date(dto.startsAt!);
+    const actor: BookingActor = {
+      kind: 'STAFF',
+      userId: staffUserId,
+      override: Boolean(dto.overrideRules) || walkIn,
+    };
     const created = await this.prisma.$transaction(async (tx) => {
       const guest = await tx.guest.findFirst({ where: { id: dto.guestId, studioId, isActive: true } });
       if (!guest) throw appError('GUEST.NOT_FOUND');
@@ -276,7 +288,7 @@ export class BookingsService {
         action: 'BOOKING_CREATED',
         entityId: group.groupId,
         entityType: 'BookingGroup',
-        details: `${guest.lastName} ${guest.firstName}: ${treatments.map((t) => t.name).join(', ')}, ${startsAt.toISOString()}${dto.overrideRules ? ' (időkorlát felülírva)' : ''}`,
+        details: `${guest.lastName} ${guest.firstName}: ${treatments.map((t) => t.name).join(', ')}, ${startsAt.toISOString()}${walkIn ? ' (helyben beengedés)' : dto.overrideRules ? ' (időkorlát felülírva)' : ''}`,
       });
       return { group, treatments, bookings: await toBookingDtos(tx, group.bookings) };
     });

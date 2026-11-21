@@ -48,7 +48,38 @@ describe('mock-booking — időpontfoglalás (TICKET-57)', () => {
     ]);
     const calendar = mockBookingEngine.calendar('2026-11-17', '2026-11-17');
     expect(calendar.bookings.map((b) => b.guestName)).toContain('Kovács Anna');
-    expect(calendar.days[0].hours).toEqual({ opensAt: 420, closesAt: 1080 });
+    expect(calendar.days[0].hours).toEqual({ opensAt: 420, closesAt: 1140, lastStartAt: 1080 });
+  });
+
+  it('Beauty alap (TICKET-59): a Kozmetikus 1 saját erőforrás, a kozmetikai kezelés csak a recepción', () => {
+    const calendar = mockBookingEngine.calendar('2026-11-17', '2026-11-17');
+    expect(calendar.resources.map((r) => r.name)).toContain('Kozmetikus 1');
+    const facial = calendar.treatments.find((t) => t.name === 'Tisztító arckezelés')!;
+    expect(facial).toMatchObject({ resourceId: 'br-kozmetikus', durationMinutes: 120, bufferMinutes: 0, isOnline: false });
+    expect(mockBookingEngine.catalog().treatments.map((t) => t.id)).not.toContain(facial.id);
+    // A 120 perces kezelés legkésőbb 17:00-kor indulhat (19:00-s zárás).
+    const slots = mockBookingEngine.availability({ dayKey: DAY, treatmentIds: [facial.id] }).slots;
+    expect(slots[slots.length - 1].startsAt).toBe(at(DAY, '17:00'));
+  });
+
+  it('helyben beengedés: most kezdődik, a 30 perces határ nem, a kapacitás köti; megérkezéskor a kozmetikai bérletből von le', () => {
+    vi.setSystemTime(new Date(NOW.getTime() + 2 * 60_000));
+    const remaining = () =>
+      mockStudioEngine.getGuestPasses('guest-1').find((p) => p.passTemplateName === '5 Alkalmas Prémium Kozmetikai Bérlet')!
+        .calculatedRemainingPasses;
+    const before = remaining()!;
+    const idOf = (name: string) => mockBookingEngine.calendar(DAY, DAY).treatments.find((t) => t.name === name)!.id;
+
+    const created = mockBookingEngine.createStaffBooking({ guestId: 'guest-1', treatmentIds: [idOf('Tisztító arckezelés')], walkIn: true });
+    expect(created.bookings[0]).toMatchObject({ startsAt: NOW.toISOString(), resourceId: 'br-kozmetikus' });
+    expect(
+      errorOf(() => mockBookingEngine.createStaffBooking({ guestId: 'guest-3', treatmentIds: [idOf('Lézeres szőrtelenítés: hónalj')], walkIn: true })),
+    ).toMatchObject({ code: 'BOOKING.CAPACITY_FULL' });
+
+    const arrived = mockBookingEngine.setStatus(created.bookings[0].id, { status: BookingStatus.ARRIVED });
+    expect(arrived.deduction).toBe('DEDUCTED');
+    expect(arrived.passName).toBe('5 Alkalmas Prémium Kozmetikai Bérlet');
+    expect(remaining()).toBe(before - 1);
   });
 
   it('kapacitás: a Ceragem 1 fős, a HIEMT és az Intimpad közös gépen fut', () => {
