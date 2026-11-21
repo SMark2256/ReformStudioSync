@@ -186,9 +186,15 @@ export interface BookingPassWarningItem {
 export interface CreateStaffBookingRequestDto {
   guestId: string;
   treatmentIds: string[];
-  startsAt: string;
+  /** A kezdés; helyben beengedésnél (`walkIn`) nem kell, a szerver számolja. */
+  startsAt?: string;
   /** A 30 napos és 30 perces korlát felülírása (a kapacitás nem írható felül). */
   overrideRules?: boolean;
+  /**
+   * Helyben beengedés, „Most kezdődik” (TICKET-59): a kezdés a mostani idő 5 percre lefelé
+   * kerekítve (`walkInStart`). Az időablakot felülírja, a nyitvatartást és a kapacitást nem.
+   */
+  walkIn?: boolean;
   note?: string;
 }
 

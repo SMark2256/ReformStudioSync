@@ -5,6 +5,7 @@ import {
   BookingStatus,
   BookingStatusValue,
   formatTimeOfDay,
+  type UpdateBookingStatusResponseDto,
   parseDayKey,
   STUDIO_TIME_ZONE,
   studioMinutesOfDay,
@@ -33,6 +34,28 @@ export const BOOKING_STATUS_BADGE: Record<BookingStatus, NonNullable<BadgeProps[
 export const bookingStatusLabel = (status: BookingStatus): string => BOOKING_STATUS_LABELS[status as string as BookingStatusValue];
 
 export const passWarningText = (warning: BookingPassWarning): string => BOOKING_PASS_WARNING_TEXT[warning];
+
+/** Mi történt a bérlettel az állapotváltáskor (a toast leírása). */
+export function deductionText(
+  result: Pick<UpdateBookingStatusResponseDto, 'deduction' | 'passName' | 'remainingPasses'>,
+): string | undefined {
+  switch (result.deduction) {
+    case 'DEDUCTED':
+      return result.passName
+        ? `1 alkalom levonva: ${result.passName}${result.remainingPasses !== null ? `, maradt: ${result.remainingPasses}` : ''}.`
+        : '1 alkalom levonva.';
+    case 'ALREADY_DEDUCTED':
+      return 'A levonás már megtörtént, nem vontunk le újra.';
+    case 'LINKED_EXISTING':
+      return 'A mai levonáshoz kapcsolva, nem vontunk le újra.';
+    case 'NO_USABLE_PASS':
+      return 'Nincs felhasználható bérlet: levonás és tartozás nélkül rögzítve.';
+    case 'REVERSED':
+      return 'A levonás visszavonva.';
+    default:
+      return undefined;
+  }
+}
 
 /** „09:30” a stúdió időzónájában. */
 export const formatBookingTime = (iso: string): string => formatTimeOfDay(studioMinutesOfDay(iso));

@@ -771,7 +771,7 @@ model Booking {
 /// Stúdiószintű beállítások: heti nyitvatartás és a foglalási korlátok.
 model BookingSettings {
   studioId          String   @id @default("default-studio") @map("studio_id")
-  /// 7 elem (hétfő…vasárnap): `{ opensAt, closesAt }` percben, vagy `null` (zárva).
+  /// 7 elem (hétfő…vasárnap): `{ opensAt, closesAt, lastStartAt }` percben, vagy `null` (zárva).
   openingHours      Json     @map("opening_hours")
   maxAdvanceDays    Int      @default(30) @map("max_advance_days")
   minLeadMinutes    Int      @default(30) @map("min_lead_minutes")

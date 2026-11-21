@@ -14,6 +14,7 @@ import {
   findSequenceSlots,
   hungarianHolidayName,
   hungarianPublicHolidays,
+  normalizeOpeningHours,
   OccupancyItem,
   orderTreatments,
   PassType,
@@ -24,6 +25,7 @@ import {
   resolveDayHours,
   studioDateTime,
   studioMinutesOfDay,
+  walkInStart,
 } from '@reform/shared';
 import { describe, expect, it } from 'vitest';
 
@@ -41,6 +43,7 @@ const RESOURCES: BookingResourceRule[] = [
   { id: 'r-hiemt', capacity: 1, isActive: true },
   { id: 'r-ceragem', capacity: 1, isActive: true },
   { id: 'r-flabelos', capacity: 1, isActive: true },
+  { id: 'r-kozmetikus', capacity: 1, isActive: true },
 ];
 const RESOURCE = new Map(RESOURCES.map((r) => [r.id, r]));
 
@@ -51,6 +54,8 @@ const T = {
   intimpad: { id: 't-intimpad', resourceId: 'r-hiemt', durationMinutes: 30, bufferMinutes: 5, sortOrder: 4 },
   ceragem: { id: 't-ceragem', resourceId: 'r-ceragem', durationMinutes: 40, bufferMinutes: 5, sortOrder: 5 },
   flabelos: { id: 't-flabelos', resourceId: 'r-flabelos', durationMinutes: 10, bufferMinutes: 5, sortOrder: 6 },
+  // Beauty alap (TICKET-59): 120 perces arckezelés szünet nélkül.
+  facial: { id: 't-facial', resourceId: 'r-kozmetikus', durationMinutes: 120, bufferMinutes: 0, sortOrder: 7 },
 } satisfies Record<string, BookableTreatmentRule>;
 
 /** 2026-11-17, kedd, 11:00 Budapest (téli idő, UTC+1). */
@@ -113,27 +118,58 @@ describe('magyar munkaszüneti napok', () => {
     });
     expect(
       resolveDayHours('2026-04-06', DEFAULT_BOOKING_SETTINGS, [{ dayKey: '2026-04-06', isOpen: true }]),
-    ).toMatchObject({ hours: { opensAt: 420, closesAt: 1080 }, closedReason: null, overridden: true });
+    ).toMatchObject({ hours: { opensAt: 420, closesAt: 1140, lastStartAt: 1080 }, closedReason: null, overridden: true });
     expect(
       resolveDayHours(DAY, DEFAULT_BOOKING_SETTINGS, [{ dayKey: DAY, isOpen: false }]),
     ).toMatchObject({ hours: null, closedReason: 'OVERRIDE_CLOSED' });
   });
 
-  it('hétvégén zárva, hétköznap 07:00–18:00', () => {
+  it('hétvégén zárva, hétköznap 07:00–19:00, utolsó kezdés 18:00', () => {
     expect(resolveDayHours('2026-11-21', DEFAULT_BOOKING_SETTINGS).closedReason).toBe('WEEKLY_CLOSED');
-    expect(resolveDayHours(DAY, DEFAULT_BOOKING_SETTINGS).hours).toEqual({ opensAt: 420, closesAt: 1080 });
+    expect(resolveDayHours(DAY, DEFAULT_BOOKING_SETTINGS).hours).toEqual({ opensAt: 420, closesAt: 1140, lastStartAt: 1080 });
   });
 });
 
 describe('nyitvatartás a szünettel és a nyári időszámítás', () => {
-  it('a kezelés a szünettel együtt férjen bele: Hypoxi 17:25 még igen, 17:30 már nem', () => {
-    expect(checkPlacement(planItem(T.hypoxi, at(DAY, '17:25')), RESOURCE.get('r-hypoxi')!, ctx())).toBeNull();
-    expect(checkPlacement(planItem(T.hypoxi, at(DAY, '17:30')), RESOURCE.get('r-hypoxi')!, ctx())).toBe(
+  it('utolsó kezdés 18:00: Hypoxi 18:00-kor még igen, 18:15-kor már nem', () => {
+    expect(checkPlacement(planItem(T.hypoxi, at(DAY, '18:00')), RESOURCE.get('r-hypoxi')!, ctx())).toBeNull();
+    expect(checkPlacement(planItem(T.hypoxi, at(DAY, '18:15')), RESOURCE.get('r-hypoxi')!, ctx())).toBe(
       'OUTSIDE_OPENING_HOURS',
     );
     expect(checkPlacement(planItem(T.hypoxi, at(DAY, '06:45')), RESOURCE.get('r-hypoxi')!, ctx())).toBe(
       'OUTSIDE_OPENING_HOURS',
     );
+  });
+
+  it('a 120 perces kezelés a 19:00-s zárásig férjen bele: legkésőbb 17:00-kor indul', () => {
+    const kozmetikus = RESOURCE.get('r-kozmetikus')!;
+    expect(checkPlacement(planItem(T.facial, at(DAY, '17:00')), kozmetikus, ctx())).toBeNull();
+    expect(checkPlacement(planItem(T.facial, at(DAY, '17:05')), kozmetikus, ctx())).toBe('OUTSIDE_OPENING_HOURS');
+    const slots = findSequenceSlots({ dayKey: DAY, treatments: [T.facial], resources: RESOURCES, ctx: ctx(), now: NOW });
+    expect(studioMinutesOfDay(slots[slots.length - 1].startsAt)).toBe(17 * 60);
+  });
+
+  it('a kezelés a szünettel együtt férjen bele a zárásba (18:00-s zárásnál Hypoxi 17:25 igen, 17:30 nem)', () => {
+    const weekday = { opensAt: 420, closesAt: 1080, lastStartAt: 1080 };
+    const settings = { ...DEFAULT_BOOKING_SETTINGS, openingHours: [weekday, weekday, weekday, weekday, weekday, null, null] };
+    const hypoxi = RESOURCE.get('r-hypoxi')!;
+    expect(checkPlacement(planItem(T.hypoxi, at(DAY, '17:25')), hypoxi, ctx({ settings }))).toBeNull();
+    expect(checkPlacement(planItem(T.hypoxi, at(DAY, '17:30')), hypoxi, ctx({ settings }))).toBe('OUTSIDE_OPENING_HOURS');
+  });
+
+  it('a tárolt nyitvatartás: hiányzó vagy hibás utolsó kezdés helyett a zárás', () => {
+    const [old, invalid, ok] = normalizeOpeningHours([
+      { opensAt: 420, closesAt: 1080 },
+      { opensAt: 420, closesAt: 1080, lastStartAt: 1200 },
+      { opensAt: 420, closesAt: 1140, lastStartAt: 1080 },
+      null,
+      null,
+      null,
+      null,
+    ]);
+    expect(old).toEqual({ opensAt: 420, closesAt: 1080, lastStartAt: 1080 });
+    expect(invalid).toEqual({ opensAt: 420, closesAt: 1080, lastStartAt: 1080 });
+    expect(ok).toEqual({ opensAt: 420, closesAt: 1140, lastStartAt: 1080 });
   });
 
   it('a helyi 07:00 télen 06:00 UTC, nyáron 05:00 UTC', () => {
@@ -161,8 +197,8 @@ describe('nyitvatartás a szünettel és a nyári időszámítás', () => {
       now: new Date('2026-10-20T10:00:00.000Z'),
     });
     expect(autumn[0].startsAt.toISOString()).toBe('2026-10-25T06:00:00.000Z');
-    // 07:00-tól 17:45-ig 15 percenként (a 10 perc + 5 perc szünet 18:00-ig fér bele).
-    expect(autumn).toHaveLength(44);
+    // 07:00-tól az utolsó kezdésig (18:00) 15 percenként.
+    expect(autumn).toHaveLength(45);
   });
 
   it('a nyári időszámítás utáni hétfőn 07:00 = 05:00 UTC', () => {
@@ -189,6 +225,13 @@ describe('foglalási időablak: 30 nap / 30 perc / 24 óra', () => {
   it('legfeljebb 30 nappal előre (naptári nap szerint)', () => {
     expect(checkBookingWindow(at('2026-12-17', '17:00'), NOW, s)).toBeNull();
     expect(checkBookingWindow(at('2026-12-18', '07:00'), NOW, s)).toBe('TOO_FAR');
+  });
+
+  it('helyben beengedés: a kezdés most, 5 percre lefelé kerekítve', () => {
+    expect(walkInStart(new Date('2026-11-17T10:04:59.000Z')).toISOString()).toBe('2026-11-17T10:00:00.000Z');
+    expect(walkInStart(new Date('2026-11-17T10:05:00.000Z')).toISOString()).toBe('2026-11-17T10:05:00.000Z');
+    // A felülírt időablak mellett a már elkezdődött (múltbeli) kezdés is rögzíthető.
+    expect(checkBookingWindow(walkInStart(new Date('2026-11-17T10:03:00.000Z')), NOW, s, true)).toBeNull();
   });
 
   it('a recepció mindhármat felülírja', () => {
@@ -352,7 +395,7 @@ describe('többkezeléses foglalás sorrendje', () => {
     expect(first.endsAt.getTime()).toBe(first.items[1].endsAt.getTime());
   });
 
-  it('a szünet is beleszámít a zárás előtti utolsó időpontba', () => {
+  it('többkezeléses foglalásnál minden kezelés legkésőbb az utolsó kezdéskor indul', () => {
     const slots = findSequenceSlots({
       dayKey: DAY,
       treatments: [T.hypoxi, T.flabelos],
@@ -360,8 +403,8 @@ describe('többkezeléses foglalás sorrendje', () => {
       ctx: ctx(),
       now: NOW,
     });
-    // Hypoxi 30 perc, utána Flabelos 10 + 5 perc: 17:15-ös kezdés 18:00-kor ér véget.
-    expect(studioMinutesOfDay(slots[slots.length - 1].startsAt)).toBe(17 * 60 + 15);
+    // Hypoxi 30 perc, utána Flabelos: a 17:30-as kezdésnél a Flabelos 18:00-kor indul.
+    expect(studioMinutesOfDay(slots[slots.length - 1].startsAt)).toBe(17 * 60 + 30);
   });
 });
 

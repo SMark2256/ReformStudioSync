@@ -4,7 +4,9 @@ import {
   BookingSettingsBundleDto,
   BookingSettingsDto,
   DayHours,
+  DEFAULT_OPENING_HOURS,
   formatTimeOfDay,
+  lastStartOf,
   parseTimeOfDay,
 } from '@reform/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -43,6 +45,19 @@ const WEEKDAY_NAMES = ['Hétfő', 'Kedd', 'Szerda', 'Csütörtök', 'Péntek', '
 const STUDIO_WIDE = 'studio';
 
 type NumberSetting = 'maxAdvanceDays' | 'minLeadMinutes' | 'changeCutoffHours' | 'holdMinutes';
+
+/** Új nyitvatartási nap: a hétköznapi alapértelmezés (07:00–19:00, utolsó kezdés 18:00). */
+const DEFAULT_DAY_HOURS = DEFAULT_OPENING_HOURS[0]!;
+
+/** A nap hibája, vagy `null`: a nyitás a zárás előtt, az utolsó kezdés a kettő között. */
+function dayHoursError(hours: DayHours): string | null {
+  if (hours.opensAt >= hours.closesAt) return 'A zárás a nyitás után legyen.';
+  const lastStart = lastStartOf(hours);
+  if (lastStart < hours.opensAt || lastStart > hours.closesAt) {
+    return 'Az utolsó kezdés a nyitás és a zárás közé essen.';
+  }
+  return null;
+}
 
 const useRefresh = () => {
   const queryClient = useQueryClient();
@@ -88,6 +103,7 @@ const RulesCard: React.FC<{ settings: BookingSettingsDto }> = ({ settings }) => 
   const setNumber = (key: NumberSetting, value: string) =>
     setDraft((d): BookingSettingsDto => ({ ...d, [key]: Number(value) }));
 
+  const hoursInvalid = draft.openingHours.some((h) => h && dayHoursError(h));
   const save = useMutation({
     mutationFn: () => bookingApi.updateSettings(draft),
     onSuccess: () => {
@@ -116,13 +132,30 @@ const RulesCard: React.FC<{ settings: BookingSettingsDto }> = ({ settings }) => 
     <Card>
       <CardHeader>
         <CardTitle>Nyitvatartás és foglalási szabályok</CardTitle>
-        <CardDescription>a kezelés a gép szünetével együtt férjen bele a nyitvatartásba</CardDescription>
+        <CardDescription>
+          a kezelés legkésőbb az utolsó kezdéskor indul, és a szünettel együtt a zárásig véget ér
+        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         <fieldset className="space-y-2">
           <legend className="text-xs font-semibold text-muted-foreground">Heti nyitvatartás</legend>
           {WEEKDAY_NAMES.map((name, index) => {
             const hours = draft.openingHours[index];
+            const error = hours ? dayHoursError(hours) : null;
+            const timeField = (key: keyof DayHours, label: string, value: number) => (
+              <Input
+                type="time"
+                aria-label={`${name}, ${label}`}
+                aria-invalid={error ? true : undefined}
+                aria-describedby={error ? `${fieldId}-hours-error-${index}` : undefined}
+                value={formatTimeOfDay(value)}
+                onChange={(e) => {
+                  const minutes = parseTimeOfDay(e.target.value);
+                  if (minutes !== null) setDay(index, { ...hours!, [key]: minutes });
+                }}
+                className="w-28"
+              />
+            );
             return (
               <div key={name} className="flex flex-wrap items-center gap-3">
                 <div className="flex w-36 items-center gap-2">
@@ -130,7 +163,7 @@ const RulesCard: React.FC<{ settings: BookingSettingsDto }> = ({ settings }) => 
                     id={`${fieldId}-open-${index}`}
                     checked={Boolean(hours)}
                     onCheckedChange={(checked) =>
-                      setDay(index, checked === true ? { opensAt: 7 * 60, closesAt: 18 * 60 } : null)
+                      setDay(index, checked === true ? { ...DEFAULT_DAY_HOURS } : null)
                     }
                   />
                   <Label htmlFor={`${fieldId}-open-${index}`} className="text-[13px] font-normal text-foreground">
@@ -139,27 +172,16 @@ const RulesCard: React.FC<{ settings: BookingSettingsDto }> = ({ settings }) => 
                 </div>
                 {hours ? (
                   <>
-                    <Input
-                      type="time"
-                      aria-label={`${name}, nyitás`}
-                      value={formatTimeOfDay(hours.opensAt)}
-                      onChange={(e) => {
-                        const minutes = parseTimeOfDay(e.target.value);
-                        if (minutes !== null) setDay(index, { ...hours, opensAt: minutes });
-                      }}
-                      className="w-28"
-                    />
+                    {timeField('opensAt', 'nyitás', hours.opensAt)}
                     <span aria-hidden="true">–</span>
-                    <Input
-                      type="time"
-                      aria-label={`${name}, zárás`}
-                      value={formatTimeOfDay(hours.closesAt)}
-                      onChange={(e) => {
-                        const minutes = parseTimeOfDay(e.target.value);
-                        if (minutes !== null) setDay(index, { ...hours, closesAt: minutes });
-                      }}
-                      className="w-28"
-                    />
+                    {timeField('closesAt', 'zárás', hours.closesAt)}
+                    <span className="text-[13px] text-muted-foreground">utolsó kezdés</span>
+                    {timeField('lastStartAt', 'utolsó kezdés', lastStartOf(hours))}
+                    {error && (
+                      <p id={`${fieldId}-hours-error-${index}`} className="w-full text-xs text-destructive">
+                        {error}
+                      </p>
+                    )}
                   </>
                 ) : (
                   <span className="text-[13px] text-muted-foreground">Zárva</span>
@@ -206,7 +228,7 @@ const RulesCard: React.FC<{ settings: BookingSettingsDto }> = ({ settings }) => 
         </div>
       </CardContent>
       <CardFooter className="justify-end">
-        <Button variant="primary" disabled={save.isPending} onClick={() => save.mutate()}>
+        <Button variant="primary" disabled={save.isPending || hoursInvalid} onClick={() => save.mutate()}>
           Mentés
         </Button>
       </CardFooter>

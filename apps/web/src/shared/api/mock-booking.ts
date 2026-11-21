@@ -31,6 +31,8 @@ import {
   checkBookingWindow,
   checkChangeWindow,
   checkSequence,
+  COSMETIC_RESOURCE_NAME,
+  COSMETIC_TREATMENTS,
   CreateBookingResponseDto,
   CreateClosureRequestDto,
   CreateClosureResponseDto,
@@ -73,14 +75,18 @@ import {
   UpsertHolidayOverrideRequestDto,
   WaitlistEntryDto,
   WaitlistStatus,
+  walkInStart,
 } from '@reform/shared';
 import { mockStudioEngine } from './mock-engine';
 
 // Az időpontfoglalás (TICKET-57) kliensoldali párja: ugyanazokkal a `@reform/shared`
 // szabályokkal (nyitvatartás, kapacitás, 30 nap / 30 perc / 24 óra, sorrend), mint az API. A
 // vendégek és a bérletek a mock motorban élnek, a foglalások saját tárolóban. Demóban nincs
-// levél: a vendég belépőkódja a válaszban jön vissza.
-const BOOKING_STORAGE_KEY = 'reform-studio-mock-booking-v1';
+// levél: a vendég belépőkódja a válaszban jön vissza. A v2 (TICKET-59) a „Kozmetikus 1”-et és az
+// utolsó kezdést hozza: a régi demóállapot helyett a friss kiinduló adat töltődik be.
+const BOOKING_STORAGE_KEY = 'reform-studio-mock-booking-v2';
+/** A kozmetikai kezelések a mock motor kozmetikai szolgáltatására (és bérletére) szólnak. */
+const COSMETIC_SERVICE_NAME = 'Hialuronos Arckezelés & Rádiófrekvencia';
 const DEMO_GUEST_CODE = '123456';
 const MINUTE_MS = 60_000;
 
@@ -172,6 +178,7 @@ function createInitialBookingState(now = new Date()): MockBookingState {
     { id: 'br-hiemt', name: 'HIEMT / Intimpad gép', capacity: 1, isActive: true, sortOrder: 3 },
     { id: 'br-ceragem', name: 'Ceragem', capacity: 1, isActive: true, sortOrder: 4 },
     { id: 'br-flabelos', name: 'Flabelos', capacity: 1, isActive: true, sortOrder: 5 },
+    { id: 'br-kozmetikus', name: COSMETIC_RESOURCE_NAME, capacity: 1, isActive: true, sortOrder: 6 },
   ];
   const treatment = (
     id: string,
@@ -180,16 +187,19 @@ function createInitialBookingState(now = new Date()): MockBookingState {
     durationMinutes: number,
     sortOrder: number,
     serviceName: string | null = null,
+    cosmetic = false,
   ): TreatmentRow => ({
     id,
     name,
     resourceId,
     serviceName,
     durationMinutes,
-    bufferMinutes: 5,
+    // A kozmetikai kezelés ideje az előkészítést és az elpakolást is tartalmazza.
+    bufferMinutes: cosmetic ? 0 : 5,
     sortOrder,
     isActive: true,
-    isOnline: true,
+    // Kozmetikai kezelés egyelőre csak a recepción foglalható.
+    isOnline: !cosmetic,
   });
   const treatments = [
     treatment('bt-hypoxi', 'Hypoxi Trainer', 'br-hypoxi', 30, 1, 'Hypoxi'),
@@ -198,6 +208,9 @@ function createInitialBookingState(now = new Date()): MockBookingState {
     treatment('bt-intimpad', 'Intimpad', 'br-hiemt', 30, 4),
     treatment('bt-ceragem', 'Ceragem', 'br-ceragem', 40, 5),
     treatment('bt-flabelos', 'Flabelos', 'br-flabelos', 10, 6),
+    ...COSMETIC_TREATMENTS.map((t, index) =>
+      treatment(`bt-cosmetic-${index + 1}`, t.name, 'br-kozmetikus', t.durationMinutes, 7 + index, COSMETIC_SERVICE_NAME, true),
+    ),
   ];
 
   const day = nextOpenDay(toStudioDayKey(now), settings);
@@ -291,6 +304,7 @@ interface CreateGroupInput {
   note?: string;
   excludeRefIds?: string[];
   skipWindow?: boolean;
+  walkIn?: boolean;
   userName: string | null;
 }
 
@@ -497,7 +511,7 @@ class MockBookingEngine {
       state,
       groupId,
       input.source === BookingSource.ONLINE ? 'BOOKING_CREATED_ONLINE' : 'BOOKING_CREATED',
-      `${guest.lastName} ${guest.firstName}: ${ordered.map((t) => t.name).join(', ')}${input.override ? ' (időkorlát felülírva)' : ''}`,
+      `${guest.lastName} ${guest.firstName}: ${ordered.map((t) => t.name).join(', ')}${input.walkIn ? ' (helyben beengedés)' : input.override ? ' (időkorlát felülírva)' : ''}`,
       input.userName,
     );
     return { groupId, rows, warnings, ordered };
@@ -704,16 +718,21 @@ class MockBookingEngine {
     );
   }
 
+  /** Helyben beengedésnél (`walkIn`) a kezdés most, 5 percre lefelé kerekítve; az időablak nem köti. */
   createStaffBooking(dto: CreateStaffBookingRequestDto): CreateBookingResponseDto {
     const now = new Date();
     const state = this.load(now);
+    if (!dto.walkIn && !dto.startsAt) {
+      throw appError('COMMON.VALIDATION_FAILED', { message: 'Érvényes kezdési időpontot adj meg.' });
+    }
     const created = this.createGroup(
       state,
       {
         guestId: dto.guestId,
         treatmentIds: dto.treatmentIds,
-        startsAt: new Date(dto.startsAt),
-        override: Boolean(dto.overrideRules),
+        startsAt: dto.walkIn ? walkInStart(now) : new Date(dto.startsAt!),
+        override: Boolean(dto.overrideRules) || Boolean(dto.walkIn),
+        walkIn: dto.walkIn,
         source: BookingSource.RECEPTION,
         note: dto.note,
         userName: 'Demó Munkatárs',

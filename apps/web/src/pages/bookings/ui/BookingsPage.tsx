@@ -73,7 +73,7 @@ export const BookingsPage: React.FC = () => {
     <>
       <PageHeader
         title={APP_ROUTES.bookings.title}
-        description="Napi és heti foglalási naptár gépenként, várólista és foglalási szabályok."
+        description="Napi és heti foglalási naptár gépenként és kozmetikusonként, várólista és foglalási szabályok."
         actions={
           <Button variant="primary" onClick={() => setCreating(true)} disabled={!data}>
             <Plus aria-hidden="true" />
@@ -113,11 +113,11 @@ export const BookingsPage: React.FC = () => {
                   onValueChange={(value) => value && setView(value as View)}
                 >
                   <ToggleGroupItem value="day">Nap</ToggleGroupItem>
-                  <ToggleGroupItem value="week">Hét (gépenként)</ToggleGroupItem>
+                  <ToggleGroupItem value="week">Hét (erőforrásonként)</ToggleGroupItem>
                 </ToggleGroup>
                 {view === 'week' && data && (
                   <Select value={activeResourceId} onValueChange={setResourceId}>
-                    <SelectTrigger aria-label="Gép" className="w-48">
+                    <SelectTrigger aria-label="Gép vagy kozmetikus" className="w-48">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>

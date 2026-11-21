@@ -256,8 +256,16 @@ function seed(db: Row) {
   resource('r-hypoxi', 'Hypoxi Trainer', 3);
   resource('r-hiemt', 'HIEMT / Intimpad gép', 1);
   resource('r-ceragem', 'Ceragem', 1);
+  resource('r-kozmetikus', 'Kozmetikus 1', 1);
 
-  const treatment = (id: string, name: string, resourceId: string, durationMinutes: number, sortOrder: number) =>
+  const treatment = (
+    id: string,
+    name: string,
+    resourceId: string,
+    durationMinutes: number,
+    sortOrder: number,
+    over: Row = {},
+  ) =>
     db.bookableTreatment.rows.push({
       id,
       studioId: STUDIO,
@@ -269,11 +277,16 @@ function seed(db: Row) {
       sortOrder,
       isActive: true,
       isOnline: true,
+      ...over,
     });
   treatment('t-hypoxi', 'Hypoxi Trainer', 'r-hypoxi', 30, 1);
   treatment('t-hiemt', 'HIEMT', 'r-hiemt', 30, 3);
   treatment('t-intimpad', 'Intimpad', 'r-hiemt', 30, 4);
   treatment('t-ceragem', 'Ceragem', 'r-ceragem', 40, 5);
+  // Beauty alap (TICKET-59): szünet nélkül, csak recepciós foglalással, a kozmetikai bérletre.
+  const cosmetic = { serviceId: 'svc-facial', bufferMinutes: 0, isOnline: false };
+  treatment('t-facial', 'Tisztító arckezelés', 'r-kozmetikus', 120, 7, cosmetic);
+  treatment('t-armpit', 'Lézeres szőrtelenítés: hónalj', 'r-kozmetikus', 30, 8, cosmetic);
 
   for (const [id, lastName, firstName] of [
     ['g1', 'Kiss', 'Anna'],
@@ -352,6 +365,9 @@ function setup(options: { googleConfigured?: boolean } = {}) {
   );
   return { db, bookings, waitlist, publicBooking, calendarSync, notifications, google };
 }
+
+const walkIn = (bookings: BookingsService, guestId: string, treatmentIds: string[], now: Date) =>
+  bookings.create(STUDIO, { guestId, treatmentIds, walkIn: true }, 'staff-1', now);
 
 const staffBook = (
   bookings: BookingsService,
@@ -485,6 +501,80 @@ describe('foglalás: kapacitás, közös gép, önátfedés', () => {
     await expect(staffBook(bookings, 'g2', ['t-ceragem'], at(DAY, '09:00'))).rejects.toMatchObject({
       code: 'BOOKING.CLOSED',
     });
+  });
+});
+
+describe('Beauty alap: Kozmetikus 1, helyben beengedés, utolsó kezdés (TICKET-59)', () => {
+  it('helyben beengedés: a kezdés most, 5 percre lefelé kerekítve, a 30 perces határ nem köti', async () => {
+    const { bookings, db } = setup();
+    const now = new Date(NOW.getTime() + 3 * MINUTE);
+    const created = await walkIn(bookings, 'g1', ['t-facial'], now);
+    expect(created.bookings[0]).toMatchObject({ resourceId: 'r-kozmetikus', startsAt: NOW.toISOString() });
+    expect(created.bookings[0].endsAt).toBe(new Date(NOW.getTime() + 120 * MINUTE).toISOString());
+    // Szünet nélkül: a gép a kezelés végéig foglalt.
+    expect(created.bookings[0].blockedUntil).toBe(created.bookings[0].endsAt);
+    expect(db.auditLog.rows.at(-1).details).toContain('helyben beengedés');
+  });
+
+  it('helyben beengedés: a kapacitást nem írja felül, párhuzamosan sem', async () => {
+    const { bookings, db } = setup();
+    const results = await Promise.allSettled([
+      walkIn(bookings, 'g1', ['t-facial'], NOW),
+      walkIn(bookings, 'g2', ['t-armpit'], NOW),
+    ]);
+    expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+    expect((results.find((r) => r.status === 'rejected') as PromiseRejectedResult).reason).toMatchObject({
+      code: 'BOOKING.CAPACITY_FULL',
+    });
+    expect(db.booking.rows).toHaveLength(1);
+  });
+
+  it('helyben beengedés zárás után: nyitvatartáson kívül', async () => {
+    const { bookings } = setup();
+    await expect(walkIn(bookings, 'g1', ['t-hypoxi'], at('2026-11-17', '18:20'))).rejects.toMatchObject({
+      code: 'BOOKING.OUTSIDE_OPENING_HOURS',
+    });
+  });
+
+  it('a 120 perces kezelés legkésőbb 17:00-kor indulhat; a gépi kezelés 18:00-kor még igen, utána nem', async () => {
+    const { bookings } = setup();
+    await staffBook(bookings, 'g1', ['t-facial'], at(FAR_DAY, '17:00'));
+    await expect(staffBook(bookings, 'g2', ['t-facial'], at(FAR_DAY, '17:05'), true)).rejects.toMatchObject({
+      code: 'BOOKING.OUTSIDE_OPENING_HOURS',
+    });
+    await staffBook(bookings, 'g3', ['t-hypoxi'], at(FAR_DAY, '18:00'));
+    await expect(staffBook(bookings, 'g4', ['t-hypoxi'], at(FAR_DAY, '18:15'), true)).rejects.toMatchObject({
+      code: 'BOOKING.OUTSIDE_OPENING_HOURS',
+    });
+  });
+
+  it('a kozmetikai kezelés nem jelenik meg a nyilvános foglalón, és online nem foglalható', async () => {
+    const { publicBooking } = setup();
+    const catalog = await publicBooking.catalog(NOW);
+    expect(catalog.treatments.map((t) => t.id)).not.toContain('t-facial');
+    await expect(
+      publicBooking.create(
+        {
+          treatmentIds: ['t-facial'],
+          startsAt: at(FAR_DAY, '09:00').toISOString(),
+          contact: { lastName: 'Kiss', firstName: 'Anna', email: 'anna@example.com', phone: '+36 30 123 4567' },
+          privacyAccepted: true,
+        },
+        undefined,
+        NOW,
+      ),
+    ).rejects.toMatchObject({ code: 'BOOKING.TREATMENT_NOT_FOUND' });
+  });
+
+  it('megérkezéskor 1 alkalom a kozmetikai bérletből', async () => {
+    const ctx = setup();
+    ctx.db.service.rows.push({ id: 'svc-facial', name: 'Hialuronos Arckezelés & Rádiófrekvencia', womenOnly: false });
+    addPass(ctx.db, 'g1', { serviceId: 'svc-facial', totalPasses: 5 });
+    const booking = (await walkIn(ctx.bookings, 'g1', ['t-facial'], NOW)).bookings[0];
+    const result = await ctx.bookings.setStatus(STUDIO, booking.id, { status: 'ARRIVED' as any }, 'staff-1', NOW);
+    expect(result.deduction).toBe('DEDUCTED');
+    expect(ledger.recordDeduction).toHaveBeenCalledTimes(1);
+    expect(ctx.db.passUsageLog.rows[0]).toMatchObject({ serviceId: 'svc-facial', guestId: 'g1' });
   });
 });
 
