@@ -74,6 +74,8 @@ export const APP_ERROR_CATALOG = {
   'CHECKIN.BALANCE_CHANGED': { status: 409, message: 'A bérlet egyenlege időközben módosult. Kérjük, próbáld újra!', action: 'reload' },
   'CHECKIN.NOT_FOUND': { status: 404, message: 'A beléptetési naplóbejegyzés nem található.', action: 'notify' },
   'CHECKIN.WOMEN_ONLY': { status: 400, message: 'Ez a szolgáltatás csak nőknek szól, férfi vendég nem léptethető be vele.', action: 'notify' },
+  'CHECKIN.DEBT_BLOCKED': { status: 409, message: 'Tartozás miatt a belépés a türelmi idő (5 nap) után nem engedélyezett. Kivételes beengedés indoklással a recepciós kártyáról lehetséges.', action: 'notify' },
+  'CHECKIN.OVERRIDE_REASON_REQUIRED': { status: 400, message: 'Kivételes beengedéshez az indoklás megadása kötelező.', action: 'notify' },
   'CHECKIN.NOT_REVOCABLE': { status: 400, message: 'Ez a beléptetés már sztornózva van, vagy nem sikeres beléptetés, ezért nem sztornózható.', action: 'notify' },
 
   // Havi tagság

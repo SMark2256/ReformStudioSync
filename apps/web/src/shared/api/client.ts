@@ -4,6 +4,7 @@ import {
   CheckInRevokedPayload,
   CheckInStatus,
   DailyFinanceSummaryDto,
+  CheckInOverrideRequestDto,
   DeductPassUsageRequestDto,
   DisplayDeviceDto,
   DocumentType,
@@ -402,13 +403,16 @@ export const api = {
     );
   },
 
-  scanCheckIn(data: {
-    barcode: string;
-    visitType?: VisitType;
-    serviceId?: string;
-    forceDuplicate?: boolean;
-    idempotencyKey?: string;
-  }): Promise<CheckInResultPayload> {
+  /** Kivételes beengedés (TICKET-15): `forceOverride` + `overrideReason`, egyedi `idempotencyKey`-jel. */
+  scanCheckIn(
+    data: {
+      barcode: string;
+      visitType?: VisitType;
+      serviceId?: string;
+      forceDuplicate?: boolean;
+      idempotencyKey?: string;
+    } & CheckInOverrideRequestDto,
+  ): Promise<CheckInResultPayload> {
     return request<CheckInResultPayload>(
       '/checkins',
       {

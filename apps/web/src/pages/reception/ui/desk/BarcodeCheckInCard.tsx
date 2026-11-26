@@ -35,7 +35,7 @@ const TEST_CARDS = [
   {
     code: '100003',
     name: 'Szabó Eszter',
-    scenario: 'Érvényes bérlet, nincs tartozás',
+    scenario: '9 napos tagdíj-elmaradás: elutasítva, kivételesen beengedhető',
   },
   {
     code: '100004',

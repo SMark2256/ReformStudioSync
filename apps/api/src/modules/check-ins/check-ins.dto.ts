@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { VisitType } from '@reform/shared';
+import { CHECK_IN_OVERRIDE_REASON_MAX_LENGTH, VisitType } from '@reform/shared';
 import { Type } from 'class-transformer';
 import {
   IsArray,
@@ -8,10 +8,35 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
+  MaxLength,
   ValidateNested,
 } from 'class-validator';
 
-export class ScanCheckInDto {
+/**
+ * Kivételes beengedés (TICKET-15): a tartozás miatti tiltás feloldása, recepciósnak és adminnak.
+ * Az indoklás `forceOverride` mellett kötelező (üresen 400 `CHECKIN.OVERRIDE_REASON_REQUIRED`).
+ */
+export class CheckInOverrideDto {
+  @ApiPropertyOptional({
+    default: false,
+    description:
+      'Kivételes beengedés: a tartozás (türelmi időn túli tagdíj, bérlet-hátralék, ismeretlen hátralék) miatti tiltást feloldja, naplózva (audit: CHECKIN_OVERRIDE). Más okú elutasítást nem old fel.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  forceOverride?: boolean;
+
+  @ApiPropertyOptional({
+    example: 'A vendég ma átutalta a tagdíjat, a bizonylatot bemutatta.',
+    description: 'A kivételes beengedés indoklása (naplózva). `forceOverride` mellett kötelező.',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(CHECK_IN_OVERRIDE_REASON_MAX_LENGTH)
+  overrideReason?: string;
+}
+
+export class ScanCheckInDto extends CheckInOverrideDto {
   @ApiProperty({ example: '100001' })
   @IsString()
   @IsNotEmpty({ message: 'A vonalkód megadása kötelező.' })

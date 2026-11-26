@@ -6,13 +6,18 @@ import {
   AuthUserDto,
   type BookingRuleSettings,
   canDeleteMeasurement,
+  checkInOverrideAuditDetails,
+  CheckInOverrideRequestDto,
   computePassDebt,
   computeRemainingPasses,
   countActiveDeductions,
   DAY_TICKET_DURATION_DAYS,
   DAY_TICKET_TOTAL_PASSES,
   dayTicketValidUntil,
+  debtDeniedMessage,
   DEFAULT_OPENING_HOURS,
+  type EntryDebt,
+  evaluateEntryDebt,
   getPassStatus,
   type HolidayOverrideInput,
   isOccasionPassType,
@@ -64,6 +69,7 @@ import {
   MessageStatus,
   MonitorDeviceRevokedPayload,
   MonitorTestPingPayload,
+  normalizeOverrideReason,
   OfflineScanItemDto,
   OfflineSyncResponseDto,
   OverdueBucket,
@@ -79,7 +85,7 @@ import {
   pickCircuitMembershipService,
   RecordPaymentRequestDto,
   readTourState,
-  resolveArrivalEntitlement,
+  resolveCheckInAccess,
   Role,
   ServiceCategory,
   ServiceDto,
@@ -259,6 +265,67 @@ function logCorrection(
     createdAt: now.toISOString(),
     ...entry,
   });
+}
+
+/**
+ * Tartozás miatti tiltás bemenete (TICKET-15, az API `entryDebtInput` párja): a tagdíjak és a
+ * bérletek hátraléka a vásárlás napjával.
+ */
+function entryDebtInput(guest: GuestDto, payments: readonly PaymentDto[]) {
+  return {
+    dues: (guest.memberships ?? []).flatMap((m) => m.dues ?? []),
+    passDebts: (guest.passes ?? []).map((p) => ({
+      purchasedAt: p.createdAt,
+      debtStatus: computePassDebt(p, passAllocations(p.id, payments)).status,
+    })),
+  };
+}
+
+/** A vendég ismert bérlet-hátraléka összesen (Ft), az elutasítás szövegéhez. */
+function guestPassDebtHuf(guest: GuestDto, payments: readonly PaymentDto[]) {
+  return summarizePassDebts(
+    (guest.passes ?? []).map((p) => ({
+      debt: computePassDebt(p, passAllocations(p.id, payments)),
+    })),
+  ).debtHuf;
+}
+
+/** A kivételes beengedés indoklása (az API `requireOverrideReason` párja): üresen 400. */
+function requireOverrideReason(input: CheckInOverrideRequestDto): string | null {
+  if (!input.forceOverride) return null;
+  const reason = normalizeOverrideReason(input.overrideReason);
+  if (!reason) throw appError('CHECKIN.OVERRIDE_REASON_REQUIRED');
+  return reason;
+}
+
+/** `CHECKIN_OVERRIDE` audit (az API `logCheckInOverride` párja). */
+function logCheckInOverride(
+  state: MockDatabaseState,
+  data: {
+    checkInId: string;
+    guest: GuestDto;
+    debt: EntryDebt;
+    passDebtHuf: number;
+    reason: string;
+  },
+  now: Date,
+) {
+  logCorrection(
+    state,
+    {
+      action: 'CHECKIN_OVERRIDE',
+      entityType: 'LoggedCheckIn',
+      entityId: data.checkInId,
+      details: checkInOverrideAuditDetails({
+        guestId: data.guest.id,
+        guestName: `${data.guest.lastName} ${data.guest.firstName}`,
+        debt: data.debt,
+        passDebtHuf: data.passDebtHuf,
+        reason: data.reason,
+      }),
+    },
+    now,
+  );
 }
 
 // Kisméretű SVG alapú optimalizált WebP/SVG előtte-utána mintaillusztráció
@@ -1873,6 +1940,7 @@ class MockStudioEngine {
    * 2.4 Alkalmas kezelés: Recepciós kézzel kiválasztja a kezelést és a megfelelő aktív bérletet.
    */
   deductPassUsage(input: DeductPassUsageRequestDto): CheckInResultPayload {
+    const overrideReason = requireOverrideReason(input);
     const state = this.load();
     const now = new Date();
     const guest = state.guests.find((g) => g.id === input.guestId);
@@ -1909,6 +1977,16 @@ class MockStudioEngine {
     const deductionError = passDeductionError(syncPassState(pass, now).status);
     if (deductionError) throw appError(deductionError);
 
+    // Tartozás a türelmi időn túl (TICKET-15, mint az API-n): csak kivételes beengedéssel.
+    const debt = evaluateEntryDebt(entryDebtInput(guest, state.payments), now);
+    const passDebtHuf = guestPassDebtHuf(guest, state.payments);
+    if (debt.blocked && !overrideReason) {
+      throw appError('CHECKIN.DEBT_BLOCKED', {
+        message: debtDeniedMessage(debt, passDebtHuf),
+      });
+    }
+    const overridden = debt.blocked && !!overrideReason;
+
     const guestName = `${guest.lastName} ${guest.firstName}`;
     const visitId = `vis-${Date.now()}`;
     const checkInLog: LoggedCheckInDto = {
@@ -1924,10 +2002,19 @@ class MockStudioEngine {
       userId: 'staff-default-1',
       staffName: 'Recepciós Munkatárs',
       status: CheckInStatus.SUCCESS,
-      reason: `Kezelés: ${serviceName}`,
+      reason: overridden
+        ? `Kezelés: ${serviceName} (kivételes beengedés: ${overrideReason})`
+        : `Kezelés: ${serviceName}`,
       visitId,
       createdAt: now.toISOString(),
     };
+    if (overridden && overrideReason) {
+      logCheckInOverride(
+        state,
+        { checkInId: checkInLog.id, guest, debt, passDebtHuf, reason: overrideReason },
+        now,
+      );
+    }
 
     const usageId = `ulog-${Date.now()}`;
     pass.usageLogs = [
@@ -2018,6 +2105,7 @@ class MockStudioEngine {
       totalPasses: pass.totalPasses,
       expirationDate: pass.expirationDate,
       warnings,
+      overridden: overridden || undefined,
       suggestedRenewalTemplateId: pass.passTemplateId,
       isBirthday: isBirthdayToday(guest.birthDate, now),
       timestamp: now.toISOString(),
@@ -2180,14 +2268,18 @@ class MockStudioEngine {
 
   /**
    * 2.3 Vonalkódos beléptetés (10 mp dupla leolvasás védelemmel), az API `processBarcodeCheckIn`
-   * párja: a döntés a közös `resolveArrivalEntitlement`, a beolvasás soha nem von le alkalmat.
+   * párja: a döntés a közös `resolveCheckInAccess` (jogosultság + tartozás, TICKET-15), a beolvasás
+   * soha nem von le alkalmat. Kivételes beengedés: `forceOverride` + kötelező indoklás, audittal.
    */
-  scanCheckIn(input: {
-    barcode: string;
-    visitType?: VisitType;
-    serviceId?: string;
-    forceDuplicate?: boolean;
-  }): CheckInResultPayload {
+  scanCheckIn(
+    input: {
+      barcode: string;
+      visitType?: VisitType;
+      serviceId?: string;
+      forceDuplicate?: boolean;
+    } & CheckInOverrideRequestDto,
+  ): CheckInResultPayload {
+    const overrideReason = requireOverrideReason(input);
     const state = this.load();
     const barcode = input.barcode.trim();
     const now = new Date();
@@ -2275,39 +2367,15 @@ class MockStudioEngine {
       (m) => m.status === MembershipStatus.PAUSED,
     );
 
-    let overdueAmountHuf = 0;
-    let maxOverdueDays = 0;
-    for (const m of guest.memberships ?? []) {
-      for (const d of m.dues ?? []) {
-        if (
-          d.status === MembershipDueStatus.PAID ||
-          d.status === MembershipDueStatus.WAIVED
-        ) {
-          continue;
-        }
-        const rem = Math.max(0, d.amountHuf - d.paidAmountHuf);
-        if (rem > 0 && new Date(d.dueDate) < now) {
-          overdueAmountHuf += rem;
-          const days = Math.ceil(
-            (now.getTime() - new Date(d.dueDate).getTime()) /
-              (24 * 60 * 60 * 1000),
-          );
-          if (days > maxOverdueDays) maxOverdueDays = days;
-        }
-      }
-    }
-
-    const warnings: CheckInWarningCode[] = [];
-    if (overdueAmountHuf > 0) warnings.push('OVERDUE_DUES');
-    if (pausedMembership && !activeMembership)
-      warnings.push('MEMBERSHIP_PAUSED');
-
     const passes = guest.passes ?? [];
     const serviceOf = (id: string | null | undefined) =>
       state.services.find((s) => s.id === id);
     // Csak nőknek szóló tagság / bérlet: férfi vendéggel nem számít (TICKET-42, mint az API-n).
-    const entitlement = resolveArrivalEntitlement(
+    // Tartozás a türelmi időn túl: elutasítás, kivételes beengedéssel feloldható (TICKET-15).
+    const access = resolveCheckInAccess(
       {
+        ...entryDebtInput(guest, state.payments),
+        override: overrideReason !== null,
         guestGender: guest.gender,
         memberships: (guest.memberships ?? []).map((m) => ({
           ...m,
@@ -2321,6 +2389,12 @@ class MockStudioEngine {
       },
       now,
     );
+    const { entitlement, debt } = access;
+
+    const warnings: CheckInWarningCode[] = [];
+    if (debt.duesOverdueHuf > 0) warnings.push('OVERDUE_DUES');
+    if (pausedMembership && !activeMembership)
+      warnings.push('MEMBERSHIP_PAUSED');
     const used =
       entitlement.kind === 'CIRCUIT_MEMBERSHIP'
         ? entitlement.membership
@@ -2333,7 +2407,7 @@ class MockStudioEngine {
     ) {
       warnings.push('GENDER_MISSING');
     }
-    // Bérlet-hátralék (TICKET-14): csak jelzés, a beléptetést nem tiltja (mint az API-n).
+    // Bérlet-hátralék (TICKET-14) a recepciónak; a tiltás a fenti `access` (TICKET-15, mint az API-n).
     const passDebt = summarizePassDebts(
       passes.map((p) => ({
         debt: computePassDebt(p, passAllocations(p.id, state.payments)),
@@ -2341,11 +2415,13 @@ class MockStudioEngine {
       })),
     );
     const overdue = {
-      overdueAmountHuf: overdueAmountHuf > 0 ? overdueAmountHuf : undefined,
-      overdueDays: maxOverdueDays > 0 ? maxOverdueDays : undefined,
+      overdueAmountHuf: debt.duesOverdueHuf > 0 ? debt.duesOverdueHuf : undefined,
+      overdueDays: debt.duesOverdueDays > 0 ? debt.duesOverdueDays : undefined,
       passDebtHuf: passDebt.debtHuf > 0 ? passDebt.debtHuf : undefined,
       passDebtSince: passDebt.since ?? undefined,
       passDebtUnknown: passDebt.hasUnknown || undefined,
+      passDebtDays: debt.passDebtDays > 0 ? debt.passDebtDays : undefined,
+      overridden: access.overridden || undefined,
     };
 
     // Köredzéses érkezés (aktív havi tagság vagy köredzésre érvényes időalapú bérlet) -> NINCS alkalomlevonás!
@@ -2389,10 +2465,24 @@ class MockStudioEngine {
         userId: 'staff-default-1',
         staffName: 'Recepciós Munkatárs',
         status: CheckInStatus.SUCCESS,
-        reason: null,
+        // Kivételes beengedés (TICKET-15): a belépés okaként és auditként is rögzül.
+        reason: access.overridden ? `Kivételes beengedés: ${overrideReason}` : null,
         visitId,
         createdAt: now.toISOString(),
       };
+      if (access.overridden && overrideReason) {
+        logCheckInOverride(
+          state,
+          {
+            checkInId: checkInLog.id,
+            guest,
+            debt,
+            passDebtHuf: passDebt.debtHuf,
+            reason: overrideReason,
+          },
+          now,
+        );
+      }
 
       state.checkIns.unshift(checkInLog);
       state.visits.unshift({
@@ -2474,7 +2564,9 @@ class MockStudioEngine {
       };
     }
 
-    const reason = ARRIVAL_DENIED_MESSAGES[entitlement.reason];
+    const reason = entitlement.overridable
+      ? debtDeniedMessage(debt, passDebt.debtHuf)
+      : ARRIVAL_DENIED_MESSAGES[entitlement.reason];
     const lastPass = passes[0];
 
     const deniedLog: LoggedCheckInDto = {
@@ -2503,6 +2595,9 @@ class MockStudioEngine {
       barcode: guest.barcode,
       guestName: guestFullName,
       reason,
+      deniedReasonCode: entitlement.reason,
+      debtReasons: entitlement.overridable ? debt.reasons : undefined,
+      overrideAllowed: entitlement.overridable || undefined,
       warnings,
       ...overdue,
       suggestedRenewalTemplateId: lastPass?.passTemplateId ?? 'tpl-10',

@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { PassType, PaymentMethod, ServiceCategory } from '@reform/shared';
+import { CheckInOverrideDto } from '../check-ins/check-ins.dto';
 import {
   IsBoolean,
   IsDateString,
@@ -161,7 +162,7 @@ export class ToggleFreezePassDto {
   note?: string;
 }
 
-export class DeductPassUsageDto {
+export class DeductPassUsageDto extends CheckInOverrideDto {
   @ApiProperty({ description: 'Vendég azonosítója' })
   @IsString()
   @IsNotEmpty()

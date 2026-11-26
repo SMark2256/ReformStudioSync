@@ -46,6 +46,8 @@ interface ReceptionDeskTabProps {
   offlineQueueNotice: React.ReactNode;
   onScan: (barcode: string) => void;
   onForceDuplicate: (barcode: string) => void;
+  /** Kivételes beengedés tartozás miatti elutasításnál (TICKET-15). */
+  onOverride: (checkIn: CheckInResultPayload) => void;
   onRevoke: (checkInId: string) => void;
   onOpenGuest: (guest: GuestDto | null) => void;
   onOpenDeduct: (guest: GuestDto | null) => void;
@@ -73,6 +75,7 @@ export const ReceptionDeskTab: React.FC<ReceptionDeskTabProps> = ({
   offlineQueueNotice,
   onScan,
   onForceDuplicate,
+  onOverride,
   onRevoke,
   onOpenGuest,
   onOpenDeduct,
@@ -215,6 +218,7 @@ export const ReceptionDeskTab: React.FC<ReceptionDeskTabProps> = ({
               onOpenDeduct={onOpenDeduct}
               onRevoke={onRevoke}
               onForceDuplicate={onForceDuplicate}
+              onOverride={onOverride}
               onOpenSellForGuestId={onOpenSellForGuestId}
             />
 

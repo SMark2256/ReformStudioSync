@@ -5,6 +5,7 @@ import {
   PassType,
   ServiceCategory,
 } from './enums';
+import type { ArrivalDeniedReason, DebtDeniedReason } from './pass-rules';
 
 export const SOCKET_NAMESPACE = '/monitor';
 
@@ -96,6 +97,19 @@ export interface CheckInResultPayload {
   passDebtSince?: string;
   /** Legalább egy bérlet hátraléka ismeretlen; csak ha igaz. */
   passDebtUnknown?: boolean;
+  /** A legrégebbi hátralékos bérlet vásárlása óta eltelt napok (TICKET-15), csak ha van hátralék. */
+  passDebtDays?: number;
+  /**
+   * Az elutasítás oka gépi kóddal (TICKET-15), csak `DENIED` esetén. Csak a recepción látható,
+   * a monitorra nem kerül (`toMonitorPayload`).
+   */
+  deniedReasonCode?: ArrivalDeniedReason;
+  /** Tartozás miatti elutasításnál az összes ok (tagdíj, bérlet-hátralék, ismeretlen hátralék). */
+  debtReasons?: DebtDeniedReason[];
+  /** Csak ha igaz: az elutasítás kivételes beengedéssel (`forceOverride` + indoklás) feloldható. */
+  overrideAllowed?: boolean;
+  /** Csak ha igaz: a belépés (vagy a kezelésválasztás) kivételes beengedéssel történt. */
+  overridden?: boolean;
   greetingSeconds?: number;
   suggestedRenewalTemplateId?: string | null;
   /** Sikeres belépésnél: a vendégnek ma (Europe/Budapest) van a születésnapja. */

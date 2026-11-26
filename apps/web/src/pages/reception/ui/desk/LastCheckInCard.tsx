@@ -4,7 +4,7 @@ import {
   greetingForCheckIn,
   GuestDto,
 } from '@reform/shared';
-import { AlertTriangle, RotateCcw, Ticket, Users } from 'lucide-react';
+import { AlertTriangle, RotateCcw, ShieldCheck, Ticket, Users } from 'lucide-react';
 import React from 'react';
 import { isTestEnvironment } from '@/shared/api';
 import {
@@ -21,6 +21,10 @@ import {
   DataList,
   DataListItem,
 } from '@/shared/ui';
+import {
+  CHECK_IN_OVERRIDE_TEXTS,
+  DEBT_DENIED_REASON_LABELS,
+} from '../../model/checkInOverrideTexts';
 import { CHECK_IN_STATUS_BADGES } from './checkInStatus';
 import { formatHuf } from './format';
 
@@ -32,6 +36,8 @@ interface LastCheckInCardProps {
   onOpenDeduct: (guest: GuestDto) => void;
   onRevoke: (checkInId: string) => void;
   onForceDuplicate: (barcode: string) => void;
+  /** Tartozás miatti elutasításnál (TICKET-15): a kivételes beengedés dialógusa. */
+  onOverride: (checkIn: CheckInResultPayload) => void;
   onOpenSellForGuestId: (guestId: string, templateId?: string | null) => void;
 }
 
@@ -43,6 +49,7 @@ export const LastCheckInCard: React.FC<LastCheckInCardProps> = ({
   onOpenDeduct,
   onRevoke,
   onForceDuplicate,
+  onOverride,
   onOpenSellForGuestId,
 }) => {
   const statusBadge = lastCheckIn && CHECK_IN_STATUS_BADGES[lastCheckIn.status];
@@ -55,6 +62,8 @@ export const LastCheckInCard: React.FC<LastCheckInCardProps> = ({
   const greeting = lastCheckIn && greetingForCheckIn(lastCheckIn);
   const hasOverdueDues = (lastCheckIn?.overdueAmountHuf ?? 0) > 0;
   const hasPassDebt = (lastCheckIn?.passDebtHuf ?? 0) > 0;
+  // Tartozás miatti elutasítás (TICKET-15): az ok a szervertől, kivételes beengedéssel feloldható.
+  const canOverride = isDenied && !!lastCheckIn?.overrideAllowed;
 
   return (
     <Card data-tour="reception.last-check-in">
@@ -95,6 +104,11 @@ export const LastCheckInCard: React.FC<LastCheckInCardProps> = ({
                     {lastCheckIn.guestName}
                   </h3>
                   <Badge variant={statusBadge.variant}>{statusBadge.label}</Badge>
+                  {lastCheckIn.overridden && (
+                    <Badge variant="warning">
+                      {CHECK_IN_OVERRIDE_TEXTS.overriddenBadge}
+                    </Badge>
+                  )}
                   <Badge variant="secondary" dot={false}>
                     {lastCheckIn.mode === 'CIRCUIT_GREETING'
                       ? `${greeting?.kind} (0 levonás)`
@@ -104,11 +118,27 @@ export const LastCheckInCard: React.FC<LastCheckInCardProps> = ({
                 <p className="font-mono text-xs text-muted-foreground">
                   #{lastCheckIn.barcode}
                 </p>
-                <p className="mt-1 text-[13px] text-foreground">
-                  {lastCheckIn.passName ??
-                    lastCheckIn.reason ??
-                    'Nincs aktív bérlet'}
-                </p>
+                {canOverride ? (
+                  <p className="mt-1 text-[13px] text-foreground">
+                    <span className="font-medium">
+                      {CHECK_IN_OVERRIDE_TEXTS.deniedReasonTitle}:{' '}
+                      {(lastCheckIn.debtReasons ?? [])
+                        .map((r) => DEBT_DENIED_REASON_LABELS[r])
+                        .join(', ')}
+                    </span>
+                    {lastCheckIn.reason && (
+                      <span className="block text-muted-foreground">
+                        {lastCheckIn.reason}
+                      </span>
+                    )}
+                  </p>
+                ) : (
+                  <p className="mt-1 text-[13px] text-foreground">
+                    {lastCheckIn.passName ??
+                      lastCheckIn.reason ??
+                      'Nincs aktív bérlet'}
+                  </p>
+                )}
               </div>
             </div>
 
@@ -129,6 +159,8 @@ export const LastCheckInCard: React.FC<LastCheckInCardProps> = ({
                       Bérlet-hátralék: {formatHuf(lastCheckIn.passDebtHuf!)}
                       {lastCheckIn.passDebtSince &&
                         ` (${new Date(lastCheckIn.passDebtSince).toLocaleDateString('hu-HU')} óta)`}
+                      {lastCheckIn.passDebtDays !== undefined &&
+                        `, a vásárlás óta ${lastCheckIn.passDebtDays} nap`}
                     </p>
                   )}
                   {lastCheckIn.passDebtUnknown && (
@@ -191,10 +223,21 @@ export const LastCheckInCard: React.FC<LastCheckInCardProps> = ({
                 </Button>
               )}
 
+              {canOverride && (
+                <Button
+                  size="sm"
+                  variant="primary"
+                  onClick={() => onOverride(lastCheckIn)}
+                >
+                  <ShieldCheck aria-hidden strokeWidth={1.75} />
+                  {CHECK_IN_OVERRIDE_TEXTS.action}
+                </Button>
+              )}
+
               {lastCheckIn.guestId && (
                 <Button
                   size="sm"
-                  variant={isDenied ? 'primary' : 'secondary'}
+                  variant={isDenied && !canOverride ? 'primary' : 'secondary'}
                   onClick={() =>
                     onOpenSellForGuestId(
                       lastCheckIn.guestId!,
