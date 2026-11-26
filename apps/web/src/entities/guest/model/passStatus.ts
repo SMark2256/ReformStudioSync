@@ -109,6 +109,26 @@ export function getGuestPassSummary(
     : summary({ label: 'Nincs aktív bérlet', variant: 'secondary' }, null);
 }
 
+/**
+ * A bérlet lejárata a felületen: napra pontos dátum, napijegynél (percre pontos `validUntil`,
+ * TICKET-7) az időponttal együtt, pl. „2026. 11. 26. 19:00”. A lejáratot a szerver adja.
+ */
+export function formatPassExpiry(pass: {
+  expirationDate: string;
+  validUntil?: string | null;
+}): string {
+  if (!pass.validUntil) {
+    return new Date(pass.expirationDate).toLocaleDateString('hu-HU');
+  }
+  return new Date(pass.validUntil).toLocaleString('hu-HU', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
 /** Rövid dátum: „nov. 29.”, más évben „2027. jan. 4.” (UI-specifikáció 7.2). */
 export function formatShortDate(iso: string, now = new Date()): string {
   const date = new Date(iso);

@@ -64,11 +64,19 @@ export interface PassStatusInput {
   expirationDate: Date | string;
   isFrozen: boolean;
   cancelledAt?: Date | string | null;
+  /** Percre pontos lejárat (napijegy, TICKET-7); ha meg van adva, ezen túl a bérlet lejárt. */
+  validUntil?: Date | string | null;
+}
+
+/** Alkalomszámos bérlettípus (alkalmas bérlet és napijegy): elfogyhat, levonás alkalmanként. */
+export function isOccasionPassType(type: PassType | string): boolean {
+  return type === PassType.OCCASION_BASED || type === PassType.DAY_TICKET;
 }
 
 /**
  * Számolt bérletállapot. Sorrend: sztornózott → fagyasztott → még nem kezdődött → lejárt → elfogyott → aktív.
  * A kezdés és a lejárat napra pontos (Europe/Budapest): a lejárat napján 23:59-kor még érvényes.
+ * Ha van `validUntil` (napijegy), az percre pontos: a zárás után a jegy lejárt.
  */
 export function getPassStatus(pass: PassStatusInput, now: Date = new Date()): PassStatus {
   if (pass.cancelledAt) return PassStatus.CANCELLED;
@@ -76,7 +84,10 @@ export function getPassStatus(pass: PassStatusInput, now: Date = new Date()): Pa
   const today = toStudioDayKey(now);
   if (today < toStudioDayKey(pass.startDate)) return PassStatus.NOT_STARTED;
   if (today > toStudioDayKey(pass.expirationDate)) return PassStatus.EXPIRED;
-  if (pass.type === PassType.OCCASION_BASED && (pass.remainingPasses ?? 0) <= 0) {
+  if (pass.validUntil && now.getTime() > new Date(pass.validUntil).getTime()) {
+    return PassStatus.EXPIRED;
+  }
+  if (isOccasionPassType(pass.type) && (pass.remainingPasses ?? 0) <= 0) {
     return PassStatus.DEPLETED;
   }
   return PassStatus.ACTIVE;
@@ -119,7 +130,8 @@ export interface ArrivalMembershipInput {
 
 /**
  * Köredzésre jogosít-e a bérlet: csak időalapú bérlet, amely nincs szolgáltatáshoz kötve, vagy
- * a szolgáltatása köredzés (CIRCUIT). Alkalmas bérlet köredzésre sem ad ingyenes belépést.
+ * a szolgáltatása köredzés (CIRCUIT). Alkalmas bérlet és napijegy köredzésre sem ad ingyenes
+ * belépést: azokból a kezelésválasztó von le egy alkalmat.
  */
 export function passGrantsCircuitEntry(pass: {
   type: PassType | string;

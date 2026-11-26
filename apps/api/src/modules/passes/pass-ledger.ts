@@ -1,5 +1,11 @@
 import { Prisma } from '@prisma/client';
-import { appError, AppErrorCode, isPassOpen, VisitType } from '@reform/shared';
+import {
+  appError,
+  AppErrorCode,
+  isOccasionPassType,
+  isPassOpen,
+  VisitType,
+} from '@reform/shared';
 
 /**
  * Bérlet-alkalom főkönyv (TICKET-16). Minden levonás és jóváírás ezen megy át, így a
@@ -56,7 +62,7 @@ export async function recordArrival(
 }
 
 /**
- * 1 alkalom levonása. Alkalmas bérletnél atomi `updateMany` véd a túlfogyasztás ellen;
+ * 1 alkalom levonása. Alkalmas bérletnél és napijegynél atomi `updateMany` véd a túlfogyasztás ellen;
  * időalapú bérletnél is készül `delta: -1` sor (ez a kezelés nyoma és visszavonható),
  * de alkalomszám nincs, így a számolást nem torzítja.
  */
@@ -76,7 +82,7 @@ export async function recordDeduction(
 ): Promise<{ usageId: string; remaining: number | 'Korlátlan' }> {
   let remaining: number | 'Korlátlan' = 'Korlátlan';
 
-  if (pass.type === 'OCCASION_BASED') {
+  if (isOccasionPassType(pass.type)) {
     const atomicUpdate = await tx.guestPass.updateMany({
       where: {
         id: pass.id,
@@ -135,7 +141,7 @@ export async function reverseDeduction(
   }
 
   const pass = usage.guestPass;
-  if (pass.type !== 'OCCASION_BASED') return 'Korlátlan';
+  if (!isOccasionPassType(pass.type)) return 'Korlátlan';
 
   // A kimerülés miatt lezárt bérlet újranyílik, a sztornózott nem.
   const updated = await tx.guestPass.update({

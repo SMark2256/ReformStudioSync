@@ -11,6 +11,7 @@ import {
   EXPIRING_SOON_THRESHOLD_DAYS,
   greetingFields,
   isBirthdayToday,
+  isOccasionPassType,
   LoggedCheckInDto,
   OfflineSyncResponseDto,
   PassType,
@@ -479,7 +480,7 @@ export class CheckInsService {
 
       const now = new Date();
       let restoredRemaining: number | 'Korlátlan' =
-        checkIn.guestPass?.type === 'OCCASION_BASED'
+        checkIn.guestPass && isOccasionPassType(checkIn.guestPass.type)
           ? (checkIn.guestPass.remainingPasses ?? 0)
           : 'Korlátlan';
 

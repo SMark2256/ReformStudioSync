@@ -615,6 +615,7 @@ export class GuestsService {
         usedPassesCount: countActiveDeductions(usageLogs),
         startDate: p.startDate.toISOString(),
         expirationDate: p.expirationDate.toISOString(),
+        validUntil: p.validUntil?.toISOString() ?? null,
         isActive: p.isActive,
         isFrozen: p.isFrozen,
         frozenAt: p.frozenAt ? p.frozenAt.toISOString() : null,

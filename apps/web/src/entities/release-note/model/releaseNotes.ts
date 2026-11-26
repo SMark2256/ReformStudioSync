@@ -109,6 +109,22 @@ export const getJiraIssueUrl = (jiraKey: string): string =>
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    id: 'v0.3-day-ticket',
+    version: '0.3',
+    date: '2026-11-26',
+    kind: 'NEW_FEATURE',
+    title: 'Napijegy',
+    summary: 'Napijegy külön típusként, a vásárlás napján zárásig érvényes.',
+    details: [
+      'Új bérlettípus a sablonoknál: „Napijegy”, mindig 1 alkalommal.',
+      'A lejárat az eladás napjának zárása a Foglalások › Beállítások nyitvatartásából; zárt napon a nap végéig érvényes. A nyitvatartás későbbi módosítása az eladott jegyet nem változtatja meg.',
+      'A napijegy nem hosszabbítható és nem fagyasztható; a vendég adatlapján a lejárat időponttal látszik.',
+      'A meglévő „1 Alkalmas Napijegy” sablonok és az eladott jegyek napijeggyé váltak; a még érvényes régi jegyek lejárata nem rövidült.',
+    ],
+    jiraKey: 'TICKET-7',
+    link: { type: 'route', path: '/passes', label: 'Bérletek megnyitása' },
+  },
+  {
     id: 'v0.3-pass-debt',
     version: '0.3',
     date: '2026-11-26',

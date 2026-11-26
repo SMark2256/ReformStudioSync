@@ -15,7 +15,7 @@ import {
   type ResponsiveTableColumn,
 } from '@/shared/ui';
 import { formatHuf } from '../desk/format';
-import { SERVICE_CATEGORY_LABELS } from './labels';
+import { DAY_TICKET_VALIDITY_LABEL, SERVICE_CATEGORY_LABELS } from './labels';
 import { PassTemplateDialog } from './PassTemplateDialog';
 import { ServiceDialog } from './ServiceDialog';
 
@@ -37,7 +37,10 @@ const templateColumns: ResponsiveTableColumn<PassTemplateDto>[] = [
     key: 'days',
     header: 'Érvényesség',
     align: 'right',
-    cell: (t) => `${t.durationDays} nap`,
+    cell: (t) =>
+      t.type === PassType.DAY_TICKET
+        ? DAY_TICKET_VALIDITY_LABEL
+        : `${t.durationDays} nap`,
   },
   {
     key: 'price',

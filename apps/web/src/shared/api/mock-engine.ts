@@ -4,11 +4,18 @@ import {
   ARRIVAL_DENIED_MESSAGES,
   AuditLogDto,
   AuthUserDto,
+  type BookingRuleSettings,
   canDeleteMeasurement,
   computePassDebt,
   computeRemainingPasses,
   countActiveDeductions,
+  DAY_TICKET_DURATION_DAYS,
+  DAY_TICKET_TOTAL_PASSES,
+  dayTicketValidUntil,
+  DEFAULT_OPENING_HOURS,
   getPassStatus,
+  type HolidayOverrideInput,
+  isOccasionPassType,
   isPassOpen,
   nextPassDebtSince,
   passCoversService,
@@ -108,6 +115,9 @@ export interface MockDatabaseState {
   devices: DisplayDeviceDto[];
 }
 
+/** A napijegy lejáratához szükséges nyitvatartás: heti beállítás és a napi felülírások. */
+type StudioHours = [Pick<BookingRuleSettings, 'openingHours'>, HolidayOverrideInput[]];
+
 function addDays(base: Date, days: number): string {
   return new Date(base.getTime() + days * 24 * 60 * 60 * 1000).toISOString();
 }
@@ -182,7 +192,7 @@ function reverseDeduction(
   usage.reversedAt = now.toISOString();
   usage.reversalReason = reason;
   syncPassState(pass, now);
-  return pass.type === PassType.OCCASION_BASED
+  return isOccasionPassType(pass.type)
     ? (pass.remainingPasses ?? 0)
     : 'Korlátlan';
 }
@@ -389,9 +399,9 @@ export function createInitialMockDatabase(): MockDatabaseState {
       serviceId: 'srv-reformer',
       serviceName: 'Reformer Pilates',
       name: '1 Alkalmas Napijegy',
-      type: PassType.OCCASION_BASED,
+      type: PassType.DAY_TICKET,
       totalPasses: 1,
-      durationDays: 7,
+      durationDays: 1,
       price: 6500,
       isActive: true,
       createdAt: addDays(now, -30),
@@ -1312,6 +1322,16 @@ class MockStudioEngine {
   private version = 0;
   private notifyScheduled = false;
 
+  /**
+   * A stúdió nyitvatartása a napijegy lejáratához (TICKET-7): a foglalási mock (`mock-booking`)
+   * adja a Beállítások fül nyitvatartását és a munkaszüneti felülírásokat; anélkül az alapértelmezés.
+   */
+  private studioHours: () => StudioHours = () => [{ openingHours: DEFAULT_OPENING_HOURS }, []];
+
+  setStudioHoursSource(source: () => StudioHours): void {
+    this.studioHours = source;
+  }
+
   private readonly handleStorage = (event: StorageEvent) => {
     // Más böngészőfül írta át a demó adatbázist (vagy törölte a teljes localStorage-et).
     if (event.key === STORAGE_KEY || event.key === null) this.emitChange();
@@ -1667,6 +1687,8 @@ class MockStudioEngine {
   }): PassTemplateDto {
     const state = this.load();
     const service = state.services.find((s) => s.id === input.serviceId);
+    // Napijegy: mindig egy alkalom, az érvényességet eladáskor a zárás adja (mint az API-n, TICKET-7).
+    const isDayTicket = input.type === PassType.DAY_TICKET;
     const tpl: PassTemplateDto = {
       id: `tpl-${Date.now()}`,
       studioId: DEFAULT_STUDIO_ID,
@@ -1674,11 +1696,12 @@ class MockStudioEngine {
       serviceName: service?.name ?? null,
       name: input.name.trim(),
       type: input.type,
-      totalPasses:
-        input.type === PassType.OCCASION_BASED
+      totalPasses: isDayTicket
+        ? DAY_TICKET_TOTAL_PASSES
+        : input.type === PassType.OCCASION_BASED
           ? (input.totalPasses ?? 1)
           : null,
-      durationDays: input.durationDays,
+      durationDays: isDayTicket ? DAY_TICKET_DURATION_DAYS : input.durationDays,
       price: input.price,
       isActive: true,
       createdAt: new Date().toISOString(),
@@ -1700,9 +1723,15 @@ class MockStudioEngine {
     const state = this.load();
     const idx = state.templates.findIndex((t) => t.id === id);
     if (idx === -1) throw appError('PASS.TEMPLATE_NOT_FOUND');
+    const { durationDays, ...rest } = input;
     state.templates[idx] = {
       ...state.templates[idx],
-      ...input,
+      ...rest,
+      // Napijegynél az érvényesség nem napokban mérődik (az API-val azonosan).
+      ...(durationDays !== undefined &&
+      state.templates[idx].type !== PassType.DAY_TICKET
+        ? { durationDays }
+        : {}),
     };
     this.save(state);
     return state.templates[idx];
@@ -1740,9 +1769,14 @@ class MockStudioEngine {
     }
 
     const now = new Date();
-    const exp = new Date(
-      now.getTime() + template.durationDays * 24 * 60 * 60 * 1000,
-    );
+    // Napijegy: a vásárlás napján zárásig érvényes, a foglalási nyitvatartásból (TICKET-7).
+    const validUntil =
+      template.type === PassType.DAY_TICKET
+        ? dayTicketValidUntil(now, ...this.studioHours())
+        : null;
+    const exp =
+      validUntil ??
+      new Date(now.getTime() + template.durationDays * 24 * 60 * 60 * 1000);
     const amount =
       input.customAmount !== undefined ? input.customAmount : template.price;
     const priceHuf = Math.round(amount);
@@ -1769,6 +1803,7 @@ class MockStudioEngine {
       usedPassesCount: 0,
       startDate: now.toISOString(),
       expirationDate: exp.toISOString(),
+      validUntil: validUntil?.toISOString() ?? null,
       isActive: true,
       isFrozen: false,
       frozenAt: null,
@@ -1917,7 +1952,7 @@ class MockStudioEngine {
     ];
     syncPassState(pass, now);
     const newRemaining: number | 'Korlátlan' =
-      pass.type === PassType.OCCASION_BASED
+      isOccasionPassType(pass.type)
         ? (pass.remainingPasses ?? 0)
         : 'Korlátlan';
     pass.usageLogs[0].remainingAfter = pass.remainingPasses;
@@ -1947,6 +1982,7 @@ class MockStudioEngine {
 
     const warnings: CheckInWarningCode[] = [];
     if (womenOnly === 'GENDER_MISSING') warnings.push('GENDER_MISSING');
+    // A napijegy egyetlen alkalmának felhasználása és aznapi lejárata várt (mint az API-n).
     if (pass.type === PassType.OCCASION_BASED && typeof newRemaining === 'number') {
       if (newRemaining === 0) {
         warnings.push('DEPLETED_PASS');
@@ -1961,7 +1997,7 @@ class MockStudioEngine {
       (new Date(pass.expirationDate).getTime() - now.getTime()) /
         (24 * 60 * 60 * 1000),
     );
-    if (daysLeft <= EXPIRING_SOON_THRESHOLD_DAYS) {
+    if (pass.type !== PassType.DAY_TICKET && daysLeft <= EXPIRING_SOON_THRESHOLD_DAYS) {
       warnings.push('EXPIRING_SOON');
     }
 
@@ -2056,6 +2092,7 @@ class MockStudioEngine {
     for (const guest of state.guests) {
       const pass = (guest.passes ?? []).find((p) => p.id === passId);
       if (pass) {
+        if (pass.type === PassType.DAY_TICKET) throw appError('PASS.DAY_TICKET_FIXED');
         const base =
           new Date(pass.expirationDate).getTime() > Date.now()
             ? new Date(pass.expirationDate)
@@ -2089,6 +2126,7 @@ class MockStudioEngine {
       const pass = (guest.passes ?? []).find((p) => p.id === passId);
       if (pass) {
         if (!pass.isFrozen) {
+          if (pass.type === PassType.DAY_TICKET) throw appError('PASS.DAY_TICKET_FIXED');
           // Csak érvényes bérlet fagyasztható (az API-val azonos szabály); a feloldás mindig mehet.
           if (!isPassFreezable(syncPassState(pass, now).status)) {
             throw appError('PASS.NOT_FREEZABLE');
@@ -2498,7 +2536,7 @@ class MockStudioEngine {
       (p) => p.id === checkIn.guestPassId,
     );
     let restoredRemaining: number | 'Korlátlan' =
-      checkInPass?.type === PassType.OCCASION_BASED
+      checkInPass && isOccasionPassType(checkInPass.type)
         ? (checkInPass.remainingPasses ?? 0)
         : 'Korlátlan';
 

@@ -35,6 +35,8 @@ enum ServiceCategory {
 enum PassType {
   OCCASION_BASED
   TIME_BASED
+  /// Napijegy (TICKET-7): egy alkalom, a vásárlás napján zárásig érvényes (`GuestPass.validUntil`).
+  DAY_TICKET
 }
 
 enum MembershipStatus {
@@ -292,6 +294,9 @@ model GuestPass {
   remainingPasses Int?      @map("remaining_passes")
   startDate       DateTime  @map("start_date")
   expirationDate  DateTime  @map("expiration_date")
+  /// Percre pontos lejárat (napijegy: az eladás napjának zárása, eladáskor számolva, TICKET-7).
+  /// `null`: csak a napra pontos `expirationDate` számít.
+  validUntil      DateTime? @map("valid_until")
   isActive        Boolean   @default(true) @map("is_active")
   isFrozen        Boolean   @default(false) @map("is_frozen")
   frozenAt        DateTime? @map("frozen_at")

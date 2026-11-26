@@ -108,7 +108,8 @@ const TEMPLATES: {
   price: number;
 }[] = [
   // Az eredeti seed sablonjai (szolgáltatáshoz nem kötöttek).
-  { name: '1 Alkalmas Napijegy', serviceName: null, type: PassType.OCCASION_BASED, totalPasses: 1, durationDays: 7, price: 6500 },
+  // Napijegy (TICKET-7): a vásárlás napján zárásig érvényes; a `durationDays` nem számít.
+  { name: '1 Alkalmas Napijegy', serviceName: null, type: PassType.DAY_TICKET, totalPasses: 1, durationDays: 1, price: 6500 },
   { name: '5 Alkalmas Reformer Bérlet', serviceName: null, type: PassType.OCCASION_BASED, totalPasses: 5, durationDays: 35, price: 29000 },
   { name: '10 Alkalmas Reformer Bérlet', serviceName: null, type: PassType.OCCASION_BASED, totalPasses: 10, durationDays: 60, price: 54000 },
   { name: 'Havi Korlátlan Reformer Bérlet', serviceName: null, type: PassType.TIME_BASED, totalPasses: null, durationDays: 30, price: 69000 },
