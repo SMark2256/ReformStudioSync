@@ -32,6 +32,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { FinanceService } from '../finance/finance.service';
 import { EmailAutomationsService } from '../mailing/email-automations.service';
 import { MESSAGE_INCLUDE, toMessageLogDto } from '../mailing/mail-outbox.service';
+import { PASS_DEBT_INCLUDE, passDebtFields } from '../passes/pass-debt';
 import {
   CreateGuestDocumentDto,
   CreateGuestDto,
@@ -71,6 +72,7 @@ export class GuestsService {
             include: { service: true, employee: true },
             orderBy: { usedAt: 'desc' as const },
           },
+          ...PASS_DEBT_INCLUDE,
         },
         orderBy: { expirationDate: 'asc' as const },
       },
@@ -624,6 +626,8 @@ export class GuestsService {
         ),
         createdAt: p.createdAt.toISOString(),
         usageLogs,
+        // Hátralék (TICKET-14): a szerver számolja, a felület csak megjeleníti.
+        ...passDebtFields(p),
       };
     });
 

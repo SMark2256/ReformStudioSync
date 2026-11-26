@@ -26,6 +26,7 @@ describe('PassesService & FinanceService — Kritikus Bérlet, Kezeléslevonás,
       },
       guestPass: {
         findFirst: vi.fn(),
+        findUnique: vi.fn().mockResolvedValue(null),
         create: vi.fn(),
         update: vi.fn(),
         updateMany: vi.fn().mockResolvedValue({ count: 1 }),

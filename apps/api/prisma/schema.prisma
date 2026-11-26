@@ -302,6 +302,10 @@ model GuestPass {
   frozenAt        DateTime? @map("frozen_at")
   /// A bérlet eladásának sztornója (az eladási befizetés sztornózásakor) — ettől kezdve nem használható.
   cancelledAt     DateTime? @map("cancelled_at")
+  /// Eladáskori ár (Ft, TICKET-14); a hátralék ehhez képest számolódik. `null`: ismeretlen.
+  priceHuf        Int?      @map("price_huf")
+  /// A hátralék keletkezése; kiegyenlítéskor `null`. A TICKET-15 türelmi ideje erre épül.
+  debtSince       DateTime? @map("debt_since")
   createdAt       DateTime  @default(now()) @map("created_at")
 
   guest        Guest               @relation(fields: [guestId], references: [id], onDelete: Cascade)

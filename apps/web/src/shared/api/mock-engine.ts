@@ -6,6 +6,7 @@ import {
   AuthUserDto,
   type BookingRuleSettings,
   canDeleteMeasurement,
+  computePassDebt,
   computeRemainingPasses,
   countActiveDeductions,
   DAY_TICKET_DURATION_DAYS,
@@ -16,6 +17,7 @@ import {
   type HolidayOverrideInput,
   isOccasionPassType,
   isPassOpen,
+  nextPassDebtSince,
   passCoversService,
   passDeductionError,
   CheckInResultPayload,
@@ -83,6 +85,7 @@ import {
   ServiceDto,
   StoredTourState,
   stopsBilling,
+  summarizePassDebts,
   TodayDashboardDto,
   TOUR_ID_PATTERN,
   TOUR_STEP_MAX,
@@ -132,6 +135,50 @@ function syncPassState(pass: GuestPassDto, now = new Date()): GuestPassDto {
   pass.isActive = isPassOpen(pass, remaining);
   pass.status = getPassStatus(pass, now);
   return pass;
+}
+
+/** A bérlethez rendelt befizetések (allokációk) a hátralékhoz, a sztornó jelzésével. */
+function passAllocations(passId: string, payments: readonly PaymentDto[]) {
+  return payments.flatMap((p) =>
+    (p.allocations ?? [])
+      .filter((a) => a.passId === passId)
+      .map((a) => ({ amountHuf: a.amountHuf, isCancelled: p.isCancelled })),
+  );
+}
+
+/**
+ * Bérlet-hátralék (TICKET-14), ugyanazzal a szabállyal, mint az API-n (`computePassDebt`):
+ * a számolt mezők és a keletkezés időpontja (`nextPassDebtSince`) a tárolt befizetésekből.
+ */
+function syncPassDebt(
+  pass: GuestPassDto,
+  payments: readonly PaymentDto[],
+  now = new Date(),
+): GuestPassDto {
+  const debt = computePassDebt(pass, passAllocations(pass.id, payments));
+  pass.priceHuf = debt.priceHuf;
+  pass.paidHuf = debt.paidHuf;
+  pass.debtHuf = debt.debtHuf;
+  pass.debtStatus = debt.status;
+  pass.debtSince = nextPassDebtSince(pass.debtSince, debt, now.toISOString());
+  return pass;
+}
+
+/**
+ * A TICKET-14 előtti bérlet eladáskori ára, mint a migráció backfillje: az első (eladási)
+ * befizetés összege. A minta bérletek eladása nincs részletezve, ezek kifizetettnek számítanak.
+ */
+function legacyPassPriceHuf(
+  pass: GuestPassDto,
+  payments: readonly PaymentDto[],
+): number {
+  const sale = payments
+    .filter((p) => p.guestPassId === pass.id)
+    .sort(
+      (a, b) =>
+        a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id),
+    )[0];
+  return sale ? Math.round(sale.amount) : 0;
 }
 
 /** Levonás visszavonása és jóváírás — pontosan egyszer (az API `reverseDeduction` párja). */
@@ -1175,6 +1222,8 @@ export function createInitialMockDatabase(): MockDatabaseState {
       logs.sort((a, b) => new Date(b.usedAt).getTime() - new Date(a.usedAt).getTime());
       p.usageLogs = logs;
       syncPassState(p, now);
+      p.priceHuf ??= legacyPassPriceHuf(p, payments);
+      syncPassDebt(p, payments, now);
     }
   }
 
@@ -1355,9 +1404,16 @@ class MockStudioEngine {
         }
       }
       // A bérletállapot időfüggő (lejárat, kezdés), ezért olvasáskor is frissül.
+      // A TICKET-14 előtti tárolt bérlet az eladási befizetésből kap árat (mint a migrációban).
       const now = new Date();
       for (const g of parsed.guests) {
-        for (const p of g.passes ?? []) syncPassState(p, now);
+        for (const p of g.passes ?? []) {
+          syncPassState(p, now);
+          if (p.priceHuf === undefined) {
+            p.priceHuf = legacyPassPriceHuf(p, parsed.payments);
+          }
+          syncPassDebt(p, parsed.payments, now);
+        }
         syncGuestArrivals(parsed, g);
       }
       return parsed;
@@ -1371,7 +1427,10 @@ class MockStudioEngine {
     // Szinkronban tartjuk a vendégek treatmentHistory és payments tömbjeit
     const now = new Date();
     for (const g of state.guests) {
-      for (const p of g.passes ?? []) syncPassState(p, now);
+      for (const p of g.passes ?? []) {
+        syncPassState(p, now);
+        syncPassDebt(p, state.payments, now);
+      }
       g.treatmentHistory = (g.passes ?? [])
         .flatMap((p) =>
           (p.usageLogs ?? []).map((u) => ({
@@ -1683,6 +1742,8 @@ class MockStudioEngine {
     passTemplateId: string;
     paymentMethod: PaymentMethod;
     customAmount?: number;
+    /** Részletfizetés (TICKET-14): most fizetett összeg; hiányában a teljes ár. */
+    paidAmount?: number;
     note?: string;
   }) {
     const state = this.load();
@@ -1718,6 +1779,13 @@ class MockStudioEngine {
       new Date(now.getTime() + template.durationDays * 24 * 60 * 60 * 1000);
     const amount =
       input.customAmount !== undefined ? input.customAmount : template.price;
+    const priceHuf = Math.round(amount);
+    // Részletfizetés (TICKET-14): a maradék a bérlet hátraléka (mint az API-n).
+    const paidAmount = input.paidAmount ?? amount;
+    if (Math.round(paidAmount) > priceHuf) {
+      throw appError('PASS.PAID_EXCEEDS_PRICE');
+    }
+    const isInstallment = Math.round(paidAmount) < priceHuf;
     const passId = `pass-${Date.now()}`;
 
     const newPass: GuestPassDto = {
@@ -1740,6 +1808,7 @@ class MockStudioEngine {
       isFrozen: false,
       frozenAt: null,
       status: PassStatus.ACTIVE, // syncPassState számolja
+      priceHuf, // a hátralék többi mezőjét a syncPassDebt számolja
       createdAt: now.toISOString(),
       usageLogs: [
         {
@@ -1771,10 +1840,12 @@ class MockStudioEngine {
       passName: template.name,
       recordedByUserId: 'staff-default-1',
       recordedByName: 'Recepciós Munkatárs',
-      amount,
+      amount: paidAmount,
       paymentMethod: input.paymentMethod,
       isCancelled: false,
-      note: input.note?.trim() || `${template.name} értékesítés`,
+      note:
+        input.note?.trim() ||
+        `${template.name} értékesítés${isInstallment ? ' [Részletfizetés]' : ''}`,
       createdAt: now.toISOString(),
       allocations: [
         {
@@ -1783,7 +1854,7 @@ class MockStudioEngine {
           membershipDueId: null,
           passId: newPass.id,
           passName: template.name,
-          amountHuf: amount,
+          amountHuf: Math.round(paidAmount),
         },
       ],
     };
@@ -1794,7 +1865,7 @@ class MockStudioEngine {
     return {
       pass: newPass,
       paymentId: payment.id,
-      amount,
+      amount: paidAmount,
     };
   }
 
@@ -2262,9 +2333,19 @@ class MockStudioEngine {
     ) {
       warnings.push('GENDER_MISSING');
     }
+    // Bérlet-hátralék (TICKET-14): csak jelzés, a beléptetést nem tiltja (mint az API-n).
+    const passDebt = summarizePassDebts(
+      passes.map((p) => ({
+        debt: computePassDebt(p, passAllocations(p.id, state.payments)),
+        debtSince: p.debtSince,
+      })),
+    );
     const overdue = {
       overdueAmountHuf: overdueAmountHuf > 0 ? overdueAmountHuf : undefined,
       overdueDays: maxOverdueDays > 0 ? maxOverdueDays : undefined,
+      passDebtHuf: passDebt.debtHuf > 0 ? passDebt.debtHuf : undefined,
+      passDebtSince: passDebt.since ?? undefined,
+      passDebtUnknown: passDebt.hasUnknown || undefined,
     };
 
     // Köredzéses érkezés (aktív havi tagság vagy köredzésre érvényes időalapú bérlet) -> NINCS alkalomlevonás!
@@ -2547,9 +2628,11 @@ class MockStudioEngine {
       }
     }
 
+    // Csak a vendég saját bérletéhez (a hátralékát csökkenti), mint az API-n.
     if (input.passId) {
       const p = (guest.passes ?? []).find((x) => x.id === input.passId);
-      passName = p?.passTemplateName ?? 'Bérlet';
+      if (!p) throw appError('PASS.NOT_FOUND');
+      passName = p.passTemplateName ?? 'Bérlet';
     }
 
     const payId = `pay-${Date.now()}`;

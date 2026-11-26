@@ -17,6 +17,7 @@ import {
   PassType,
   resolveArrivalEntitlement,
   ServiceCategory,
+  summarizePassDebts,
   VisitType,
   womenOnlyAccess,
 } from '@reform/shared';
@@ -28,6 +29,7 @@ import {
   reverseDeduction,
   voidArrival,
 } from '../passes/pass-ledger';
+import { PASS_DEBT_INCLUDE, passDebtOf } from '../passes/pass-debt';
 import { ScanCheckInDto, SyncOfflineScansDto } from './check-ins.dto';
 
 interface GreetingServiceRow {
@@ -157,7 +159,7 @@ export class CheckInsService {
         },
         include: {
           passes: {
-            include: { passTemplate: true, service: true },
+            include: { passTemplate: true, service: true, ...PASS_DEBT_INCLUDE },
             orderBy: { expirationDate: 'asc' },
           },
           memberships: {
@@ -287,9 +289,16 @@ export class CheckInsService {
       ) {
         warnings.push('GENDER_MISSING');
       }
+      // Bérlet-hátralék (TICKET-14): csak jelzés a recepciónak, a beléptetést nem tiltja (az a TICKET-15).
+      const passDebt = summarizePassDebts(
+        guest.passes.map((p) => ({ debt: passDebtOf(p), debtSince: p.debtSince })),
+      );
       const overdue = {
         overdueAmountHuf: overdueAmountHuf > 0 ? overdueAmountHuf : undefined,
         overdueDays: maxOverdueDays > 0 ? maxOverdueDays : undefined,
+        passDebtHuf: passDebt.debtHuf > 0 ? passDebt.debtHuf : undefined,
+        passDebtSince: passDebt.since ?? undefined,
+        passDebtUnknown: passDebt.hasUnknown || undefined,
       };
 
       // Aktív havi tagság: köredzéses érkezés alkalomlevonás nélkül.

@@ -125,6 +125,21 @@ export const RELEASE_NOTES: ReleaseNote[] = [
     link: { type: 'route', path: '/passes', label: 'Bérletek megnyitása' },
   },
   {
+    id: 'v0.3-pass-debt',
+    version: '0.3',
+    date: '2026-11-26',
+    kind: 'NEW_FEATURE',
+    title: 'Bérlet-hátralék (részletfizetés)',
+    summary: 'A bérlet hátralékos része látszik a vendég adatlapján.',
+    details: [
+      'Bérleteladáskor „Részletfizetés” jelöléssel a vendég most csak egy részt fizet; a különbözet a bérlet hátraléka.',
+      'A vendég adatlapján a bérlet mellett látszik az ár, a befizetett összeg, a hátralék és az, hogy mióta áll fenn.',
+      'A bérlethez rögzített befizetés csökkenti, a teljes rendezés megszünteti a hátralékot; egy részlet sztornója visszaállítja.',
+      'Beolvasáskor a recepciós kártya a tagdíj-elmaradás mellett a bérlet-hátralékot is jelzi (csak a recepción látható).',
+    ],
+    jiraKey: 'TICKET-14',
+  },
+  {
     id: 'v0.3-beauty-basics',
     version: '0.3',
     date: '2026-11-21',

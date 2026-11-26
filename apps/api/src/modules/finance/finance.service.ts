@@ -27,6 +27,7 @@ import {
   womenOnlyAccess,
 } from '@reform/shared';
 import { PrismaService } from '../../prisma/prisma.service';
+import { refreshPassDebtSince } from '../passes/pass-debt';
 
 @Injectable()
 export class FinanceService {
@@ -203,6 +204,15 @@ export class FinanceService {
         }
       }
 
+      // Bérlethez rendelt befizetés csak a vendég saját bérletéhez mehet (a hátralékát csökkenti).
+      if (dto.passId) {
+        const pass = await tx.guestPass.findFirst({
+          where: { id: dto.passId, guestId: guest.id, studioId },
+          select: { id: true },
+        });
+        if (!pass) throw appError('PASS.NOT_FOUND');
+      }
+
       const payment = await tx.payment.create({
         data: {
           studioId,
@@ -229,6 +239,9 @@ export class FinanceService {
             amountHuf: Math.round(dto.amountHuf),
           },
         });
+      }
+      if (dto.passId) {
+        await refreshPassDebtSince(tx, dto.passId, new Date());
       }
 
       return {
@@ -315,6 +328,18 @@ export class FinanceService {
             note: `${isSalePayment ? 'Fizetés és bérlet sztornózva' : 'Részletfizetés sztornózva (a bérlet érvényes marad)'}${reason ? `: ${reason}` : ''}`,
           },
         });
+      }
+
+      // A sztornózott részlet már nem csökkenti a hátralékot (TICKET-14), a sztornózott eladásé
+      // megszűnik. Az allokáció bérlete is számít, ha eltér a befizetés `guestPassId`-jétől.
+      const debtPassIds = new Set(
+        (payment.allocations ?? [])
+          .map((a) => a.passId)
+          .filter((id): id is string => !!id),
+      );
+      if (payment.guestPassId) debtPassIds.add(payment.guestPassId);
+      for (const passId of debtPassIds) {
+        await refreshPassDebtSince(tx, passId, new Date());
       }
 
       // Ha havi tagdíjhoz volt rendelve, visszavonjuk a befizetett összeget az esedékességről

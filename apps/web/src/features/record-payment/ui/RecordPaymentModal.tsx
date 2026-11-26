@@ -1,6 +1,11 @@
-import { GuestDto, MembershipDueStatus, PaymentMethod } from '@reform/shared';
+import {
+  GuestDto,
+  GuestPassDto,
+  MembershipDueStatus,
+  PaymentMethod,
+} from '@reform/shared';
 import React, { useEffect, useId, useRef, useState } from 'react';
-import { GuestPicker } from '@/entities/guest';
+import { GuestPicker, getPassDebtView } from '@/entities/guest';
 import {
   Button,
   Dialog,
@@ -36,6 +41,14 @@ const fieldGroupClassName = 'flex flex-col gap-1.5';
 const isValidAmount = (amountHuf: number) =>
   Number.isInteger(amountHuf) && amountHuf >= 1;
 
+const DEFAULT_AMOUNT_HUF = 22000;
+
+/** Bérlet választásakor a szerver adta hátralék az előtöltött összeg (TICKET-14). */
+const passDefaultAmount = (pass: GuestPassDto | undefined) => {
+  const debt = pass && getPassDebtView(pass);
+  return debt?.kind === 'outstanding' ? debt.debtHuf : DEFAULT_AMOUNT_HUF;
+};
+
 interface RecordPaymentModalProps {
   isOpen: boolean;
   initialGuest: GuestDto | null;
@@ -67,7 +80,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
   const [targetType, setTargetType] = useState<TargetType>('DUE');
   const [selectedDueId, setSelectedDueId] = useState<string>('');
   const [selectedPassId, setSelectedPassId] = useState<string>('');
-  const [amountHuf, setAmountHuf] = useState<number>(22000);
+  const [amountHuf, setAmountHuf] = useState<number>(DEFAULT_AMOUNT_HUF);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(
     PaymentMethod.CASH,
   );
@@ -110,12 +123,17 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
       setSelectedDueId(chosenDue.id);
       setAmountHuf(chosenDue.remainingHuf);
     } else if ((selectedGuest.passes ?? []).length > 0) {
+      // A hátralékos bérlet kerül előre, ha van ilyen.
+      const passes = selectedGuest.passes!;
+      const pass =
+        passes.find((p) => getPassDebtView(p).kind === 'outstanding') ??
+        passes[0];
       setTargetType('PASS');
-      setSelectedPassId(selectedGuest.passes![0].id);
-      setAmountHuf(22000);
+      setSelectedPassId(pass.id);
+      setAmountHuf(passDefaultAmount(pass));
     } else {
       setTargetType('CUSTOM');
-      setAmountHuf(22000);
+      setAmountHuf(DEFAULT_AMOUNT_HUF);
     }
   }, [selectedGuestId, preselectedDueId]);
 
@@ -224,18 +242,31 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
                 <Label htmlFor={`${fieldId}-pass`}>Bérlet</Label>
                 <Select
                   value={selectedPassId}
-                  onValueChange={setSelectedPassId}
+                  onValueChange={(value) => {
+                    setSelectedPassId(value);
+                    setAmountHuf(
+                      passDefaultAmount(
+                        selectedGuest?.passes?.find((p) => p.id === value),
+                      ),
+                    );
+                  }}
                 >
                   <SelectTrigger id={`${fieldId}-pass`}>
                     <SelectValue placeholder="Válassz bérletet" />
                   </SelectTrigger>
                   <SelectContent>
-                    {(selectedGuest?.passes ?? []).map((p) => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.passTemplateName} (
-                        {new Date(p.createdAt).toLocaleDateString('hu-HU')})
-                      </SelectItem>
-                    ))}
+                    {(selectedGuest?.passes ?? []).map((p) => {
+                      const debt = getPassDebtView(p);
+                      return (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.passTemplateName} (
+                          {new Date(p.createdAt).toLocaleDateString('hu-HU')})
+                          {debt.kind === 'outstanding' &&
+                            `, hátralék: ${debt.debtHuf.toLocaleString('hu-HU')} Ft`}
+                          {debt.kind === 'unknown' && ', hátralék nem ismert'}
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
               </div>

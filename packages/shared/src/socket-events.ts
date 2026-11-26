@@ -90,6 +90,12 @@ export interface CheckInResultPayload {
   warnings: CheckInWarningCode[];
   overdueAmountHuf?: number;
   overdueDays?: number;
+  /** Bérlet-hátralék összesen (Ft), csak ha van (TICKET-14). Csak a recepción látható. */
+  passDebtHuf?: number;
+  /** A legkorábbi bérlet-hátralék keletkezése (ISO). */
+  passDebtSince?: string;
+  /** Legalább egy bérlet hátraléka ismeretlen; csak ha igaz. */
+  passDebtUnknown?: boolean;
   greetingSeconds?: number;
   suggestedRenewalTemplateId?: string | null;
   /** Sikeres belépésnél: a vendégnek ma (Europe/Budapest) van a születésnapja. */
