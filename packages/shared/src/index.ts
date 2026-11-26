@@ -12,6 +12,7 @@ export * from './guest-arrivals';
 export * from './measurements';
 export * from './tours';
 export * from './booking-rules';
+export * from './day-ticket';
 export * from './booking-contracts';
 export * from './intake';
 export * from './intake-forms';

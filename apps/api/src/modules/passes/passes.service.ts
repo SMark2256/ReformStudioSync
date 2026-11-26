@@ -7,6 +7,9 @@ import {
   CheckInWarningCode,
   computeRemainingPasses,
   countActiveDeductions,
+  DAY_TICKET_DURATION_DAYS,
+  DAY_TICKET_TOTAL_PASSES,
+  dayTicketValidUntil,
   DEFAULT_STUDIO_ID,
   EXPIRING_SOON_THRESHOLD_DAYS,
   frozenDaysBetween,
@@ -23,9 +26,11 @@ import {
   PassUsageLogDto,
   ServiceCategory,
   ServiceDto,
+  toStudioDayKey,
   womenOnlyAccess,
 } from '@reform/shared';
 import { PrismaService } from '../../prisma/prisma.service';
+import { loadBookingSettings, type Tx } from '../bookings/booking-engine';
 import { MonitorGateway } from '../monitor/monitor.gateway';
 import {
   logCorrection,
@@ -141,6 +146,8 @@ export class PassesService {
     if (dto.type === PassType.OCCASION_BASED && !dto.totalPasses) {
       throw appError('PASS.TEMPLATE_TOTAL_REQUIRED');
     }
+    // Napijegy: mindig egy alkalom, az érvényességet eladáskor a zárás adja (TICKET-7).
+    const isDayTicket = dto.type === PassType.DAY_TICKET;
 
     const created = await this.prisma.passTemplate.create({
       data: {
@@ -148,9 +155,12 @@ export class PassesService {
         serviceId: dto.serviceId || null,
         name: dto.name.trim(),
         type: dto.type,
-        totalPasses:
-          dto.type === PassType.OCCASION_BASED ? (dto.totalPasses ?? 1) : null,
-        durationDays: dto.durationDays,
+        totalPasses: isDayTicket
+          ? DAY_TICKET_TOTAL_PASSES
+          : dto.type === PassType.OCCASION_BASED
+            ? (dto.totalPasses ?? 1)
+            : null,
+        durationDays: isDayTicket ? DAY_TICKET_DURATION_DAYS : dto.durationDays,
         price: dto.price,
       },
       include: { service: true },
@@ -189,7 +199,8 @@ export class PassesService {
       data: {
         ...(dto.name !== undefined ? { name: dto.name.trim() } : {}),
         ...(dto.price !== undefined ? { price: dto.price } : {}),
-        ...(dto.durationDays !== undefined
+        ...(dto.durationDays !== undefined &&
+        existing.type !== 'DAY_TICKET'
           ? { durationDays: dto.durationDays }
           : {}),
         ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),
@@ -244,10 +255,18 @@ export class PassesService {
         throw appError('PASS.WOMEN_ONLY');
       }
 
-      const startDate = dto.startDate ? new Date(dto.startDate) : new Date();
-      const expirationDate = new Date(
+      // Napijegy: a vásárlás napján zárásig érvényes; a lejáratot most számoljuk és tároljuk, így a
+      // nyitvatartás későbbi módosítása nem hat rá. Egyedi kezdődátum napijegynél nincs.
+      let startDate = dto.startDate ? new Date(dto.startDate) : new Date();
+      let expirationDate = new Date(
         startDate.getTime() + template.durationDays * 24 * 60 * 60 * 1000,
       );
+      let validUntil: Date | null = null;
+      if (template.type === 'DAY_TICKET') {
+        startDate = new Date();
+        validUntil = await this.dayTicketExpiry(tx, studioId, startDate);
+        expirationDate = validUntil;
+      }
       const amount =
         dto.customAmount !== undefined
           ? dto.customAmount
@@ -264,6 +283,7 @@ export class PassesService {
           remainingPasses: template.totalPasses,
           startDate,
           expirationDate,
+          validUntil,
           isActive: true,
           isFrozen: false,
         },
@@ -451,6 +471,7 @@ export class PassesService {
 
       const warnings: CheckInWarningCode[] = [];
       if (womenOnly === 'GENDER_MISSING') warnings.push('GENDER_MISSING');
+      // A napijegy egyetlen alkalmának felhasználása és aznapi lejárata várt, nem kell rá figyelmeztetés.
       if (pass.type === 'OCCASION_BASED' && typeof newRemaining === 'number') {
         if (newRemaining === 0) {
           warnings.push('DEPLETED_PASS');
@@ -465,7 +486,7 @@ export class PassesService {
       const daysLeft = Math.ceil(
         (pass.expirationDate.getTime() - now.getTime()) / (24 * 60 * 60 * 1000),
       );
-      if (daysLeft <= EXPIRING_SOON_THRESHOLD_DAYS) {
+      if (pass.type !== 'DAY_TICKET' && daysLeft <= EXPIRING_SOON_THRESHOLD_DAYS) {
         warnings.push('EXPIRING_SOON');
       }
 
@@ -575,6 +596,9 @@ export class PassesService {
       if (!pass) {
         throw appError('PASS.NOT_FOUND');
       }
+      if (pass.type === 'DAY_TICKET') {
+        throw appError('PASS.DAY_TICKET_FIXED');
+      }
 
       const baseDate =
         pass.expirationDate.getTime() > Date.now()
@@ -627,6 +651,9 @@ export class PassesService {
       const now = new Date();
 
       if (!pass.isFrozen) {
+        if (pass.type === 'DAY_TICKET') {
+          throw appError('PASS.DAY_TICKET_FIXED');
+        }
         // Csak érvényes bérlet fagyasztható; a feloldás mindig mehet.
         const status = getPassStatus(
           {
@@ -693,6 +720,24 @@ export class PassesService {
     });
   }
 
+  /**
+   * A napijegy lejárata: a vásárlás napjának zárása a foglalási modul nyitvatartásából (heti
+   * nyitvatartás és az aznapi munkaszüneti/zárási felülírás), zárt napon a nap vége (TICKET-7).
+   */
+  private async dayTicketExpiry(
+    tx: Tx,
+    studioId: string,
+    soldAt: Date,
+  ): Promise<Date> {
+    const [settings, overrides] = await Promise.all([
+      loadBookingSettings(tx, studioId),
+      tx.bookingHolidayOverride.findMany({
+        where: { studioId, dayKey: toStudioDayKey(soldAt) },
+      }),
+    ]);
+    return dayTicketValidUntil(soldAt, settings, overrides);
+  }
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private mapPass(p: any): GuestPassDto {
     const usageLogs: PassUsageLogDto[] = (p.usageLogs ?? []).map(
@@ -734,6 +779,7 @@ export class PassesService {
       usedPassesCount: countActiveDeductions(usageLogs),
       startDate: p.startDate.toISOString(),
       expirationDate: p.expirationDate.toISOString(),
+      validUntil: p.validUntil ? p.validUntil.toISOString() : null,
       isActive: p.isActive,
       isFrozen: p.isFrozen,
       frozenAt: p.frozenAt ? p.frozenAt.toISOString() : null,

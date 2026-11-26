@@ -118,6 +118,8 @@ export interface GuestPassDto {
   usedPassesCount?: number;
   startDate: string;
   expirationDate: string;
+  /** Percre pontos lejárat (napijegy: a vásárlás napjának zárása, TICKET-7); a szerver számolja. */
+  validUntil?: string | null;
   isActive: boolean;
   isFrozen: boolean;
   frozenAt: string | null;

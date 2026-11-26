@@ -6,6 +6,8 @@ export enum Role {
 export enum PassType {
   OCCASION_BASED = 'OCCASION_BASED',
   TIME_BASED = 'TIME_BASED',
+  /** Napijegy (TICKET-7): egy alkalom, a vásárlás napján zárásig érvényes (`GuestPassDto.validUntil`). */
+  DAY_TICKET = 'DAY_TICKET',
 }
 
 /** Számolt bérletállapot (`getPassStatus`), ezt mutatja a felület az `isActive` jelző helyett. */

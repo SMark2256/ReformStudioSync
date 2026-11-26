@@ -295,6 +295,7 @@ export class PublicBookingService {
         remainingPasses: p.remainingPasses ?? null,
         totalPasses: p.row.totalPasses,
         expirationDate: p.row.expirationDate.toISOString(),
+        validUntil: p.row.validUntil?.toISOString() ?? null,
         status: getPassStatus(p, now),
       }));
     return {

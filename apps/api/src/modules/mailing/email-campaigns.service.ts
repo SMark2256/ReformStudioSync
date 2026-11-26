@@ -63,6 +63,7 @@ export class EmailCampaignsService {
             totalPasses: true,
             startDate: true,
             expirationDate: true,
+            validUntil: true,
             isFrozen: true,
             cancelledAt: true,
             serviceId: true,

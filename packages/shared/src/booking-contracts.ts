@@ -395,6 +395,8 @@ export interface GuestPassSummaryDto {
   remainingPasses: number | null;
   totalPasses: number | null;
   expirationDate: string;
+  /** Percre pontos lejárat (napijegy, TICKET-7). */
+  validUntil?: string | null;
   status: PassStatus;
 }
 

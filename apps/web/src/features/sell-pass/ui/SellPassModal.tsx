@@ -190,10 +190,13 @@ export const SellPassModal: React.FC<SellPassModalProps> = ({
                       </span>
                     )}
                     <span className="text-xs font-normal text-muted-foreground">
-                      {tpl.type === PassType.TIME_BASED
-                        ? 'Korlátlan belépés'
-                        : `${tpl.totalPasses} alkalom`}
-                      , {tpl.durationDays} napig érvényes
+                      {tpl.type === PassType.DAY_TICKET
+                        ? 'Napijegy: 1 alkalom, a vásárlás napján zárásig érvényes'
+                        : `${
+                            tpl.type === PassType.TIME_BASED
+                              ? 'Korlátlan belépés'
+                              : `${tpl.totalPasses} alkalom`
+                          }, ${tpl.durationDays} napig érvényes`}
                     </span>
                     <span className="text-[13px] font-semibold tabular-nums text-foreground">
                       {tpl.price.toLocaleString('hu-HU')} Ft

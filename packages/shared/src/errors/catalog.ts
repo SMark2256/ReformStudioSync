@@ -65,6 +65,7 @@ export const APP_ERROR_CATALOG = {
   'PASS.USAGE_NOT_FOUND': { status: 404, message: 'A kezelési levonás nem található.', action: 'notify' },
   'PASS.USAGE_ALREADY_REVERSED': { status: 400, message: 'Ez a levonás már korábban vissza lett vonva.', action: 'notify' },
   'PASS.USAGE_NOT_REVERSIBLE': { status: 400, message: 'Csak alkalomlevonási tétel vonható vissza.', action: 'notify' },
+  'PASS.DAY_TICKET_FIXED': { status: 409, message: 'A napijegy a vásárlás napján zárásig érvényes: nem fagyasztható és nem hosszabbítható.', action: 'notify' },
   'PASS.WOMEN_ONLY': { status: 400, message: 'Ez a bérlet vagy tagság csak nőknek szól, férfi vendégnek nem adható el.', action: 'notify' },
 
   // Beléptetés

@@ -23,7 +23,7 @@ import {
 } from '@/shared/ui';
 import { formatHuf } from '../desk/format';
 import { FormField, RequiredFieldNote } from './FormField';
-import { PASS_TYPE_LABELS } from './labels';
+import { DAY_TICKET_FORM_HINT, PASS_TYPE_LABELS } from './labels';
 
 interface PassTemplateDialogProps {
   open: boolean;
@@ -63,6 +63,7 @@ const PassTemplateForm: React.FC<{
   const [passes, setPasses] = useState<number>(10);
   const [days, setDays] = useState<number>(60);
   const [price, setPrice] = useState<number>(54000);
+  const isDayTicket = type === PassType.DAY_TICKET;
 
   const createTemplateMutation = useMutation({
     mutationFn: api.createPassTemplate,
@@ -86,7 +87,8 @@ const PassTemplateForm: React.FC<{
           name,
           type,
           totalPasses: type === PassType.OCCASION_BASED ? passes : null,
-          durationDays: days,
+          // Napijegynél az érvényességet a szerver adja (zárásig); a mező kötelező, 1 nap.
+          durationDays: isDayTicket ? 1 : days,
           price,
         });
       }}
@@ -145,18 +147,24 @@ const PassTemplateForm: React.FC<{
             )}
           </FormField>
         )}
-        <FormField label="Érvényesség (nap)">
-          {(id) => (
-            <Input
-              id={id}
-              type="number"
-              min={1}
-              value={days}
-              onChange={(e) => setDays(Number(e.target.value))}
-              className="tabular-nums"
-            />
-          )}
-        </FormField>
+        {isDayTicket ? (
+          <p className="text-sm text-muted-foreground sm:col-span-2">
+            {DAY_TICKET_FORM_HINT}
+          </p>
+        ) : (
+          <FormField label="Érvényesség (nap)">
+            {(id) => (
+              <Input
+                id={id}
+                type="number"
+                min={1}
+                value={days}
+                onChange={(e) => setDays(Number(e.target.value))}
+                className="tabular-nums"
+              />
+            )}
+          </FormField>
+        )}
         <FormField label="Ár (Ft)">
           {(id) => (
             <Input

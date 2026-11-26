@@ -444,6 +444,7 @@ class MockBookingEngine {
       remainingPasses: p.calculatedRemainingPasses ?? p.remainingPasses,
       startDate: p.startDate,
       expirationDate: p.expirationDate,
+      validUntil: p.validUntil ?? null,
       isFrozen: p.isFrozen,
       cancelledAt: p.cancelledAt ?? null,
       serviceId: p.serviceId ?? null,
@@ -870,6 +871,12 @@ class MockBookingEngine {
     };
   }
 
+  /** A napijegy lejáratához (TICKET-7): a heti nyitvatartás és a munkaszüneti felülírások. */
+  studioHours(): [Pick<BookingSettingsDto, 'openingHours'>, HolidayOverrideDto[]] {
+    const state = this.load();
+    return [state.settings, state.holidayOverrides];
+  }
+
   updateSettings(patch: Partial<BookingSettingsDto>): BookingSettingsDto {
     const state = this.load();
     state.settings = {
@@ -1216,6 +1223,7 @@ class MockBookingEngine {
           remainingPasses: p.calculatedRemainingPasses ?? p.remainingPasses,
           totalPasses: p.totalPasses,
           expirationDate: p.expirationDate,
+          validUntil: p.validUntil ?? null,
           status: p.status,
         })),
       bookings: state.bookings
@@ -1357,3 +1365,6 @@ class MockBookingEngine {
 }
 
 export const mockBookingEngine = new MockBookingEngine();
+
+// A napijegy lejárata a foglalási nyitvatartásból jön (TICKET-7), mint az API-n.
+mockStudioEngine.setStudioHoursSource(() => mockBookingEngine.studioHours());

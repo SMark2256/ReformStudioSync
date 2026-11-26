@@ -1,6 +1,7 @@
 export { DigitalPassCardModal } from './ui/DigitalPassCardModal';
 export { GuestPicker } from './ui/GuestPicker';
 export {
+  formatPassExpiry,
   formatRemainingPasses,
   formatShortDate,
   getGuestPassSummary,

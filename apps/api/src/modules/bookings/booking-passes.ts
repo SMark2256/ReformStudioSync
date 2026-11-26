@@ -72,6 +72,7 @@ export async function loadGuestPasses(tx: Tx, guestId: string): Promise<LoadedGu
       ),
       startDate: p.startDate,
       expirationDate: p.expirationDate,
+      validUntil: p.validUntil,
       isFrozen: p.isFrozen,
       cancelledAt: p.cancelledAt,
       serviceId,

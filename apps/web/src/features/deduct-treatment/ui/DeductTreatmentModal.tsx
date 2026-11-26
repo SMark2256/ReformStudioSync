@@ -1,6 +1,7 @@
 import {
   greetingFor,
   GuestDto,
+  isOccasionPassType,
   passCoversService,
   PassStatus,
   PassType,
@@ -8,7 +9,7 @@ import {
   womenOnlyAccess,
 } from '@reform/shared';
 import React, { useEffect, useId, useState } from 'react';
-import { GuestPicker } from '@/entities/guest';
+import { formatPassExpiry, GuestPicker } from '@/entities/guest';
 import {
   Alert,
   AlertDescription,
@@ -157,7 +158,7 @@ export const DeductTreatmentModal: React.FC<DeductTreatmentModalProps> = ({
   const passError = showErrors && !!selectedGuest && !selectedPass;
 
   const remainingAfterDeduction =
-    selectedPass?.type === PassType.OCCASION_BASED
+    selectedPass && isOccasionPassType(selectedPass.type)
       ? Math.max(0, (selectedPass.remainingPasses ?? 1) - 1)
       : 'Korlátlan';
 
@@ -314,11 +315,7 @@ export const DeductTreatmentModal: React.FC<DeductTreatmentModalProps> = ({
                             )}
                           </span>
                           <span className="text-xs font-normal text-muted-foreground">
-                            Érvényes:{' '}
-                            {new Date(p.expirationDate).toLocaleDateString(
-                              'hu-HU',
-                            )}
-                            , eddig felhasznált: {p.usedPassesCount ?? 0} alk.
+                            Érvényes: {formatPassExpiry(p)}, eddig felhasznált: {p.usedPassesCount ?? 0} alk.
                           </span>
                         </span>
                         <span className="flex flex-col items-end">

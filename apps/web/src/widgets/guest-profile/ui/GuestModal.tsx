@@ -9,6 +9,7 @@ import {
   isPassFreezable,
   MembershipDueStatus,
   MembershipStatus,
+  PassType,
   PaymentMethod,
   pickCircuitMembershipService,
   ServiceDto,
@@ -29,6 +30,7 @@ import {
 import React, { useEffect, useId, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
+  formatPassExpiry,
   formatRemainingPasses,
   MEMBERSHIP_STATUS_LABEL,
   PASS_STATUS_BADGE,
@@ -1274,6 +1276,8 @@ export const GuestModal: React.FC<GuestModalProps> = ({
             {(guest.passes ?? []).map((pass) => {
               const badge = PASS_STATUS_BADGE[pass.status];
               const passName = pass.passTemplateName ?? 'Bérlet';
+              // A napijegy a vásárlás napján zárásig érvényes: nem hosszabbítható, nem fagyasztható (TICKET-7).
+              const isDayTicket = pass.type === PassType.DAY_TICKET;
               return (
                 <div
                   key={pass.id}
@@ -1293,32 +1297,34 @@ export const GuestModal: React.FC<GuestModalProps> = ({
                       </span>{' '}
                       (felhasznált: {pass.usedPassesCount ?? 0}) · Lejárat:{' '}
                       <span className="font-medium text-foreground">
-                        {formatDate(pass.expirationDate)}
+                        {formatPassExpiry(pass)}
                       </span>
                     </p>
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2">
-                    {[7, 14, 30].map((days) => (
-                      <Button
-                        key={days}
-                        variant="secondary"
-                        size="sm"
-                        aria-label={`${passName} hosszabbítása ${days} nappal`}
-                        onClick={() =>
-                          onExtendPass?.(
-                            pass.id,
-                            days,
-                            extendReason || 'Admin hosszabbítás',
-                          )
-                        }
-                      >
-                        <CalendarPlus aria-hidden strokeWidth={1.75} />+{days}{' '}
-                        nap
-                      </Button>
-                    ))}
+                    {!isDayTicket &&
+                      [7, 14, 30].map((days) => (
+                        <Button
+                          key={days}
+                          variant="secondary"
+                          size="sm"
+                          aria-label={`${passName} hosszabbítása ${days} nappal`}
+                          onClick={() =>
+                            onExtendPass?.(
+                              pass.id,
+                              days,
+                              extendReason || 'Admin hosszabbítás',
+                            )
+                          }
+                        >
+                          <CalendarPlus aria-hidden strokeWidth={1.75} />+{days}{' '}
+                          nap
+                        </Button>
+                      ))}
                     {/* Fagyasztani csak érvényes bérletet lehet; a feloldás mindig elérhető. */}
-                    {(pass.isFrozen || isPassFreezable(pass.status)) && (
+                    {(pass.isFrozen ||
+                      (!isDayTicket && isPassFreezable(pass.status))) && (
                       <Button
                         variant="secondary"
                         size="sm"
