@@ -5,6 +5,7 @@ import {
   CheckInRevokedPayload,
   CheckInStatus,
   CheckInWarningCode,
+  computePassDebt,
   computeRemainingPasses,
   countActiveDeductions,
   DEFAULT_STUDIO_ID,
@@ -15,6 +16,7 @@ import {
   getPassStatus,
   isPassFreezable,
   isPassOpen,
+  nextPassDebtSince,
   passCoversService,
   passDeductionError,
   GuestPassDto,
@@ -34,6 +36,7 @@ import {
   reverseDeduction,
   voidArrival,
 } from './pass-ledger';
+import { PASS_DEBT_INCLUDE, passDebtFields } from './pass-debt';
 import {
   CreatePassTemplateDto,
   CreateServiceDto,
@@ -252,6 +255,16 @@ export class PassesService {
         dto.customAmount !== undefined
           ? dto.customAmount
           : Number(template.price);
+      const priceHuf = Math.round(amount);
+      // Részletfizetés (TICKET-14): a most fizetett rész; a maradék a bérlet hátraléka.
+      const paidAmount = dto.paidAmount ?? amount;
+      if (Math.round(paidAmount) > priceHuf) {
+        throw appError('PASS.PAID_EXCEEDS_PRICE');
+      }
+      const now = new Date();
+      const debt = computePassDebt({ priceHuf }, [
+        { amountHuf: Math.round(paidAmount), isCancelled: false },
+      ]);
 
       const guestPass = await tx.guestPass.create({
         data: {
@@ -266,6 +279,8 @@ export class PassesService {
           expirationDate,
           isActive: true,
           isFrozen: false,
+          priceHuf,
+          debtSince: nextPassDebtSince(null, debt, now),
         },
         include: {
           passTemplate: true,
@@ -290,24 +305,30 @@ export class PassesService {
           guestId: guest.id,
           guestPassId: guestPass.id,
           recordedByUserId: staffUserId,
-          amount,
+          amount: paidAmount,
           paymentMethod: dto.paymentMethod,
-          note: dto.note?.trim() || `${template.name} értékesítés`,
+          note:
+            dto.note?.trim() ||
+            `${template.name} értékesítés${debt.status === 'OUTSTANDING' ? ' [Részletfizetés]' : ''}`,
         },
       });
 
-      await tx.paymentAllocation
-        .create({
-          data: {
-            paymentId: payment.id,
-            passId: guestPass.id,
-            amountHuf: Math.round(amount),
-          },
-        })
-        .catch(() => null);
+      // A hátralék a hozzárendelésekből számolódik, ezért ez nem maradhat el (TICKET-14).
+      await tx.paymentAllocation.create({
+        data: {
+          paymentId: payment.id,
+          passId: guestPass.id,
+          amountHuf: Math.round(paidAmount),
+        },
+      });
 
       return {
-        pass: this.mapPass(guestPass),
+        pass: this.mapPass({
+          ...guestPass,
+          allocations: [
+            { amountHuf: Math.round(paidAmount), payment: { isCancelled: false } },
+          ],
+        }),
         paymentId: payment.id,
         amount: Number(payment.amount),
       };
@@ -592,7 +613,7 @@ export class PassesService {
           expirationDate: newExpiration,
           isActive: shouldActivate,
         },
-        include: { passTemplate: true, usageLogs: true },
+        include: { passTemplate: true, usageLogs: true, ...PASS_DEBT_INCLUDE },
       });
 
       await tx.passUsageLog.create({
@@ -617,7 +638,7 @@ export class PassesService {
     return this.prisma.$transaction(async (tx) => {
       const pass = await tx.guestPass.findFirst({
         where: { id: passId, studioId },
-        include: { passTemplate: true, usageLogs: true },
+        include: { passTemplate: true, usageLogs: true, ...PASS_DEBT_INCLUDE },
       });
 
       if (!pass) {
@@ -648,7 +669,7 @@ export class PassesService {
             isFrozen: true,
             frozenAt: now,
           },
-          include: { passTemplate: true, usageLogs: true },
+          include: { passTemplate: true, usageLogs: true, ...PASS_DEBT_INCLUDE },
         });
 
         await tx.passUsageLog.create({
@@ -675,7 +696,7 @@ export class PassesService {
             frozenAt: null,
             expirationDate: newExpiration,
           },
-          include: { passTemplate: true, usageLogs: true },
+          include: { passTemplate: true, usageLogs: true, ...PASS_DEBT_INCLUDE },
         });
 
         await tx.passUsageLog.create({
@@ -744,6 +765,7 @@ export class PassesService {
       }),
       createdAt: p.createdAt.toISOString(),
       usageLogs,
+      ...passDebtFields(p),
     };
   }
 }

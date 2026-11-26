@@ -53,6 +53,8 @@ export const LastCheckInCard: React.FC<LastCheckInCardProps> = ({
     lastCheckIn.mode !== 'CIRCUIT_GREETING';
   // A szolgáltatás neve a közös üdvözlés-térképből (TICKET-43), mint a monitoron és a toastban.
   const greeting = lastCheckIn && greetingForCheckIn(lastCheckIn);
+  const hasOverdueDues = (lastCheckIn?.overdueAmountHuf ?? 0) > 0;
+  const hasPassDebt = (lastCheckIn?.passDebtHuf ?? 0) > 0;
 
   return (
     <Card data-tour="reception.last-check-in">
@@ -110,14 +112,30 @@ export const LastCheckInCard: React.FC<LastCheckInCardProps> = ({
               </div>
             </div>
 
-            {lastCheckIn.overdueAmountHuf !== undefined &&
-              lastCheckIn.overdueAmountHuf > 0 && (
+            {(hasOverdueDues || hasPassDebt || lastCheckIn.passDebtUnknown) && (
               <Alert variant="destructive">
                 <AlertTriangle aria-hidden strokeWidth={1.75} />
                 <AlertDescription>
-                  Havi tagdíj elmaradás (csak a recepción látható):{' '}
-                  {formatHuf(lastCheckIn.overdueAmountHuf)} (
-                  {lastCheckIn.overdueDays ?? 1} nap késés)
+                  {hasOverdueDues && (
+                    <p>
+                      Havi tagdíj elmaradás (csak a recepción látható):{' '}
+                      {formatHuf(lastCheckIn.overdueAmountHuf!)} (
+                      {lastCheckIn.overdueDays ?? 1} nap késés)
+                    </p>
+                  )}
+                  {/* Bérlet-hátralék (TICKET-14): az összeget a szerver adja. */}
+                  {hasPassDebt && (
+                    <p>
+                      Bérlet-hátralék: {formatHuf(lastCheckIn.passDebtHuf!)}
+                      {lastCheckIn.passDebtSince &&
+                        ` (${new Date(lastCheckIn.passDebtSince).toLocaleDateString('hu-HU')} óta)`}
+                    </p>
+                  )}
+                  {lastCheckIn.passDebtUnknown && (
+                    <p>
+                      Egy bérlet hátraléka nem ismert, ellenőrizd az adatlapon.
+                    </p>
+                  )}
                 </AlertDescription>
               </Alert>
             )}

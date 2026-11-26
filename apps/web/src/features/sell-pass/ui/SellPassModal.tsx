@@ -6,12 +6,13 @@ import {
   womenOnlyAccess,
 } from '@reform/shared';
 import { Banknote, Building2, CreditCard } from 'lucide-react';
-import React, { useEffect, useId, useState } from 'react';
+import React, { useEffect, useId, useRef, useState } from 'react';
 import { GuestPicker } from '@/entities/guest';
 import {
   Alert,
   AlertDescription,
   Button,
+  Checkbox,
   Dialog,
   DialogBody,
   DialogContent,
@@ -23,6 +24,7 @@ import {
   Input,
   Label,
 } from '@/shared/ui';
+import { cn } from '@/shared/lib/utils';
 
 // Választható elem (bérlet, fizetési mód): `secondary` gomb, a kijelölt `aria-pressed`, halvány
 // kiemelő háttérrel. A mentés csak a `primary` gombbal történik.
@@ -49,6 +51,8 @@ interface SellPassModalProps {
     passTemplateId: string;
     paymentMethod: PaymentMethod;
     customAmount?: number;
+    /** Részletfizetés (TICKET-14): most fizetett összeg; a különbözet a bérlet hátraléka. */
+    paidAmount?: number;
     note?: string;
   }) => void;
 }
@@ -67,12 +71,17 @@ export const SellPassModal: React.FC<SellPassModalProps> = ({
   const templatesLabelId = useId();
   const methodsLabelId = useId();
   const guestHintId = useId();
+  const installmentId = useId();
   const [selectedGuestId, setSelectedGuestId] = useState<string>('');
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(
     PaymentMethod.POS_CARD,
   );
   const [note, setNote] = useState<string>('');
+  const [isInstallment, setIsInstallment] = useState(false);
+  const [paidAmount, setPaidAmount] = useState<number>(0);
+  const [showPaidError, setShowPaidError] = useState(false);
+  const paidInputRef = useRef<HTMLInputElement>(null);
 
   // Az előre kiválasztott vendég akkor is választható, ha a lista (még) nem tartalmazza.
   const guestOptions =
@@ -102,6 +111,8 @@ export const SellPassModal: React.FC<SellPassModalProps> = ({
         '',
     );
     setNote('');
+    setIsInstallment(false);
+    setShowPaidError(false);
   }, [isOpen, preselectedTemplateId, templates, initialGuest?.id]);
 
   // Másik vendégnél a kijelölt bérlet marad, ha neki is eladható.
@@ -124,13 +135,25 @@ export const SellPassModal: React.FC<SellPassModalProps> = ({
     womenOnlyAccess(selectedGuest.gender, selectedTemplate.womenOnly) ===
       'GENDER_MISSING';
 
+  // A most fizetett rész legalább 1 Ft, és legfeljebb a bérlet ára (a szerver is ellenőrzi).
+  const price = selectedTemplate?.price ?? 0;
+  const isValidPaid =
+    Number.isInteger(paidAmount) && paidAmount >= 1 && paidAmount <= price;
+  const paidInvalid = isInstallment && showPaidError && !isValidPaid;
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedGuest || !selectedTemplate) return;
+    if (isInstallment && !isValidPaid) {
+      setShowPaidError(true);
+      paidInputRef.current?.focus();
+      return;
+    }
     onConfirmSell({
       guestId: selectedGuest.id,
       passTemplateId: selectedTemplateId,
       paymentMethod,
+      paidAmount: isInstallment ? paidAmount : undefined,
       note: note.trim() || undefined,
     });
   };
@@ -147,7 +170,11 @@ export const SellPassModal: React.FC<SellPassModalProps> = ({
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+        <form
+          onSubmit={handleSubmit}
+          noValidate
+          className="flex min-h-0 flex-1 flex-col"
+        >
           <DialogBody className="space-y-5">
             <div className="flex flex-col gap-1.5">
               <GuestPicker
@@ -238,6 +265,58 @@ export const SellPassModal: React.FC<SellPassModalProps> = ({
               </div>
             </div>
 
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id={installmentId}
+                  checked={isInstallment}
+                  onCheckedChange={(checked) => {
+                    setIsInstallment(checked === true);
+                    setPaidAmount(Math.floor(price / 2));
+                    setShowPaidError(false);
+                  }}
+                />
+                <Label
+                  htmlFor={installmentId}
+                  className="text-[13px] font-normal text-foreground"
+                >
+                  Részletfizetés (most csak egy részt fizet)
+                </Label>
+              </div>
+              {isInstallment && (
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor={`${installmentId}-paid`}>
+                    Most fizetett összeg (Ft)
+                  </Label>
+                  <Input
+                    ref={paidInputRef}
+                    id={`${installmentId}-paid`}
+                    type="number"
+                    min={1}
+                    max={price}
+                    required
+                    data-barcode-ignore
+                    value={paidAmount}
+                    onChange={(e) => setPaidAmount(Number(e.target.value))}
+                    aria-invalid={paidInvalid}
+                    aria-describedby={`${installmentId}-paid-hint`}
+                    className="tabular-nums"
+                  />
+                  <span
+                    id={`${installmentId}-paid-hint`}
+                    className={cn(
+                      'text-xs',
+                      paidInvalid ? 'text-destructive' : 'text-muted-foreground',
+                    )}
+                  >
+                    {paidInvalid
+                      ? `A most fizetett összeg 1 és ${price.toLocaleString('hu-HU')} Ft közötti egész szám legyen.`
+                      : 'A ki nem fizetett rész hátralékként a bérlethez kerül, és a vendég adatlapján látszik.'}
+                  </span>
+                </div>
+              )}
+            </div>
+
             <div className="flex flex-col gap-1.5">
               <Label htmlFor={noteId}>Megjegyzés (nem kötelező)</Label>
               <Input
@@ -252,8 +331,8 @@ export const SellPassModal: React.FC<SellPassModalProps> = ({
 
           <DialogFooter>
             <DialogSummary
-              label="Fizetendő végösszeg"
-              value={`${(selectedTemplate?.price ?? 0).toLocaleString('hu-HU')} Ft`}
+              label={isInstallment ? 'Most fizetendő' : 'Fizetendő végösszeg'}
+              value={`${(isInstallment ? paidAmount : price).toLocaleString('hu-HU')} Ft`}
             />
             <Button variant="secondary" onClick={onClose}>
               Mégse

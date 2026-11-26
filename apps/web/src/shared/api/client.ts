@@ -329,6 +329,8 @@ export const api = {
     passTemplateId: string;
     paymentMethod: PaymentMethod;
     customAmount?: number;
+    /** Részletfizetés (TICKET-14); hiányában a teljes ár. */
+    paidAmount?: number;
     note?: string;
   }): Promise<{ pass: GuestPassDto; paymentId: string; amount: number }> {
     return request(

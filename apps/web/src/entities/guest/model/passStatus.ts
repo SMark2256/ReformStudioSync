@@ -118,3 +118,34 @@ export function formatShortDate(iso: string, now = new Date()): string {
     day: 'numeric',
   });
 }
+
+/** A bérlet hátraléka megjelenítésre (TICKET-14); az összegeket a szerver számolja. */
+export type PassDebtView =
+  | { kind: 'none' }
+  | {
+      kind: 'outstanding';
+      debtHuf: number;
+      paidHuf: number;
+      priceHuf: number | null;
+      since: string | null;
+    }
+  | { kind: 'unknown' };
+
+/** Fail-closed: hiányzó vagy ellentmondásos adat ismeretlen hátralék, nem „nincs hátralék”. */
+export function getPassDebtView(pass: GuestPassDto): PassDebtView {
+  if (pass.debtStatus === 'NONE') return { kind: 'none' };
+  if (
+    pass.debtStatus === 'OUTSTANDING' &&
+    pass.debtHuf !== null &&
+    pass.debtHuf !== undefined
+  ) {
+    return {
+      kind: 'outstanding',
+      debtHuf: pass.debtHuf,
+      paidHuf: pass.paidHuf ?? 0,
+      priceHuf: pass.priceHuf ?? null,
+      since: pass.debtSince ?? null,
+    };
+  }
+  return { kind: 'unknown' };
+}

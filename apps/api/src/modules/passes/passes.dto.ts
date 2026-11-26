@@ -127,6 +127,15 @@ export class SellPassDto {
   @Min(0)
   customAmount?: number;
 
+  @ApiPropertyOptional({
+    description:
+      'Részletfizetés (TICKET-14): most fizetett összeg. Hiányában a teljes ár; a különbség a bérlet hátraléka.',
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(1, { message: 'A most fizetett összeg legalább 1 Ft legyen.' })
+  paidAmount?: number;
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
