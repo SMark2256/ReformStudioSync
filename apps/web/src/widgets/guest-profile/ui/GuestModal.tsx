@@ -30,6 +30,7 @@ import React, { useEffect, useId, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   formatRemainingPasses,
+  getPassDebtView,
   MEMBERSHIP_STATUS_LABEL,
   PASS_STATUS_BADGE,
 } from '@/entities/guest';
@@ -1274,6 +1275,7 @@ export const GuestModal: React.FC<GuestModalProps> = ({
             {(guest.passes ?? []).map((pass) => {
               const badge = PASS_STATUS_BADGE[pass.status];
               const passName = pass.passTemplateName ?? 'Bérlet';
+              const debt = getPassDebtView(pass);
               return (
                 <div
                   key={pass.id}
@@ -1285,6 +1287,9 @@ export const GuestModal: React.FC<GuestModalProps> = ({
                         {passName}
                       </span>
                       <Badge variant={badge.variant}>{badge.label}</Badge>
+                      {debt.kind === 'outstanding' && (
+                        <Badge variant="destructive">Hátralékos</Badge>
+                      )}
                     </div>
                     <p className="text-xs text-muted-foreground">
                       Fennmaradó:{' '}
@@ -1296,6 +1301,23 @@ export const GuestModal: React.FC<GuestModalProps> = ({
                         {formatDate(pass.expirationDate)}
                       </span>
                     </p>
+                    {/* Bérlet-hátralék (TICKET-14): a szerver számolja, itt csak megjelenik. */}
+                    {debt.kind === 'outstanding' && (
+                      <p className="text-xs tabular-nums text-muted-foreground">
+                        {debt.priceHuf !== null &&
+                          `Ár: ${debt.priceHuf.toLocaleString('hu-HU')} Ft · `}
+                        Fizetett: {debt.paidHuf.toLocaleString('hu-HU')} Ft ·{' '}
+                        <span className="font-semibold text-destructive">
+                          Hátralék: {debt.debtHuf.toLocaleString('hu-HU')} Ft
+                        </span>
+                        {debt.since && ` (${formatDate(debt.since)} óta)`}
+                      </p>
+                    )}
+                    {debt.kind === 'unknown' && (
+                      <p className="text-xs font-medium text-warning">
+                        A bérlet hátraléka nem ismert. Ellenőrizd a befizetéseit.
+                      </p>
+                    )}
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2">

@@ -17,6 +17,7 @@ import {
 } from '../enums';
 import { EmailCategory } from '../email';
 import { CheckInResultPayload } from '../socket-events';
+import type { PassDebtStatus } from '../pass-debt';
 
 export interface AuthUserDto {
   id: string;
@@ -127,6 +128,16 @@ export interface GuestPassDto {
   status: PassStatus;
   createdAt: string;
   usageLogs?: PassUsageLogDto[];
+  /** Eladáskori ár (Ft); `null`: ismeretlen (TICKET-14). */
+  priceHuf?: number | null;
+  /** A bérlethez rendelt, nem sztornózott befizetések összege (Ft). */
+  paidHuf?: number;
+  /** Hátralék (Ft, `computePassDebt`); `null`: ismeretlen. A szerver számolja. */
+  debtHuf?: number | null;
+  /** Hiányzó mezőt a felület ismeretlennek (`UNKNOWN`) vegye, ne hátralékmentesnek. */
+  debtStatus?: PassDebtStatus;
+  /** A hátralék keletkezésének időpontja (`nextPassDebtSince`); `null`, ha nincs hátralék. */
+  debtSince?: string | null;
 }
 
 export interface MembershipDueDto {

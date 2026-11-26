@@ -4,7 +4,12 @@ export {
   formatRemainingPasses,
   formatShortDate,
   getGuestPassSummary,
+  getPassDebtView,
   MEMBERSHIP_STATUS_LABEL,
   PASS_STATUS_BADGE,
 } from './model/passStatus';
-export type { GuestPassFilter, GuestPassSummary } from './model/passStatus';
+export type {
+  GuestPassFilter,
+  GuestPassSummary,
+  PassDebtView,
+} from './model/passStatus';

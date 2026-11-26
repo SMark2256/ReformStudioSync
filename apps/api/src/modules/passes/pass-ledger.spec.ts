@@ -103,6 +103,9 @@ function createDb() {
         const p = t.passes.find((x) => matches(x, where));
         return p ? passWith(p, include) : null;
       },
+      // A hátralék frissítése (TICKET-14) a sztornó után; allokációk nélkül ismeretlen, nem ír.
+      findUnique: async ({ where }: any) =>
+        t.passes.find((x) => x.id === where.id) ?? null,
       updateMany: async ({ where, data }: any) => {
         const rows = t.passes.filter((x) => matches(x, where));
         rows.forEach((r) => applyData(r, data));

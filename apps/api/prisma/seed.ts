@@ -593,6 +593,8 @@ async function createPass(
       isActive: remaining === null || remaining > 0,
       isFrozen: spec.frozenDaysAgo !== undefined,
       frozenAt: spec.frozenDaysAgo !== undefined ? daysAgo(spec.frozenDaysAgo) : null,
+      // Teljes áron eladva (TICKET-14): nincs hátralék.
+      priceHuf: Math.round(Number(template.price)),
       createdAt: startDate,
     },
   });
