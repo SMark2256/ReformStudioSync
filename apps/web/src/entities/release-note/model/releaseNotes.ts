@@ -109,6 +109,22 @@ export const getJiraIssueUrl = (jiraKey: string): string =>
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    id: 'v0.3-debt-entry-rule',
+    version: '0.3',
+    date: '2026-11-26',
+    kind: 'FIX',
+    title: 'Belépés tartozással',
+    summary:
+      'Tartozás esetén a belépés a türelmi idő után megáll, kivételesen beengedhető.',
+    details: [
+      'Ha a havi tagdíj több mint 5 napja lejárt, vagy egy bérlet hátraléka a vásárlás után 5 napnál tovább fennáll, a beolvasás elutasít; az 5. napon még beengedi a vendéget.',
+      'Ha egy bérlet hátraléka nem ismert, a rendszer nem engedi át csendben: elutasít, és az adatlapon kell ellenőrizni.',
+      'Az elutasító kártyán látszik az ok, az összeg és a napok száma; a „Kivételes beengedés” gombbal, kötelező indoklással a vendég mégis beléptethető. A beengedés naplózódik.',
+      'A vendégmonitoron a tartozás oka és összege nem jelenik meg.',
+    ],
+    jiraKey: 'TICKET-15',
+  },
+  {
     id: 'v0.3-day-ticket',
     version: '0.3',
     date: '2026-11-26',

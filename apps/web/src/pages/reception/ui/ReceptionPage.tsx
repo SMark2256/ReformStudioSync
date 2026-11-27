@@ -34,6 +34,7 @@ import {
   RECEPTION_TAB_ROUTES,
   type ReceptionTab,
 } from '../model/receptionTabs';
+import { CheckInOverrideDialog } from './desk/CheckInOverrideDialog';
 import { ReceptionDeskTab } from './desk/ReceptionDeskTab';
 import { OfflineQueueNotice } from './desk/OfflineQueueNotice';
 import { ReceptionHeaderStatus } from './desk/ReceptionHeaderStatus';
@@ -95,6 +96,17 @@ export const ReceptionPage: React.FC = () => {
     /** Beolvasás után (TICKET-39): a szóba jöhető bérletek az előválasztáshoz. */
     treatmentOptions?: TreatmentSelectionOption[];
   }>({ isOpen: false, guest: null });
+
+  // Kivételes beengedés (TICKET-15): a feloldandó elutasítás és a kérés idempotencia-kulcsa
+  // (dialógusonként egy, így a dupla kattintás nem léptet be kétszer).
+  const [overrideState, setOverrideState] = useState<{
+    checkIn: CheckInResultPayload;
+    idempotencyKey: string;
+  } | null>(null);
+  // A kivételesen beengedett vendég indoklása a kezelés levonásához (a szerver ott is kéri).
+  const [overrideReasons, setOverrideReasons] = useState<Record<string, string>>(
+    {},
+  );
 
   const [paymentModalState, setPaymentModalState] = useState<{
     isOpen: boolean;
@@ -208,13 +220,20 @@ export const ReceptionPage: React.FC = () => {
       barcode: string;
       forceDuplicate?: boolean;
       visitType?: VisitType;
+      forceOverride?: boolean;
+      overrideReason?: string;
+      idempotencyKey?: string;
     }) =>
       api.scanCheckIn({
         barcode: vars.barcode,
         forceDuplicate: vars.forceDuplicate,
         visitType: vars.visitType ?? VisitType.CIRCUIT_TRAINING,
+        forceOverride: vars.forceOverride,
+        overrideReason: vars.overrideReason,
+        idempotencyKey: vars.idempotencyKey,
       }),
-    onSuccess: (res) => {
+    onSuccess: (res, vars) => {
+      if (vars.forceOverride) setOverrideState(null);
       // Alkalmas bérlet (TICKET-39): nincs belépés, a kezelésválasztó ablak nyílik meg.
       if (res.status === CheckInStatus.TREATMENT_SELECTION_REQUIRED) {
         notify.checkInResult(res);
@@ -239,8 +258,18 @@ export const ReceptionPage: React.FC = () => {
   });
 
   const deductTreatmentMutation = useMutation({
-    mutationFn: api.deductPassUsage,
+    // Kivételesen beengedett vendégnél az indoklás a levonáshoz is megy (TICKET-15).
+    mutationFn: (data: Parameters<typeof api.deductPassUsage>[0]) => {
+      const overrideReason = overrideReasons[data.guestId];
+      return api.deductPassUsage(
+        overrideReason ? { ...data, forceOverride: true, overrideReason } : data,
+      );
+    },
     onSuccess: (res) => {
+      if (res.guestId) {
+        const guestId = res.guestId;
+        setOverrideReasons(({ [guestId]: _used, ...rest }) => rest);
+      }
       setLastCheckIn(res);
       broadcastToScannerChannel({ type: 'CHECKIN_RESULT', payload: res });
       setDeductModalState({ isOpen: false, guest: null });
@@ -567,6 +596,12 @@ export const ReceptionPage: React.FC = () => {
             onForceDuplicate={(barcode) =>
               scanMutation.mutate({ barcode, forceDuplicate: true })
             }
+            onOverride={(checkIn) =>
+              setOverrideState({
+                checkIn,
+                idempotencyKey: `override-${checkIn.guestId ?? checkIn.barcode}-${Date.now()}`,
+              })
+            }
             onRevoke={(checkInId) => revokeMutation.mutate(checkInId)}
             onOpenGuest={openGuestSheet}
             onOpenDeduct={(guest) => setDeductModalState({ isOpen: true, guest })}
@@ -639,15 +674,45 @@ export const ReceptionPage: React.FC = () => {
       </div>
 
       {/* Modals */}
+      {overrideState && (
+        <CheckInOverrideDialog
+          guestName={overrideState.checkIn.guestName}
+          deniedReason={overrideState.checkIn.reason}
+          isSubmitting={scanMutation.isPending}
+          onClose={() => setOverrideState(null)}
+          onConfirm={(reason) => {
+            const { checkIn, idempotencyKey } = overrideState;
+            if (checkIn.guestId) {
+              const guestId = checkIn.guestId;
+              setOverrideReasons((prev) => ({ ...prev, [guestId]: reason }));
+            }
+            scanMutation.mutate({
+              barcode: checkIn.barcode,
+              visitType: VisitType.CIRCUIT_TRAINING,
+              forceOverride: true,
+              overrideReason: reason,
+              idempotencyKey,
+            });
+          }}
+        />
+      )}
+
       <DeductTreatmentModal
         isOpen={deductModalState.isOpen}
         initialGuest={deductModalState.guest}
         initialPassId={deductPreselection.passId}
         initialServiceId={deductPreselection.serviceId}
         notice={
-          deductModalState.treatmentOptions
-            ? 'Alkalmas bérlet: a beolvasás nem rögzített belépést. Válaszd ki a kezelést, a belépés a levonással rögzül.'
-            : undefined
+          [
+            deductModalState.treatmentOptions
+              ? 'Alkalmas bérlet: a beolvasás nem rögzített belépést. Válaszd ki a kezelést, a belépés a levonással rögzül.'
+              : null,
+            deductModalState.guest && overrideReasons[deductModalState.guest.id]
+              ? `Kivételes beengedés: ${overrideReasons[deductModalState.guest.id]}`
+              : null,
+          ]
+            .filter(Boolean)
+            .join(' ') || undefined
         }
         guests={deductGuests}
         services={servicesQuery.data ?? []}

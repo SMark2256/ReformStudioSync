@@ -21,6 +21,7 @@ const errorOf = (fn: () => unknown): unknown => {
 const NOW = new Date('2026-11-26T09:00:00.000Z');
 
 /** TICKET-7: a böngészős mock ugyanúgy kezeli a napijegyet, mint az API. */
+// Varga Judit (guest-5): nincs tagdíja, a régi bérlete elfogyott, így a TICKET-15 tartozás-tiltása nem érinti.
 describe('mock-engine — napijegy (TICKET-7)', () => {
   beforeEach(() => {
     vi.useFakeTimers({ toFake: ['Date'] });
@@ -36,7 +37,7 @@ describe('mock-engine — napijegy (TICKET-7)', () => {
 
   const sellDayTicket = () =>
     mockStudioEngine.sellPass({
-      guestId: 'guest-3',
+      guestId: 'guest-5',
       passTemplateId: 'tpl-1',
       paymentMethod: PaymentMethod.CASH,
     }).pass;
@@ -64,7 +65,7 @@ describe('mock-engine — napijegy (TICKET-7)', () => {
 
     openingHours[3] = { opensAt: 7 * 60, closesAt: 12 * 60, lastStartAt: 11 * 60 };
     mockBookingEngine.updateSettings({ openingHours });
-    const stored = mockStudioEngine.getGuestPasses('guest-3').find((p) => p.id === pass.id);
+    const stored = mockStudioEngine.getGuestPasses('guest-5').find((p) => p.id === pass.id);
     expect(stored?.validUntil).toBe('2026-11-26T19:00:00.000Z');
   });
 
@@ -86,13 +87,13 @@ describe('mock-engine — napijegy (TICKET-7)', () => {
   it('a levonás az egyetlen alkalmat használja fel, lejárati figyelmeztetés nélkül', () => {
     const pass = sellDayTicket();
     const res = mockStudioEngine.deductPassUsage({
-      guestId: 'guest-3',
+      guestId: 'guest-5',
       passId: pass.id,
       serviceId: 'srv-reformer',
     });
     expect(res.remainingPasses).toBe(0);
     expect(res.warnings).not.toContain('EXPIRING_SOON');
-    const stored = mockStudioEngine.getGuestPasses('guest-3').find((p) => p.id === pass.id);
+    const stored = mockStudioEngine.getGuestPasses('guest-5').find((p) => p.id === pass.id);
     expect(stored?.status).toBe(PassStatus.DEPLETED);
   });
 });

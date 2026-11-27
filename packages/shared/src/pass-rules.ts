@@ -144,11 +144,18 @@ export function passGrantsCircuitEntry(pass: {
   );
 }
 
+/**
+ * Tartozás miatti elutasítás (TICKET-15, `resolveCheckInAccess`): a türelmi idő után lejárt
+ * tagdíj, bérlet-hátralék, vagy ismeretlen hátralék (fail-closed). Kivételes beengedéssel feloldható.
+ */
+export type DebtDeniedReason = 'DUES_OVERDUE' | 'PASS_DEBT' | 'PASS_DEBT_UNKNOWN';
+
 export type ArrivalDeniedReason =
   | 'WOMEN_ONLY'
   | 'PASS_FROZEN'
   | 'MEMBERSHIP_PAUSED'
-  | 'NO_VALID_PASS';
+  | 'NO_VALID_PASS'
+  | DebtDeniedReason;
 
 /** Az elutasított beolvasás oka a recepciónak (a monitorra nem kerül). */
 export const ARRIVAL_DENIED_MESSAGES: Record<ArrivalDeniedReason, string> = {
@@ -157,6 +164,9 @@ export const ARRIVAL_DENIED_MESSAGES: Record<ArrivalDeniedReason, string> = {
   MEMBERSHIP_PAUSED: 'A vendég havi tagsága jelenleg szüneteltetve van.',
   NO_VALID_PASS:
     'Nincs érvényes bérlet vagy aktív tagság (lejárt vagy elfogytak az alkalmak)!',
+  DUES_OVERDUE: 'Havi tagdíj-elmaradás a türelmi időn túl.',
+  PASS_DEBT: 'Bérlet-hátralék a türelmi időn túl.',
+  PASS_DEBT_UNKNOWN: 'Egy bérlet hátraléka nem ismert.',
 };
 
 export type ArrivalEntitlement<P, M> =
@@ -166,7 +176,8 @@ export type ArrivalEntitlement<P, M> =
   | { kind: 'CIRCUIT_PASS'; pass: P }
   /** Csak kezelésre szóló bérlet: a beolvasás nem léptet be, a kezelésválasztó nyílik meg. */
   | { kind: 'TREATMENT_SELECTION'; passes: P[] }
-  | { kind: 'DENIED'; reason: ArrivalDeniedReason };
+  /** `overridable`: tartozás miatti elutasítás, kivételes beengedéssel feloldható (TICKET-15). */
+  | { kind: 'DENIED'; reason: ArrivalDeniedReason; overridable?: boolean };
 
 /**
  * Vonalkódos beolvasás döntése (TICKET-39), egyetlen forrás az API-n és a mockban:

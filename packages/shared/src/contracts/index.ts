@@ -493,14 +493,23 @@ export interface TodayDashboardDto {
   }[];
 }
 
-export interface ScanCheckInRequestDto {
+/**
+ * Kivételes beengedés (TICKET-15): a tartozás miatti tiltás feloldása. `forceOverride` mellett az
+ * `overrideReason` kötelező (üresen 400), a feloldás `CHECKIN_OVERRIDE` audit-bejegyzést ír.
+ */
+export interface CheckInOverrideRequestDto {
+  forceOverride?: boolean;
+  overrideReason?: string;
+}
+
+export interface ScanCheckInRequestDto extends CheckInOverrideRequestDto {
   barcode: string;
   visitType?: VisitType;
   forceDuplicate?: boolean;
   idempotencyKey?: string;
 }
 
-export interface DeductPassUsageRequestDto {
+export interface DeductPassUsageRequestDto extends CheckInOverrideRequestDto {
   guestId: string;
   passId: string;
   serviceId: string;

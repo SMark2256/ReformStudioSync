@@ -11,7 +11,9 @@ import {
   DAY_TICKET_DURATION_DAYS,
   DAY_TICKET_TOTAL_PASSES,
   dayTicketValidUntil,
+  debtDeniedMessage,
   DEFAULT_STUDIO_ID,
+  evaluateEntryDebt,
   EXPIRING_SOON_THRESHOLD_DAYS,
   frozenDaysBetween,
   greetingFields,
@@ -33,6 +35,12 @@ import {
 } from '@reform/shared';
 import { PrismaService } from '../../prisma/prisma.service';
 import { loadBookingSettings, type Tx } from '../bookings/booking-engine';
+import {
+  entryDebtInput,
+  guestPassDebtHuf,
+  logCheckInOverride,
+  requireOverrideReason,
+} from '../check-ins/check-in-override';
 import { MonitorGateway } from '../monitor/monitor.gateway';
 import {
   logCorrection,
@@ -367,6 +375,7 @@ export class PassesService {
     studioId = DEFAULT_STUDIO_ID,
   ): Promise<CheckInResultPayload> {
     const now = new Date();
+    const overrideReason = requireOverrideReason(dto);
 
     const payload = await this.prisma.$transaction(async (tx) => {
       if (dto.operationKey) {
@@ -407,8 +416,26 @@ export class PassesService {
         }
       }
 
+      // A tagdíjak és a bérletek hátraléka a tartozás miatti tiltáshoz (TICKET-15).
       const guest = await tx.guest.findFirst({
         where: { id: dto.guestId, studioId },
+        include: {
+          memberships: { include: { dues: true } },
+          passes: {
+            select: {
+              createdAt: true,
+              priceHuf: true,
+              cancelledAt: true,
+              type: true,
+              remainingPasses: true,
+              startDate: true,
+              expirationDate: true,
+              validUntil: true,
+              isFrozen: true,
+              ...PASS_DEBT_INCLUDE,
+            },
+          },
+        },
       });
       if (!guest || !guest.isActive) {
         throw appError('GUEST.NOT_FOUND', {
@@ -467,14 +494,38 @@ export class PassesService {
       const deductionError = passDeductionError(status);
       if (deductionError) throw appError(deductionError);
 
+      // Tartozás a türelmi időn túl (TICKET-15): csak kivételes beengedéssel (indoklás, audit).
+      const debt = evaluateEntryDebt(entryDebtInput(guest, now), now);
+      const passDebtHuf = guestPassDebtHuf(guest);
+      if (debt.blocked && !overrideReason) {
+        throw appError('CHECKIN.DEBT_BLOCKED', {
+          message: debtDeniedMessage(debt, passDebtHuf),
+        });
+      }
+      const overridden = debt.blocked && !!overrideReason;
+
       const checkInLog = await recordArrival(tx, {
         studioId,
         guestId: guest.id,
         guestPassId: pass.id,
         staffUserId,
         visitType: 'TREATMENT',
-        reason: `Kezelés: ${serviceName}`,
+        reason: overridden
+          ? `Kezelés: ${serviceName} (kivételes beengedés: ${overrideReason})`
+          : `Kezelés: ${serviceName}`,
       });
+      if (overridden && overrideReason) {
+        await logCheckInOverride(tx, {
+          studioId,
+          staffUserId,
+          checkInId: checkInLog.id,
+          guestId: guest.id,
+          guestName: `${guest.lastName} ${guest.firstName}`,
+          debt,
+          passDebtHuf,
+          reason: overrideReason,
+        });
+      }
 
       const { usageId, remaining: newRemaining } = await recordDeduction(
         tx,
@@ -528,6 +579,7 @@ export class PassesService {
         totalPasses: pass.totalPasses,
         expirationDate: pass.expirationDate.toISOString(),
         warnings,
+        overridden: overridden || undefined,
         suggestedRenewalTemplateId: pass.passTemplateId,
         isBirthday: isBirthdayToday(guest.birthDate, now),
         timestamp: now.toISOString(),

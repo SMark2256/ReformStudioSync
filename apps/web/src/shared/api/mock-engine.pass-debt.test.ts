@@ -111,7 +111,7 @@ describe('mock-engine — bérlet-hátralék részletfizetésnél (TICKET-14)', 
     ).toMatchObject({ code: 'PASS.NOT_FOUND' });
   });
 
-  it('beolvasáskor a recepció megkapja a bérlet-hátralékot (a beléptetést nem tiltja)', () => {
+  it('beolvasáskor a recepció megkapja a bérlet-hátralékot (TICKET-15: a türelmi időn belül nem tilt)', () => {
     sell(20000);
     tick();
     const res = mockStudioEngine.scanCheckIn({ barcode: '100003' });

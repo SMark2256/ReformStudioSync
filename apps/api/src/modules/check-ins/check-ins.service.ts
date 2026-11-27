@@ -6,6 +6,7 @@ import {
   CheckInRevokedPayload,
   CheckInStatus,
   CheckInWarningCode,
+  debtDeniedMessage,
   DEFAULT_STUDIO_ID,
   DUPLICATE_SCAN_COOLDOWN_SECONDS,
   EXPIRING_SOON_THRESHOLD_DAYS,
@@ -15,7 +16,7 @@ import {
   LoggedCheckInDto,
   OfflineSyncResponseDto,
   PassType,
-  resolveArrivalEntitlement,
+  resolveCheckInAccess,
   ServiceCategory,
   summarizePassDebts,
   VisitType,
@@ -30,6 +31,11 @@ import {
   voidArrival,
 } from '../passes/pass-ledger';
 import { PASS_DEBT_INCLUDE, passDebtOf } from '../passes/pass-debt';
+import {
+  entryDebtInput,
+  logCheckInOverride,
+  requireOverrideReason,
+} from './check-in-override';
 import { ScanCheckInDto, SyncOfflineScansDto } from './check-ins.dto';
 
 interface GreetingServiceRow {
@@ -88,6 +94,11 @@ export class CheckInsService {
    *   sem kap eseményt; a levonás a kezelésválasztóból (`deductTreatmentUsage`) történik;
    * - semmi érvényes → elutasítás (DENIED napló).
    * A beolvasás soha nem von le alkalmat, a `visitType` nem befolyásolja a döntést.
+   *
+   * Tartozás (TICKET-15, `resolveCheckInAccess`): a türelmi időn (5 nap) túli tagdíj-elmaradás,
+   * bérlet-hátralék vagy ismeretlen hátralék a belépést és a kezelésválasztást is elutasítja
+   * (`overrideAllowed`). Kivételes beengedés: `forceOverride` + kötelező indoklás; köredzésnél a
+   * belépéssel együtt `CHECKIN_OVERRIDE` audit íródik, kezelésnél a levonáskor (`deductTreatmentUsage`).
    */
   async processBarcodeCheckIn(
     dto: ScanCheckInDto,
@@ -96,6 +107,7 @@ export class CheckInsService {
   ): Promise<CheckInResultPayload> {
     const barcode = dto.barcode.trim();
     const now = new Date();
+    const overrideReason = requireOverrideReason(dto);
 
     const resultPayload = await this.prisma.$transaction(async (tx) => {
       if (dto.idempotencyKey) {
@@ -237,33 +249,12 @@ export class CheckInsService {
         (m) => m.status === 'PAUSED',
       );
 
-      let overdueAmountHuf = 0;
-      let maxOverdueDays = 0;
-      for (const m of guest.memberships ?? []) {
-        for (const d of m.dues ?? []) {
-          if (d.status === 'PAID' || d.status === 'WAIVED') continue;
-          const rem = Math.max(0, d.amountHuf - d.paidAmountHuf);
-          if (rem > 0 && d.dueDate < now) {
-            overdueAmountHuf += rem;
-            const days = Math.ceil(
-              (now.getTime() - d.dueDate.getTime()) / (24 * 60 * 60 * 1000),
-            );
-            if (days > maxOverdueDays) maxOverdueDays = days;
-          }
-        }
-      }
-
-      const warnings: CheckInWarningCode[] = [];
-      if (overdueAmountHuf > 0) {
-        warnings.push('OVERDUE_DUES');
-      }
-      if (pausedMembership && !activeMembership) {
-        warnings.push('MEMBERSHIP_PAUSED');
-      }
-
       // Csak nőknek szóló tagság / bérlet: férfi vendéggel nem számít (TICKET-42).
-      const entitlement = resolveArrivalEntitlement(
+      // Tartozás a türelmi időn túl: elutasítás, kivételes beengedéssel feloldható (TICKET-15).
+      const access = resolveCheckInAccess(
         {
+          ...entryDebtInput(guest, now),
+          override: overrideReason !== null,
           guestGender: guest.gender,
           memberships: (guest.memberships ?? []).map((m) => ({
             ...m,
@@ -277,6 +268,15 @@ export class CheckInsService {
         },
         now,
       );
+      const { entitlement, debt } = access;
+
+      const warnings: CheckInWarningCode[] = [];
+      if (debt.duesOverdueHuf > 0) {
+        warnings.push('OVERDUE_DUES');
+      }
+      if (pausedMembership && !activeMembership) {
+        warnings.push('MEMBERSHIP_PAUSED');
+      }
       const used =
         entitlement.kind === 'CIRCUIT_MEMBERSHIP'
           ? entitlement.membership
@@ -289,17 +289,36 @@ export class CheckInsService {
       ) {
         warnings.push('GENDER_MISSING');
       }
-      // Bérlet-hátralék (TICKET-14): csak jelzés a recepciónak, a beléptetést nem tiltja (az a TICKET-15).
+      // Bérlet-hátralék (TICKET-14) a recepciónak; a tiltás a fenti `access` (TICKET-15).
       const passDebt = summarizePassDebts(
         guest.passes.map((p) => ({ debt: passDebtOf(p), debtSince: p.debtSince })),
       );
       const overdue = {
-        overdueAmountHuf: overdueAmountHuf > 0 ? overdueAmountHuf : undefined,
-        overdueDays: maxOverdueDays > 0 ? maxOverdueDays : undefined,
+        overdueAmountHuf: debt.duesOverdueHuf > 0 ? debt.duesOverdueHuf : undefined,
+        overdueDays: debt.duesOverdueDays > 0 ? debt.duesOverdueDays : undefined,
         passDebtHuf: passDebt.debtHuf > 0 ? passDebt.debtHuf : undefined,
         passDebtSince: passDebt.since ?? undefined,
         passDebtUnknown: passDebt.hasUnknown || undefined,
+        passDebtDays: debt.passDebtDays > 0 ? debt.passDebtDays : undefined,
+        overridden: access.overridden || undefined,
       };
+      // Kivételes beengedés (TICKET-15): a belépés okaként és auditként is rögzül.
+      const arrivalReason = access.overridden
+        ? `Kivételes beengedés: ${overrideReason}`
+        : null;
+      const logOverride = (checkInId: string) =>
+        access.overridden && overrideReason
+          ? logCheckInOverride(tx, {
+              studioId,
+              staffUserId,
+              checkInId,
+              guestId: guest.id,
+              guestName: guestFullName,
+              debt,
+              passDebtHuf: passDebt.debtHuf,
+              reason: overrideReason,
+            })
+          : null;
 
       // Aktív havi tagság: köredzéses érkezés alkalomlevonás nélkül.
       if (entitlement.kind === 'CIRCUIT_MEMBERSHIP') {
@@ -309,8 +328,10 @@ export class CheckInsService {
           guestPassId: null,
           staffUserId,
           visitType: 'CIRCUIT_TRAINING',
+          reason: arrivalReason,
           idempotencyKey: dto.idempotencyKey,
         });
+        await logOverride(checkInRecord.id);
 
         return {
           checkInId: checkInRecord.id,
@@ -342,8 +363,10 @@ export class CheckInsService {
           guestPassId: circuitPass.id,
           staffUserId,
           visitType: 'CIRCUIT_TRAINING',
+          reason: arrivalReason,
           idempotencyKey: dto.idempotencyKey,
         });
+        await logOverride(checkInRecord.id);
 
         const daysUntilExpiration = Math.ceil(
           (circuitPass.expirationDate.getTime() - now.getTime()) /
@@ -404,7 +427,9 @@ export class CheckInsService {
         } satisfies CheckInResultPayload;
       }
 
-      const deniedReason = ARRIVAL_DENIED_MESSAGES[entitlement.reason];
+      const deniedReason = entitlement.overridable
+        ? debtDeniedMessage(debt, passDebt.debtHuf)
+        : ARRIVAL_DENIED_MESSAGES[entitlement.reason];
       const lastKnownPass = guest.passes[guest.passes.length - 1];
 
       const deniedLog = await tx.loggedCheckIn.create({
@@ -427,6 +452,9 @@ export class CheckInsService {
         barcode: guest.barcode,
         guestName: guestFullName,
         reason: deniedReason,
+        deniedReasonCode: entitlement.reason,
+        debtReasons: entitlement.overridable ? debt.reasons : undefined,
+        overrideAllowed: entitlement.overridable || undefined,
         warnings,
         ...overdue,
         suggestedRenewalTemplateId: lastKnownPass?.passTemplateId ?? null,
