@@ -269,14 +269,15 @@ function logCorrection(
 
 /**
  * Tartozás miatti tiltás bemenete (TICKET-15, az API `entryDebtInput` párja): a tagdíjak és a
- * bérletek hátraléka a vásárlás napjával.
+ * bérletek hátraléka a vásárlás napjával és a bérlet állapotával.
  */
-function entryDebtInput(guest: GuestDto, payments: readonly PaymentDto[]) {
+function entryDebtInput(guest: GuestDto, payments: readonly PaymentDto[], now: Date) {
   return {
     dues: (guest.memberships ?? []).flatMap((m) => m.dues ?? []),
     passDebts: (guest.passes ?? []).map((p) => ({
       purchasedAt: p.createdAt,
       debtStatus: computePassDebt(p, passAllocations(p.id, payments)).status,
+      passStatus: getPassStatus(p, now),
     })),
   };
 }
@@ -1978,7 +1979,7 @@ class MockStudioEngine {
     if (deductionError) throw appError(deductionError);
 
     // Tartozás a türelmi időn túl (TICKET-15, mint az API-n): csak kivételes beengedéssel.
-    const debt = evaluateEntryDebt(entryDebtInput(guest, state.payments), now);
+    const debt = evaluateEntryDebt(entryDebtInput(guest, state.payments, now), now);
     const passDebtHuf = guestPassDebtHuf(guest, state.payments);
     if (debt.blocked && !overrideReason) {
       throw appError('CHECKIN.DEBT_BLOCKED', {
@@ -2374,7 +2375,7 @@ class MockStudioEngine {
     // Tartozás a türelmi időn túl: elutasítás, kivételes beengedéssel feloldható (TICKET-15).
     const access = resolveCheckInAccess(
       {
-        ...entryDebtInput(guest, state.payments),
+        ...entryDebtInput(guest, state.payments, now),
         override: overrideReason !== null,
         guestGender: guest.gender,
         memberships: (guest.memberships ?? []).map((m) => ({

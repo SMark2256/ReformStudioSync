@@ -253,7 +253,7 @@ export class CheckInsService {
       // Tartozás a türelmi időn túl: elutasítás, kivételes beengedéssel feloldható (TICKET-15).
       const access = resolveCheckInAccess(
         {
-          ...entryDebtInput(guest),
+          ...entryDebtInput(guest, now),
           override: overrideReason !== null,
           guestGender: guest.gender,
           memberships: (guest.memberships ?? []).map((m) => ({

@@ -5,7 +5,9 @@ import {
   CheckInOverrideRequestDto,
   EntryDebt,
   EntryDueInput,
+  getPassStatus,
   normalizeOverrideReason,
+  PassStatusInput,
   summarizePassDebts,
 } from '@reform/shared';
 import { logCorrection } from '../passes/pass-ledger';
@@ -21,16 +23,23 @@ type Tx = Prisma.TransactionClient;
 interface GuestWithDebts {
   memberships?: { dues?: EntryDueInput[] | null }[] | null;
   /** Hiányzik, ha nem töltöttük be (pl. tesztben): ekkor nincs bérlet-hátralék. */
-  passes?: (Parameters<typeof passDebtOf>[0] & { createdAt?: Date | null })[] | null;
+  passes?:
+    | (Parameters<typeof passDebtOf>[0] &
+        PassStatusInput & { createdAt?: Date | null })[]
+    | null;
 }
 
-/** A tagdíjak és a bérletek hátraléka, a vásárlás napjával (a türelmi idő onnan számít). */
-export function entryDebtInput(guest: GuestWithDebts) {
+/**
+ * A tagdíjak és a bérletek hátraléka, a vásárlás napjával (a türelmi idő onnan számít) és a
+ * bérlet állapotával (lezárt bérlet ismeretlen hátraléka nem tilt).
+ */
+export function entryDebtInput(guest: GuestWithDebts, now: Date) {
   return {
     dues: (guest.memberships ?? []).flatMap((m) => m.dues ?? []),
     passDebts: (guest.passes ?? []).map((p) => ({
       purchasedAt: p.createdAt,
       debtStatus: passDebtOf(p).status,
+      passStatus: getPassStatus(p, now),
     })),
   };
 }

@@ -426,6 +426,12 @@ export class PassesService {
               createdAt: true,
               priceHuf: true,
               cancelledAt: true,
+              type: true,
+              remainingPasses: true,
+              startDate: true,
+              expirationDate: true,
+              validUntil: true,
+              isFrozen: true,
               ...PASS_DEBT_INCLUDE,
             },
           },
@@ -489,7 +495,7 @@ export class PassesService {
       if (deductionError) throw appError(deductionError);
 
       // Tartozás a türelmi időn túl (TICKET-15): csak kivételes beengedéssel (indoklás, audit).
-      const debt = evaluateEntryDebt(entryDebtInput(guest), now);
+      const debt = evaluateEntryDebt(entryDebtInput(guest, now), now);
       const passDebtHuf = guestPassDebtHuf(guest);
       if (debt.blocked && !overrideReason) {
         throw appError('CHECKIN.DEBT_BLOCKED', {

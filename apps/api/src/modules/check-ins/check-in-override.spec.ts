@@ -163,6 +163,17 @@ describe('Beléptetés tartozással és kivételes beengedés (TICKET-15)', () =
       expect(res.overrideAllowed).toBe(true);
     });
 
+    it('lejárt bérlet ismeretlen hátraléka nem tilt: a tagsággal belép', async () => {
+      txMock.guest.findUnique.mockResolvedValue({
+        ...guestWithDues(0),
+        passes: [{ ...hypoxiPass(40), priceHuf: null, expirationDate: daysAgo(2) }],
+      });
+      const res = await checkIns.processBarcodeCheckIn({ barcode: '100001' }, 'staff-1');
+      expect(res.status).toBe(CheckInStatus.SUCCESS);
+      expect(res.deniedReasonCode).toBeUndefined();
+      expect(res.overrideAllowed).toBeUndefined();
+    });
+
     it('kivételes beengedés indoklás nélkül: 400 CHECKIN.OVERRIDE_REASON_REQUIRED, semmi nem rögzül', async () => {
       txMock.guest.findUnique.mockResolvedValue(guestWithDues(6));
       await expect(

@@ -5,6 +5,7 @@ import {
   evaluateEntryDebt,
   MembershipStatus,
   normalizeOverrideReason,
+  PassStatus,
   PassType,
   resolveCheckInAccess,
   ServiceCategory,
@@ -120,13 +121,53 @@ describe('evaluateEntryDebt — türelmi idő (TICKET-15)', () => {
     ).toMatchObject({ blocked: false, reasons: [], passDebtDays: 0 });
   });
 
-  it('ismeretlen hátralék (UNKNOWN): fail-closed, a türelmi idő után tilt', () => {
+  it('ismeretlen hátralék (UNKNOWN), a bérlet állapota nélkül: fail-closed, a türelmi idő után tilt', () => {
     expect(
       evaluateEntryDebt({ dues: [], passDebts: [passDebt(5, 'UNKNOWN')] }, NOW),
     ).toMatchObject({ blocked: false });
     expect(
       evaluateEntryDebt({ dues: [], passDebts: [passDebt(6, 'UNKNOWN')] }, NOW),
     ).toMatchObject({ blocked: true, reasons: ['PASS_DEBT_UNKNOWN'] });
+  });
+
+  it('ismeretlen hátralék lejárt, elfogyott vagy sztornózott bérleten nem tilt', () => {
+    for (const passStatus of [PassStatus.EXPIRED, PassStatus.DEPLETED, PassStatus.CANCELLED]) {
+      expect(
+        evaluateEntryDebt(
+          { dues: [], passDebts: [{ ...passDebt(30, 'UNKNOWN'), passStatus }] },
+          NOW,
+        ),
+      ).toMatchObject({ blocked: false, reasons: [] });
+    }
+  });
+
+  it('ismeretlen hátralék érvényes (aktív, fagyasztott, még nem kezdődött) bérleten a 6. naptól tilt', () => {
+    for (const passStatus of [PassStatus.ACTIVE, PassStatus.FROZEN, PassStatus.NOT_STARTED]) {
+      expect(
+        evaluateEntryDebt(
+          { dues: [], passDebts: [{ ...passDebt(5, 'UNKNOWN'), passStatus }] },
+          NOW,
+        ),
+      ).toMatchObject({ blocked: false });
+      expect(
+        evaluateEntryDebt(
+          { dues: [], passDebts: [{ ...passDebt(6, 'UNKNOWN'), passStatus }] },
+          NOW,
+        ),
+      ).toMatchObject({ blocked: true, reasons: ['PASS_DEBT_UNKNOWN'] });
+    }
+  });
+
+  it('ismert hátralék (OUTSTANDING) lejárt bérleten is tilt', () => {
+    expect(
+      evaluateEntryDebt(
+        {
+          dues: [],
+          passDebts: [{ ...passDebt(6), passStatus: PassStatus.EXPIRED }],
+        },
+        NOW,
+      ),
+    ).toMatchObject({ blocked: true, reasons: ['PASS_DEBT'] });
   });
 
   it('tagdíj és bérlet-hátralék együtt: mindkét ok, sorrendben', () => {

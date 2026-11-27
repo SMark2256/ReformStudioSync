@@ -1,4 +1,4 @@
-import { Gender, MembershipDueStatus } from './enums';
+import { Gender, MembershipDueStatus, PassStatus } from './enums';
 import { getOverdueDays } from './membership-dues';
 import type { PassDebtStatus } from './pass-debt';
 import {
@@ -37,7 +37,19 @@ export interface EntryPassDebtInput {
   purchasedAt?: Date | string | null;
   debtStatus: PassDebtStatus;
   debtHuf?: number | null;
+  /**
+   * A bérlet számolt állapota (`getPassStatus`). Csak az ismeretlen hátraléknál számít: lezárt
+   * (lejárt, elfogyott, sztornózott) bérletnél nem tilt. Hiányzik: fail-closed, tilt.
+   */
+  passStatus?: PassStatus | string;
 }
+
+/** Lezárt bérlet: már nem használható, ismeretlen hátraléka nem tilt (megrendelői döntés, 2026-11-26). */
+const CLOSED_PASS_STATUSES: readonly string[] = [
+  PassStatus.EXPIRED,
+  PassStatus.DEPLETED,
+  PassStatus.CANCELLED,
+];
 
 export interface EntryDebt {
   /** A türelmi időn túli tartozás miatt tiltva (kivételes beengedéssel feloldható). */
@@ -61,8 +73,10 @@ function elapsedDays(from: Date | string | null | undefined, now: Date): number 
 /**
  * Tartozás miatti tiltás. Tagdíj: lejárt, nem fizetett / nem elengedett esedékesség maradékkal,
  * a késés > `DEBT_GRACE_DAYS`. Bérlet-hátralék: `OUTSTANDING`, a vásárlás óta > `DEBT_GRACE_DAYS`
- * nap (így a sztornó miatt újra keletkezett hátralék is a vásárlás napjától számít). Ismeretlen
- * hátralék (`UNKNOWN`) ugyanígy, fail-closed: nem engedjük át csendben.
+ * nap (így a sztornó miatt újra keletkezett hátralék is a vásárlás napjától számít), bármely
+ * bérletnél. Ismeretlen hátralék (`UNKNOWN`) ugyanígy, de csak érvényes (aktív, fagyasztott, még
+ * nem kezdődött) bérletnél; lejárt, elfogyott vagy sztornózott bérletnél nem tilt. Ha a bérlet
+ * állapota nem ismert, fail-closed: tilt, nem engedjük át csendben.
  */
 export function evaluateEntryDebt(
   input: {
@@ -92,7 +106,10 @@ export function evaluateEntryDebt(
     if (p.debtStatus === 'OUTSTANDING') {
       passDebtDays = Math.max(passDebtDays, days);
       if (days > DEBT_GRACE_DAYS) passDebtBlocked = true;
-    } else if (days > DEBT_GRACE_DAYS) {
+    } else if (
+      days > DEBT_GRACE_DAYS &&
+      !(p.passStatus && CLOSED_PASS_STATUSES.includes(p.passStatus))
+    ) {
       unknownBlocked = true;
     }
   }
